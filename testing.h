@@ -1,10 +1,9 @@
 #pragma once
 
-#include "../basic.h"
-#include "../array.h"
-#include "../string.h"
-#include "../print.h"
-#include "../log.h"
+#include "array.h"
+#include "string.h"
+#include "print.h"
+#include "log.h"
 
 struct Test {
 	Proc<void()>*       proc;

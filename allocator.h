@@ -3,8 +3,11 @@
 #include "base.h"
 #include "range.h"
 #include "code_location.h"
+#include "math.h"
+
 #include <cstdlib>
 #include <new>
+#include <stdio.h>
 
 enum Allocator_Verb: s32 {
 	ALLOCATOR_VERB_ALLOC   = 0,
@@ -84,7 +87,6 @@ inline void* realloc_crash_on_failure(void* data, u64 size) {
 }
 
 inline void* c_allocator_proc(Allocator_Verb verb, void* old_data, u64 old_size, u64 size, void* allocator_data, Code_Location loc) {
-
 	switch (verb) {
 		case ALLOCATOR_VERB_ALLOC:
 			return malloc_crash_on_failure(size);
@@ -125,16 +127,14 @@ constexpr Allocator null_allocator = {
 };
 
 template <typename T>
-inline T* copy(Allocator allocator, T thing, Code_Location loc = caller_loc())
-{
+inline T* copy(Allocator allocator, T thing, Code_Location loc = caller_loc()) {
 	T* mem = allocator.alloc<T>(1, loc);
 	memcpy(mem, &thing, sizeof(T));
 	return mem;
 }
 
 template <typename T>
-inline T* make(Allocator allocator = c_allocator, Code_Location loc = caller_loc())
-{
+inline T* make(Allocator allocator = c_allocator, Code_Location loc = caller_loc()) {
 	T* mem = allocator.alloc<T>(1, loc);
 	return new(mem) T();
 }
