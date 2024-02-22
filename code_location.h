@@ -1,12 +1,11 @@
 #pragma once
 
-#include "defines.h"
-#include "types.h"
+#include "base.h"
 #include <string.h>
 
 struct Code_Location {
-	s32   line;
-	char* file;
+	s32         line;
+	const char* file;
 
 	bool operator==(Code_Location rhs) {
 		return line == rhs.line && (strcmp(file, rhs.file) == 0);
@@ -19,7 +18,6 @@ constexpr Code_Location make_code_location(s32 line, const char* file) {
 		.file = (char*) file,
 	};
 }
-#define current_loc() make_code_location( __LINE__, __FILE__ )
 
 #if OS_WINDOWS
 	#define caller_loc() make_code_location(__builtin_LINE(), __builtin_FILE())
@@ -32,3 +30,5 @@ constexpr Code_Location make_code_location(s32 line, const char* file) {
 	}
 	#define caller_loc() make_code_location(std::source_location::current())
 #endif
+
+#define current_loc() make_code_location(__LINE__, __FILE__)

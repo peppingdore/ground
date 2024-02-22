@@ -1,5 +1,7 @@
 #pragma once
 
+#include "base.h"
+
 template<typename T>
 struct DeferScope {
 	T lambda;
