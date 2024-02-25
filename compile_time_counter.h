@@ -1,0 +1,50 @@
+#pragma once
+
+template <auto tag = []{}>
+struct CT_Counter {
+	// Stolen from: https://mc-deltat.github.io/articles/stateful-metaprogramming-cpp20
+	template <u64 N>
+	struct Counter_Reader { 
+		friend auto counted_flag(Counter_Reader<N>);
+	};
+
+	template <u64 N>
+	struct Counter_Setter {
+		friend auto counted_flag(Counter_Reader<N>) {}
+		static constexpr unsigned n = N;
+	};
+
+	template <auto Tag, u64 Next = 0>
+	consteval static u64 counter_increment() {
+		constexpr bool counted_past_value = requires(Counter_Reader<Next> r) {
+			counted_flag(r);
+		};
+
+		if constexpr (counted_past_value) {
+			return counter_increment<Tag, Next + 1>();
+		} else {
+			Counter_Setter<Next> s;
+			return s.n + 1;
+		}
+	}
+
+	template <auto Tag, u64 Next = 0>
+	consteval static u64 counter_read() {
+		constexpr bool counted_past_value = requires(Counter_Reader<Next> r) {
+			counted_flag(r);
+		};
+
+		if constexpr (counted_past_value) {
+			return counter_read<Tag, Next + 1>();
+		} else {
+			return Next;
+		}
+	}
+
+
+	template <auto Tag = []{}, u64 Val = counter_increment<Tag>()>
+	constexpr static u64 Increment = Val;
+
+	template <auto Tag = []{}, u64 Val = counter_read<Tag>()>
+	constexpr static u64 Read = Val;
+};

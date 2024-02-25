@@ -2,6 +2,7 @@
 
 #include "allocator.h"
 #include "reflection.h"
+#include <initializer_list>
 
 template <typename T>
 struct Array_View {

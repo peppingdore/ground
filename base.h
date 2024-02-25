@@ -55,6 +55,7 @@
 #define CONCAT_INTERNAL(x,y) x##y
 #define CONCAT(x,y) CONCAT_INTERNAL(x,y)
 
+#define OFFSETOF(Type, member) (s64(&((Type*) 0x1000)->member) - s64((Type*) 0x1000))
 
 using s8   = int8_t;
 using u8   = uint8_t;
