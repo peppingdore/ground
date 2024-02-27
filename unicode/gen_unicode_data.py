@@ -5,7 +5,11 @@ from pathlib import Path
 DEFAULT_UNICODE_VERSION = "15.1.0"
 UNICODE_DATA_TXT_URL = "https://www.unicode.org/Public/{version}/ucd/UnicodeData.txt"
 
-MIRRORED_FIELD_INDEX = 9
+MIRRORED_FIELD = 9
+COMMENT_FIELD = 11
+UPPERCASE_MAPPING_FIELD = 12
+LOWERCASE_MAPPING_FIELD = 13
+TITLECASE_MAPPING_FIELD = 14
 
 class Deduplicator:
 	def __init__(self):
@@ -27,14 +31,23 @@ class Codepoint:
 		self.fields     = [None for i in range(15)]
 		self.fields[0]  = int(og_fields[0], base=16)
 		for i in range(1, 15):
+			if i in [MIRRORED_FIELD, COMMENT_FIELD, UPPERCASE_MAPPING_FIELD, LOWERCASE_MAPPING_FIELD, TITLECASE_MAPPING_FIELD]:
+				continue
 			self.fields[i] = deduplicators[i].get(og_fields[i])
 
 	def pack(self):
 		nums = [0]
 		for i in range(1, len(self.fields)):
-			if i == MIRRORED_FIELD_INDEX:
-				if self.og_fields[MIRRORED_FIELD_INDEX] == "Y":
-					nums[0] |= 1 << MIRRORED_FIELD_INDEX
+			if i == COMMENT_FIELD:
+				continue
+			if i == MIRRORED_FIELD:
+				if self.og_fields[i] == "Y":
+					nums[0] |= 1 << i
+				continue
+			if i in [UPPERCASE_MAPPING_FIELD, LOWERCASE_MAPPING_FIELD, TITLECASE_MAPPING_FIELD]:
+				if self.og_fields[i]:
+					nums[0] |= 1 << i
+					nums.append(int(self.og_fields[i], base=16))
 				continue
 			if self.og_fields[i]:
 				nums[0] |= 1 << i
@@ -109,33 +122,34 @@ struct UnicodeRange {
 				hex(r.codepoints[0].fields[0]),
 				hex(r.codepoints[-1].fields[0]),
 				r.offset_into_packed_offsets_table,
-				str(r.is_uniform_range).lower()) + (',' if idx != len(ranges) else ''),
+				str(r.is_uniform_range).lower()) + ',',
 			file=f)
 		print("};", file=f)
 
 		for i in range(1, 15):
-			if i == MIRRORED_FIELD_INDEX: continue
+			if i in [MIRRORED_FIELD, COMMENT_FIELD, UPPERCASE_MAPPING_FIELD, LOWERCASE_MAPPING_FIELD, TITLECASE_MAPPING_FIELD]:
+				continue
 			print(f"const const char* UNICODE_DEDUPLICATED_FIELD_{i}[] = {{", file=f)
 			s = sorted(deduplicators[i].values.items(), key=lambda x: x[1])
 			for idx in range(len(s)):
-				print(f'"{s[idx][0]}"' + (',' if idx != len(s) else ''), file=f)
+				print(f'"{s[idx][0]}"' + ',', file=f)
 			print("};", file=f)
 
 		print("const int UNICODE_CODEPOINTS_OFFSETS_INTO_PACKED[] = {", file=f)
 		for idx in range(len(offset_into_packed)):
-			print(hex(offset_into_packed[idx]) + (',' if idx != len(offset_into_packed) else ''), file=f)
+			print(hex(offset_into_packed[idx]) + ',', file=f)
 		print("};", file=f)
 
 		print("const int UNICODE_PACKED_CODEPOINTS[] = {", file=f)
 		for idx in range(len(packed_codepoints)):
-			print(','.join(map(hex, packed_codepoints[idx])) + (',' if idx != len(packed_codepoints) else ''), file=f)
+			print(','.join(map(hex, packed_codepoints[idx])) + ',', file=f)
 		print("};", file=f)
 
 def main():
 	argparser = argparse.ArgumentParser()
 	argparser.add_argument("--version", default=DEFAULT_UNICODE_VERSION)
 	args = argparser.parse_args()
-	print("Unicode version: ", args.version)
+	print("Unicode version:", args.version)
 	gen_unicode_data_txt_tables(version=args.version)
 
 if __name__ == "__main__":
