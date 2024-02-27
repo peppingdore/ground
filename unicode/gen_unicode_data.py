@@ -104,13 +104,7 @@ struct UnicodeRange {
 		print("const UnicodeRange UNICODE_CODEPOINTS_RANGES[] = {", file=f)
 		for idx in range(len(ranges)):
 			r = ranges[idx]
-			if len(r.codepoints) == 0:
-				print("skipped range: ", r.codepoints, idx, len(ranges))
-				print(vars(ranges[0]))
-				print(vars(ranges[1]))
-				print(vars(ranges[2]))
-				print(vars(ranges[3]))
-				continue
+			assert len(r.codepoints) > 0
 			print("UnicodeRange {{ {0}, {1}, {2}, {3} }}".format(
 				hex(r.codepoints[0].fields[0]),
 				hex(r.codepoints[-1].fields[0]),
