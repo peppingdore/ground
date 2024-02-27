@@ -131,12 +131,6 @@ struct UnicodeRange {
 			print(','.join(map(hex, packed_codepoints[idx])) + (',' if idx != len(packed_codepoints) else ''), file=f)
 		print("};", file=f)
 
-
-def batch(iterable, n):
-    l = len(iterable)
-    for ndx in range(0, l, n):
-        yield iterable[ndx:min(ndx + n, l)]
-
 def main():
 	argparser = argparse.ArgumentParser()
 	argparser.add_argument("--version", default=DEFAULT_UNICODE_VERSION)
