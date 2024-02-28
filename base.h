@@ -57,6 +57,11 @@
 
 #define OFFSETOF(Type, member) (s64(&((Type*) 0x1000)->member) - s64((Type*) 0x1000))
 
+template <typename T, u64 n>
+constexpr u64 static_array_count(T(&)[n]) {
+	return n;
+}
+
 using s8   = int8_t;
 using u8   = uint8_t;
 using s16  = int16_t;
