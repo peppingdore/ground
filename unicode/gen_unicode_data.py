@@ -23,7 +23,6 @@ class Deduplicator:
 		self.values[key] = max(self.values.values(), default=0) + 1
 		return self.values[key]
 
-names = Deduplicator()
 categories = Deduplicator()
 bidi_categories = Deduplicator()
 old_names = Deduplicator()
@@ -47,9 +46,10 @@ class Codepoint:
 		self.is_fake = is_fake
 		self.og_fields = og_fields
 		self.codepoint = int(og_fields[0], base=16)
+		self.name = ""
 		if is_fake:
 			return
-		self.name_id = names.get(og_fields[1])
+		self.name = og_fields[1]
 		self.category_id = categories.get(og_fields[2])
 		self.combining_class = int(og_fields[3]) if og_fields[3] else None
 		self.bidi_category_id = bidi_categories.get(og_fields[4])
@@ -82,7 +82,6 @@ class Codepoint:
 				nums[0] |= 1 << index
 				nums.append(value)
 		
-		maybe_pack_field(self.name_id, 1)
 		if self.combining_class:
 			nums[0] |= 1 << 3
 			nums.append(self.combining_class)
@@ -155,6 +154,8 @@ def gen_unicode_data_txt_tables(version):
 	BIDI_CATEGORY_SHIFT = PACK_CURSOR
 	BIDI_CATEGORY_SIZE = max(bidi_categories.values.values()).bit_length()
 
+	names = []
+
 	packed_cursor = 0
 	packed_codepoints = []
 	offset_into_packed = []
@@ -166,12 +167,16 @@ def gen_unicode_data_txt_tables(version):
 			total_codepoints_count += 1
 			if cp.is_fake:
 				fake_codepoints_count += 1
-				offset_into_packed.append(0xffffffff)
+				offset_into_packed.append(-1)
 			else:
-				offset_into_packed.append(packed_cursor)
 				packed = cp.pack()
-				packed_codepoints.append(packed)
-				packed_cursor += len(packed)
+				if packed[0] == 0:
+					offset_into_packed.append(-2)
+				else:
+					offset_into_packed.append(packed_cursor)
+					packed_codepoints.append(packed)
+					packed_cursor += len(packed)
+			names.append(cp.name)
 
 	print("Total codepoints count: ", total_codepoints_count)
 	print("Fake codepoints count: ", fake_codepoints_count)
@@ -179,9 +184,8 @@ def gen_unicode_data_txt_tables(version):
 	with open(unicode_dir / "generated_name_table.h", "w") as f:
 		print("#pragma once", file=f)
 		print("const const char* UNICODE_CODEPOINT_NAME_TABLE[] = {", file=f)
-		print('\t"",', file=f)
-		for k, v in sorted(names.values.items(), key=lambda it: it[1]):
-			print(f'\t"{k}",', file=f)
+		for it in names:
+			print(f'\t"{it}",', file=f)
 		print("};", file=f)
 		print("", file=f)
 		print("const const char* UNICODE_CODEPOINT_OLD_NAME_TABLE[] = {", file=f)
@@ -190,10 +194,13 @@ def gen_unicode_data_txt_tables(version):
 			print(f'\t"{k}",', file=f)
 		print("};", file=f)
 
-	with open(unicode_dir / "generated_data_enums.h", "w") as f:
+	with open(unicode_dir / "generated_data_types.h", "w") as f:
 		print("#pragma once", file=f)
 		print("", file=f)
-		print(f"const int UNICODE_CATEGORY_SIZE = {CATEGORY_SIZE};", file=f)
+		print(f"const int UNICODE_CATEGORY_MASK = {hex(build_mask(CATEGORY_SHIFT, CATEGORY_SIZE))};", file=f)
+		print(f"const int UNICODE_CATEGORY_SHIFT = {CATEGORY_SHIFT};", file=f)
+		print(f"const int UNICODE_BIDI_CATEGORY_MASK = {hex(build_mask(BIDI_CATEGORY_SHIFT, BIDI_CATEGORY_SIZE))};", file=f)
+		print(f"const int UNICODE_BIDI_CATEGORY_SHIFT = {BIDI_CATEGORY_SHIFT};", file=f)
 		print("", file=f)
 		print("enum class UnicodeGeneralCategory {", file=f)
 		for k, v in categories.values.items():
@@ -207,7 +214,7 @@ def gen_unicode_data_txt_tables(version):
 		print("", file=f)
 		print("enum class UnicodeDecompositionTag {", file=f)
 		for k, v in decomposition_tags.values.items():
-			print(f'\t{k.title()} = {v},', file=f)
+			print(f'\t{k.title()} = {hex(0xffffffff - v)},', file=f)
 		print("};", file=f)
 		print("", file=f)
 		print("const const char* UNICODE_DIGIT_VALUES[] = {", file=f)
@@ -250,7 +257,10 @@ def gen_unicode_data_txt_tables(version):
 		print("", file=f)
 		print("const int UNICODE_CODEPOINTS_OFFSETS_INTO_PACKED[] = {", file=f)
 		for idx in range(len(offset_into_packed)):
-			print(hex(offset_into_packed[idx]) + ',', file=f)
+			if offset_into_packed[idx] < 0:
+				print(str(offset_into_packed[idx]) + ',', file=f)
+			else:
+				print(hex(offset_into_packed[idx]) + ',', file=f)
 		print("};", file=f)
 		print("const int UNICODE_PACKED_CODEPOINTS[] = {", file=f)
 		for idx in range(len(packed_codepoints)):
