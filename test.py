@@ -4,16 +4,14 @@ import os
 import sys
 import threading
 from pathlib import Path
-import io
 import argparse
 import subprocess
 from io import StringIO
-import queue
 from multiprocessing.pool import ThreadPool
-import traceback
 root_dir = Path(__file__).parent
 sys.path.append(root_dir)
 import build as builder
+import glob
 
 ARGS = None
 
@@ -28,21 +26,20 @@ class Test:
 
 def collect_dir_tests(folder):
 	x = []
-	verbose(f'collecting from {folder}')
+	verbose(f'Collecting tests from {folder}')
 	for it in os.scandir(folder):
 		if it.name.lower().endswith(("_test.h", "_test.cpp", "_test.hpp", "_test.c")):
 			x.append(Test(it.path, "cpp"))
 		if it.name.lower().endswith("_test.py"):
 			x.append(Test(it.path, "py"))
+		if it.is_dir():
+			x.extend(collect_dir_tests(folder / it))
 	return x
 
 def scan_tests(folder):
-	y = []
-	for it in os.scandir(folder):
-		if it.is_dir():
-			collect_dir_tests(it.path)
-			y.extend(scan_tests(it.path))
-	return y
+	tests = []
+	tests.extend(collect_dir_tests(Path(folder)))
+	return tests
 
 class ParseException(Exception):
 	pass
