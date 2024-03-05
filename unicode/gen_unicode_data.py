@@ -4,12 +4,15 @@ from pathlib import Path
 
 DEFAULT_UNICODE_VERSION = "15.1.0"
 UNICODE_DATA_TXT_URL = "https://www.unicode.org/Public/{version}/ucd/UnicodeData.txt"
+UNICODE_SCRIPTS_TXT_URL = "https://www.unicode.org/Public/{version}/ucd/Scripts.txt"
 
 MIRRORED_FIELD = 9
 COMMENT_FIELD = 11
 UPPERCASE_MAPPING_FIELD = 12
 LOWERCASE_MAPPING_FIELD = 13
 TITLECASE_MAPPING_FIELD = 14
+
+UNICODE_DIR = Path(__file__).parent
 
 class Deduplicator:
 	def __init__(self):
@@ -110,19 +113,62 @@ class UnicodeRange:
 	def add_codepoint(self, cp):
 		self.codepoints.append(cp)
 
-def gen_unicode_data_txt_tables(version):
-	unicode_dir = Path(__file__).parent
+class PropertyRange:
+	def __init__(self, fields):
+		range_fields = fields[0].split('..')
+		if len(range_fields) == 2:
+			self.start = int(range_fields[0], base=16)
+			self.end   = int(range_fields[1], base=16) 
+		else:
+			self.start = int(range_fields[0], base=16)
+			self.end   = int(range_fields[0], base=16)
+		self.props = fields[1:]
 
+
+def parse_ucd_file(text):
+	lines = text.splitlines()
+	fields = filter(lambda x: x[0] != '', map(lambda x: list(map(lambda y: y.strip(), x.split('#')[0].split(';'))), lines))
+	ranges = list(map(PropertyRange, fields))
+	
+	def merge_ranges(ranges):
+		i = 0
+		while i < len(ranges) - 1:
+			if ranges[i].end == ranges[i + 1].start - 1 and ranges[i].props == ranges[i + 1].props:
+				ranges[i].end = ranges[i + 1].end
+				del ranges[i + 1]
+			else:
+				i += 1
+
+	merge_ranges(ranges)
+	return ranges
+
+
+def parse_scripts(version):
+	r = requests.get(UNICODE_SCRIPTS_TXT_URL.format(version=version))
+	try:
+		r.raise_for_status()
+	except Exception as e:
+		raise Exception([Exception("Failed to fetch Scripts.txt"), e])
+	
+	with open(UNICODE_DIR / "Scripts.txt", "wb") as f:
+		f.write(r.content)
+
+	ranges = parse_ucd_file(r.text)
+	
+	for it in ranges:
+		print(hex(it.start), hex(it.end), it.props)
+	
+
+def gen_unicode_data_txt_tables(version):
 	r = requests.get(UNICODE_DATA_TXT_URL.format(version=version))
 	try:
 		r.raise_for_status()
 	except Exception as e:
 		raise Exception([Exception("Failed to fetch UnicodeData.txt"), e])
 
-	with open(unicode_dir / "UnicodeData.txt", "wb") as f:
+	with open(UNICODE_DIR / "UnicodeData.txt", "wb") as f:
 		f.write(r.content)
 
-	r.encoding = 'utf-8'
 	lines = r.text.splitlines()
 	ranges = [UnicodeRange()]
 	for i in range(len(lines)):
@@ -181,7 +227,7 @@ def gen_unicode_data_txt_tables(version):
 	print("Total codepoints count: ", total_codepoints_count)
 	print("Fake codepoints count: ", fake_codepoints_count)
 
-	with open(unicode_dir / "generated_name_table.h", "w") as f:
+	with open(UNICODE_DIR / "generated_name_table.h", "w") as f:
 		print("#pragma once", file=f)
 		print("const const char* UNICODE_CODEPOINT_NAME_TABLE[] = {", file=f)
 		for it in names:
@@ -194,7 +240,7 @@ def gen_unicode_data_txt_tables(version):
 			print(f'\t"{k}",', file=f)
 		print("};", file=f)
 
-	with open(unicode_dir / "generated_data_types.h", "w") as f:
+	with open(UNICODE_DIR / "generated_data_types.h", "w") as f:
 		print("#pragma once", file=f)
 		print("", file=f)
 		print(f"const int UNICODE_CATEGORY_MASK = {hex(build_mask(CATEGORY_SHIFT, CATEGORY_SIZE))};", file=f)
@@ -231,7 +277,7 @@ def gen_unicode_data_txt_tables(version):
 		print("", file=f)
 
 		
-	with open(unicode_dir / "generated_codepoint_table.h", "w") as f:
+	with open(UNICODE_DIR / "generated_codepoint_table.h", "w") as f:
 		print("#pragma once", file=f)
 		print('#include "unicode_table_types.h"', file=f)
 		print("", file=f)
@@ -273,6 +319,7 @@ def main():
 	args = argparser.parse_args()
 	print("Unicode version:", args.version)
 	gen_unicode_data_txt_tables(version=args.version)
+	parse_scripts(version=args.version)
 
 if __name__ == "__main__":
 	main()
