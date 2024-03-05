@@ -1,10 +1,8 @@
 import requests
-import argparse
 from pathlib import Path
+from deduplicator import *
 
-DEFAULT_UNICODE_VERSION = "15.1.0"
 UNICODE_DATA_TXT_URL = "https://www.unicode.org/Public/{version}/ucd/UnicodeData.txt"
-UNICODE_SCRIPTS_TXT_URL = "https://www.unicode.org/Public/{version}/ucd/Scripts.txt"
 
 MIRRORED_FIELD = 9
 COMMENT_FIELD = 11
@@ -14,19 +12,7 @@ TITLECASE_MAPPING_FIELD = 14
 
 UNICODE_DIR = Path(__file__).parent
 
-class Deduplicator:
-	def __init__(self):
-		self.values = {}
-	
-	def get(self, key):
-		if not key:
-			return 0
-		if key in self.values:
-			return self.values[key]
-		self.values[key] = max(self.values.values(), default=0) + 1
-		return self.values[key]
-
-categories = Deduplicator()
+categories = Deduplicator(file=Path(__file__).parent / "category_values.txt")
 bidi_categories = Deduplicator()
 old_names = Deduplicator()
 decomposition_tags = Deduplicator()
@@ -113,53 +99,7 @@ class UnicodeRange:
 	def add_codepoint(self, cp):
 		self.codepoints.append(cp)
 
-class PropertyRange:
-	def __init__(self, fields):
-		range_fields = fields[0].split('..')
-		if len(range_fields) == 2:
-			self.start = int(range_fields[0], base=16)
-			self.end   = int(range_fields[1], base=16) 
-		else:
-			self.start = int(range_fields[0], base=16)
-			self.end   = int(range_fields[0], base=16)
-		self.props = fields[1:]
-
-
-def parse_ucd_file(text):
-	lines = text.splitlines()
-	fields = filter(lambda x: x[0] != '', map(lambda x: list(map(lambda y: y.strip(), x.split('#')[0].split(';'))), lines))
-	ranges = list(map(PropertyRange, fields))
-	
-	def merge_ranges(ranges):
-		i = 0
-		while i < len(ranges) - 1:
-			if ranges[i].end == ranges[i + 1].start - 1 and ranges[i].props == ranges[i + 1].props:
-				ranges[i].end = ranges[i + 1].end
-				del ranges[i + 1]
-			else:
-				i += 1
-
-	merge_ranges(ranges)
-	return ranges
-
-
-def parse_scripts(version):
-	r = requests.get(UNICODE_SCRIPTS_TXT_URL.format(version=version))
-	try:
-		r.raise_for_status()
-	except Exception as e:
-		raise Exception([Exception("Failed to fetch Scripts.txt"), e])
-	
-	with open(UNICODE_DIR / "Scripts.txt", "wb") as f:
-		f.write(r.content)
-
-	ranges = parse_ucd_file(r.text)
-	
-	for it in ranges:
-		print(hex(it.start), hex(it.end), it.props)
-	
-
-def gen_unicode_data_txt_tables(version):
+def generate(version):
 	r = requests.get(UNICODE_DATA_TXT_URL.format(version=version))
 	try:
 		r.raise_for_status()
@@ -313,13 +253,3 @@ def gen_unicode_data_txt_tables(version):
 			print(','.join(map(hex, packed_codepoints[idx])) + ',', file=f)
 		print("};", file=f)
 
-def main():
-	argparser = argparse.ArgumentParser()
-	argparser.add_argument("--version", default=DEFAULT_UNICODE_VERSION)
-	args = argparser.parse_args()
-	print("Unicode version:", args.version)
-	gen_unicode_data_txt_tables(version=args.version)
-	parse_scripts(version=args.version)
-
-if __name__ == "__main__":
-	main()
