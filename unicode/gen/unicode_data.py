@@ -1,20 +1,11 @@
+#!/usr/bin/env python3
 import requests
 from pathlib import Path
 from deduplicator import *
-
-UNICODE_DATA_TXT_URL = "https://www.unicode.org/Public/{version}/ucd/UnicodeData.txt"
-
-MIRRORED_FIELD = 9
-COMMENT_FIELD = 11
-UPPERCASE_MAPPING_FIELD = 12
-LOWERCASE_MAPPING_FIELD = 13
-TITLECASE_MAPPING_FIELD = 14
-
-UNICODE_DIR = Path(__file__).parent
+import replace
 
 categories = Deduplicator(file=Path(__file__).parent / "category_values.txt")
 bidi_categories = Deduplicator(file=Path(__file__).parent / "bidi_categories.txt")
-old_names = Deduplicator()
 decomposition_tags = Deduplicator()
 digits = Deduplicator()
 numerics = Deduplicator()
@@ -55,8 +46,6 @@ class Codepoint:
 		self.digit = digits.get(og_fields[7])
 		self.numeric = numerics.get(og_fields[8])
 		self.mirrored = og_fields[9] == "Y"
-		self.old_name_id = old_names.get(og_fields[10])
-		# Field 11 (10646 comment) is ignored, because it's empty in all codepoints (as of Unicode 15).
 		self.uppercase = int(og_fields[12], base=16) if og_fields[12] else None
 		self.lowercase = int(og_fields[13], base=16) if og_fields[13] else None
 		self.titlecase = int(og_fields[14], base=16) if og_fields[14] else None
@@ -82,7 +71,6 @@ class Codepoint:
 		maybe_pack_field(self.numeric, 8)
 		if self.mirrored:
 			nums[0] |= 1 << 9
-		maybe_pack_field(self.old_name_id, 10)
 		maybe_pack_field(self.uppercase, 12)
 		maybe_pack_field(self.lowercase, 13)
 		maybe_pack_field(self.titlecase, 14)
@@ -93,44 +81,37 @@ class Codepoint:
 
 class UnicodeRange:
 	def __init__(self):
-		self.is_uniform_range = False
 		self.codepoints = []
 
-	def add_codepoint(self, cp):
-		self.codepoints.append(cp)
+class UnicodeUniformRange:
+	def __init__(self, start, end, codepoint):
+		self.start = start
+		self.end = end
+		self.codepoint = codepoint
 
-def generate(version):
-	r = requests.get(UNICODE_DATA_TXT_URL.format(version=version))
-	try:
-		r.raise_for_status()
-	except Exception as e:
-		raise Exception([Exception("Failed to fetch UnicodeData.txt"), e])
-
-	with open(UNICODE_DIR / "UnicodeData.txt", "wb") as f:
-		f.write(r.content)
-
+def generate(*, version):
+	r = requests.get(f"https://www.unicode.org/Public/{version}/ucd/UnicodeData.txt")
+	r.raise_for_status()
 	lines = r.text.splitlines()
 	ranges = [UnicodeRange()]
+	uniform_ranges = []
 	for i in range(len(lines)):
 		fields = lines[i].split(';')
 		codepoint = int(fields[0], base=16)
 		if fields[1].endswith(", First>"):
 			next_fields = lines[i+1].split(';')
-			name = fields[1].removeprefix("<").removesuffix(", First>")
-			ranges.append(UnicodeRange())
-			ranges[-1].is_uniform_range = True
-			ranges[-1].add_codepoint(Codepoint([fields[0],      name, *fields[2:]]))
-			ranges[-1].add_codepoint(Codepoint([next_fields[0], name, *fields[2:]]))
+			fields[1] = fields[1].removeprefix("<").removesuffix(", First>")
+			uniform_ranges.append(UnicodeUniformRange(int(fields[0], 16), int(next_fields[0], 16), Codepoint(fields)))
 		elif fields[1].endswith(", Last>"):
 			pass
 		else:
 			if len(ranges[-1].codepoints) > 0 and ranges[-1].codepoints[-1].codepoint != codepoint - 1:
 				if codepoint - ranges[-1].codepoints[-1].codepoint <= 2000:
 					for it in range(ranges[-1].codepoints[-1].codepoint + 1, codepoint):
-						ranges[-1].add_codepoint(Codepoint([hex(it)], is_fake=True))
+						ranges[-1].codepoints.append(Codepoint([hex(it)], is_fake=True))
 				else:
 					ranges.append(UnicodeRange())
-			ranges[-1].add_codepoint(Codepoint(fields))
+			ranges[-1].codepoints.append(Codepoint(fields))
 
 
 	PACK_CURSOR = 15
@@ -141,115 +122,57 @@ def generate(version):
 	BIDI_CATEGORY_SIZE = max(bidi_categories.values.values()).bit_length()
 
 	names = []
-
 	packed_cursor = 0
 	packed_codepoints = []
 	offset_into_packed = []
-	total_codepoints_count = 0
-	fake_codepoints_count = 0
+
+	def pack_codepoint(cp):
+		nonlocal packed_cursor
+		if cp.is_fake:
+			xxxx = -1
+		else:
+			packed = cp.pack()
+			if packed[0] == 0:
+				xxxx = -2
+			else:
+				xxxx = packed_cursor
+				packed_codepoints.append(packed)
+				packed_cursor += len(packed)
+		offset_into_packed.append(xxxx)
+		names.append(cp.name)
+	
+	c_ranges = []
 	for it in ranges:
-		it.offset_into_packed_offsets_table = len(offset_into_packed)
+		c_ranges.append(f"{{ {hex(it.codepoints[0].codepoint)}, {hex(it.codepoints[-1].codepoint)}, {len(offset_into_packed)} }}")
 		for cp in it.codepoints:
-			total_codepoints_count += 1
-			if cp.is_fake:
-				fake_codepoints_count += 1
-				offset_into_packed.append(-1)
-			else:
-				packed = cp.pack()
-				if packed[0] == 0:
-					offset_into_packed.append(-2)
-				else:
-					offset_into_packed.append(packed_cursor)
-					packed_codepoints.append(packed)
-					packed_cursor += len(packed)
-			names.append(cp.name)
+			pack_codepoint(cp)
+	c_uniform_ranges = []
+	for it in uniform_ranges:
+		c_uniform_ranges.append(f"{{ {hex(it.codepoint.codepoint)}, {hex(it.codepoint.codepoint)}, {len(offset_into_packed)} }}")
+		pack_codepoint(it.codepoint)
 
-	print("Total codepoints count: ", total_codepoints_count)
-	print("Fake codepoints count: ", fake_codepoints_count)
+	c_packed_codepoints = []
+	for it in packed_codepoints:
+		c_packed_codepoints.append(','.join(map(hex, it)))
 
-	with open(UNICODE_DIR / "generated_name_table.h", "w") as f:
-		print("#pragma once", file=f)
-		print("const const char* UNICODE_CODEPOINT_NAME_TABLE[] = {", file=f)
-		for it in names:
-			print(f'\t"{it}",', file=f)
-		print("};", file=f)
-		print("", file=f)
-		print("const const char* UNICODE_CODEPOINT_OLD_NAME_TABLE[] = {", file=f)
-		print('\t"",', file=f)
-		for k, v in sorted(old_names.values.items(), key=lambda it: it[1]):
-			print(f'\t"{k}",', file=f)
-		print("};", file=f)
+	def prepare_string_array(x):
+		x = sorted(x.values.items(), key=lambda it: it[1])
+		x = list(map(lambda it: f'"{it[0]}"', x))
+		return ['""', *x]
 
-	with open(UNICODE_DIR / "generated_data_types.h", "w") as f:
-		print("#pragma once", file=f)
-		print("", file=f)
-		print(f"const int UNICODE_CATEGORY_MASK = {hex(build_mask(CATEGORY_SHIFT, CATEGORY_SIZE))};", file=f)
-		print(f"const int UNICODE_CATEGORY_SHIFT = {CATEGORY_SHIFT};", file=f)
-		print(f"const int UNICODE_BIDI_CATEGORY_MASK = {hex(build_mask(BIDI_CATEGORY_SHIFT, BIDI_CATEGORY_SIZE))};", file=f)
-		print(f"const int UNICODE_BIDI_CATEGORY_SHIFT = {BIDI_CATEGORY_SHIFT};", file=f)
-		print("", file=f)
-		print("enum class UnicodeGeneralCategory {", file=f)
-		for k, v in categories.values.items():
-			print(f'\t{k} = {v},', file=f)
-		print("};", file=f)
-		print("", file=f)
-		print("enum class UnicodeBidiCategory {", file=f)
-		for k, v in bidi_categories.values.items():
-			print(f'\t{k} = {v},', file=f)
-		print("};", file=f)
-		print("", file=f)
-		print("enum class UnicodeDecompositionTag {", file=f)
-		for k, v in decomposition_tags.values.items():
-			print(f'\t{k.title()} = {hex(0xffffffff - v)},', file=f)
-		print("};", file=f)
-		print("", file=f)
-		print("const const char* UNICODE_DIGIT_VALUES[] = {", file=f)
-		print('\t"",', file=f)
-		for k, v in sorted(digits.values.items(), key=lambda it: it[1]):
-			print(f'\t"{k}",', file=f)
-		print("};", file=f)
-		print("", file=f)
-		print("const const char* UNICODE_NUMERIC_VALUES[] = {", file=f)
-		print('\t"",', file=f)
-		for k, v in sorted(numerics.values.items(), key=lambda it: it[1]):
-			print(f'\t"{k}",', file=f)
-		print("};", file=f)
-		print("", file=f)
+	replace.replace(Path(__file__).parent / "unicode_data_names.h", codepoint_names=',\n'.join(map(lambda it: f'"{it}"', names)))
+	replace.replace(Path(__file__).parent / "unicode_data.h",
+		category_mask=hex(build_mask(CATEGORY_SHIFT, CATEGORY_SIZE)),
+		category_shift=CATEGORY_SHIFT,
+		bidi_category_mask=hex(build_mask(BIDI_CATEGORY_SHIFT, BIDI_CATEGORY_SIZE)),
+		bidi_category_shift=BIDI_CATEGORY_SHIFT,
+		digit_values=  ',\n'.join(prepare_string_array(digits)),
+		numeric_values=',\n'.join(prepare_string_array(numerics)),
+		non_uniform_ranges=',\n'.join(c_ranges),
+		uniform_ranges=',\n'.join(c_uniform_ranges),
+		offsets_into_packed=',\n'.join(map(hex, offset_into_packed)),
+		packed_codepoints=',\n'.join(c_packed_codepoints)
+	)
 
-		
-	with open(UNICODE_DIR / "generated_codepoint_table.h", "w") as f:
-		print("#pragma once", file=f)
-		print('#include "unicode_table_types.h"', file=f)
-		print("", file=f)
-		print("const UnicodeCodepointRange UNICODE_NONUNIFORM_CODEPOINT_RANGES[] = {", file=f)
-		for r in filter(lambda x: not x.is_uniform_range, ranges):
-			assert len(r.codepoints) > 0
-			print("\t{{ {0}, {1}, {2} }},".format(
-				hex(r.codepoints[0].codepoint),
-				hex(r.codepoints[-1].codepoint - r.codepoints[0].codepoint),
-				r.offset_into_packed_offsets_table),
-			file=f)
-		print("};", file=f)
-		print("", file=f)
-		print("const UnicodeCodepointRange UNICODE_UNIFORM_CODEPOINT_RANGES[] = {", file=f)
-		for r in filter(lambda x: x.is_uniform_range, ranges):
-			assert len(r.codepoints) > 0
-			print("\t{{ {0}, {1}, {2} }},".format(
-				hex(r.codepoints[0].codepoint),
-				hex(r.codepoints[-1].codepoint - r.codepoints[0].codepoint),
-				r.offset_into_packed_offsets_table),
-			file=f)
-		print("};", file=f)
-		print("", file=f)
-		print("const int UNICODE_CODEPOINTS_OFFSETS_INTO_PACKED[] = {", file=f)
-		for idx in range(len(offset_into_packed)):
-			if offset_into_packed[idx] < 0:
-				print(str(offset_into_packed[idx]) + ',', file=f)
-			else:
-				print(hex(offset_into_packed[idx]) + ',', file=f)
-		print("};", file=f)
-		print("const int UNICODE_PACKED_CODEPOINTS[] = {", file=f)
-		for idx in range(len(packed_codepoints)):
-			print(','.join(map(hex, packed_codepoints[idx])) + ',', file=f)
-		print("};", file=f)
-
+if __name__ == "__main__":
+	generate(version="15.0.0")

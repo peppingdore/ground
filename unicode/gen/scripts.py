@@ -4,28 +4,16 @@ from deduplicator import *
 from replace import replace
 from pathlib import Path
 
-UNICODE_SCRIPTS_TXT_URL = "https://www.unicode.org/Public/{version}/ucd/Scripts.txt"
-
 def generate(version):
-	r = requests.get(UNICODE_SCRIPTS_TXT_URL.format(version=version))
-	try:
-		r.raise_for_status()
-	except Exception as e:
-		raise Exception([Exception("Failed to fetch Scripts.txt"), e])
-	
-	with open(Path(__file__).parent / "Scripts.txt", "wb") as f:
-		f.write(r.content)
-
+	r = requests.get("https://www.unicode.org/Public/{version}/ucd/Scripts.txt".format(version=version))
+	r.raise_for_status()
+	script_ranges = ucd.parse(r.text)
+	script_ranges_c = []
 	scripts = Deduplicator(file=Path(__file__).parent / "script_values.txt")
-	ranges = ucd.parse(r.text)
-	for it in ranges:
-		scripts.get(it.props[0])
-	
-	lines = []
+	for rang in sorted(script_ranges, key=lambda it: it.start):
+		scripts.get(rang.props[0]) # Check whether script is valid.
+		script_ranges_c.append(f'{{ {hex(rang.start)}, {hex(rang.end)}, UnicodeScript::{rang.props[0]} }}')
+	script_values_c = []
 	for k, v in scripts.values.items():
-		lines.append(f"\t{k} = {v},")
-	
-	replace(Path(__file__).parent / "scripts.h", script_codes='\n'.join(lines))
-
-	# for it in ranges:
-	# 	print(hex(it.start), hex(it.end), it.props, it.end - it.start + 1)
+		script_values_c.append(f"\t{k} = {v}")
+	replace(Path(__file__).parent / "scripts.h", script_ranges=',\n'.join(script_ranges_c), script_codes=',\n'.join(script_values_c))

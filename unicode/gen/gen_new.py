@@ -1,7 +1,10 @@
+#!/usr/bin/env python3
+
 import requests
 from pathlib import Path
 from deduplicator import Deduplicator
 import ucd
+import replace
 
 categories = Deduplicator(file=Path(__file__).parent / "category_values.txt")
 bidi_categories = Deduplicator(file=Path(__file__).parent / "bidi_categories.txt")
@@ -41,10 +44,6 @@ class Codepoint:
 def new_gen(*, version):
 	r = requests.get("https://www.unicode.org/Public/{version}/ucd/UnicodeData.txt".format(version=version))
 	r.raise_for_status()
-
-	with open(Path(__file__).parent / "UnicodeData.txt", "wb") as f:
-		f.write(r.content)
-
 	codepoints = {}
 	uniform_ranges = []
 
@@ -61,18 +60,15 @@ def new_gen(*, version):
 	
 	r = requests.get("https://www.unicode.org/Public/{version}/ucd/Scripts.txt".format(version=version))
 	r.raise_for_status()
-	failed_codepoints_count = 0
-	range_sum = 0
 	script_ranges = ucd.parse(r.text)
-	for rang in sorted(script_ranges, key=lambda it: it.end - it.start)[:-12]:
-		print("range: ", rang.start, rang.end, rang.end - rang.start + 1, rang.props)
-		range_sum += rang.end - rang.start + 1
-		for i in range(rang.start, rang.end + 1):
-			if not i in codepoints:
-				# print("Failed to find codepoint: ", hex(i))
-				failed_codepoints_count += 1
-
-	print("Failed count: ", failed_codepoints_count)
-	print("Range sum: ", range_sum)
+	script_ranges_c = []
+	scripts = Deduplicator(file=Path(__file__).parent / "script_values.txt")
+	for rang in sorted(script_ranges, key=lambda it: it.start):
+		scripts.get(rang.props[0]) # Check whether script is valid.
+		script_ranges_c.append(f'{{ {hex(rang.start)}, {hex(rang.end)}, UnicodeScript::{rang.props[0]} }}')
+	script_values_c = []
+	for k, v in scripts.values.items():
+		script_values_c.append(f"\t{k} = {v}")
+	replace.replace(Path(__file__).parent / "scripts.h", script_ranges=',\n'.join(script_ranges_c), script_codes=',\n'.join(script_values_c))
 
 new_gen(version="15.0.0")
