@@ -13,7 +13,7 @@ TITLECASE_MAPPING_FIELD = 14
 UNICODE_DIR = Path(__file__).parent
 
 categories = Deduplicator(file=Path(__file__).parent / "category_values.txt")
-bidi_categories = Deduplicator()
+bidi_categories = Deduplicator(file=Path(__file__).parent / "bidi_categories.txt")
 old_names = Deduplicator()
 decomposition_tags = Deduplicator()
 digits = Deduplicator()

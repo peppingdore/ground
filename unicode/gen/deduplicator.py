@@ -1,13 +1,14 @@
 class Deduplicator:
 	def __init__(self, *, file=None):
 		self.values = {}
-		with open(file, "r") as f:
-			lines = f.readlines()
-			for it in lines:
-				if len(fields) != 2:
-					continue
-				fields = it.split()
-				self.values[fields[0]] = int(fields[1])
+		if file:
+			with open(file, "r") as f:
+				lines = f.readlines()
+				for it in lines:
+					fields = it.split()
+					if len(fields) != 2:
+						continue
+					self.values[fields[0]] = int(fields[1])
 		self.file = file # If file is not None, we can't add new values to Deduplicator.
 	
 	def get(self, key):

@@ -1,6 +1,7 @@
 import ucd
 import requests
 from deduplicator import *
+from replace import replace
 from pathlib import Path
 
 UNICODE_SCRIPTS_TXT_URL = "https://www.unicode.org/Public/{version}/ucd/Scripts.txt"
@@ -15,23 +16,16 @@ def generate(version):
 	with open(Path(__file__).parent / "Scripts.txt", "wb") as f:
 		f.write(r.content)
 
-	scripts = Deduplicator(file=Path(__file__).parent / )
+	scripts = Deduplicator(file=Path(__file__).parent / "script_values.txt")
 	ranges = ucd.parse(r.text)
 	for it in ranges:
 		scripts.get(it.props[0])
-	with open(Path(__file__).parent / "generated" / "scripts.h") as f:
-		print("#pragma once", file=f)
-		print('#include "../unicode_table_types.h"', file=f)
-		print("", file=f)
-		print("enum class UnicodeScript {", file=f)
-		for k, v in scripts.values:
-			print(f"\t{k} = {v},", file=f)
-		print("};", file=f)
-		print('''''', file=f)
-		print("const UnicodeSimpleRange UNICODE_WHITE_SPACES_RANGES[] = {", file=f)
-		for it in ranges:
-			print(f'\t{{ { it.start }, { it.end } }},')
-		print("};", file=f)
+	
+	lines = []
+	for k, v in scripts.values.items():
+		lines.append(f"\t{k} = {v},")
+	
+	replace(Path(__file__).parent / "scripts.h", script_codes='\n'.join(lines))
 
-	for it in ranges:
-		print(hex(it.start), hex(it.end), it.props, it.end - it.start + 1)
+	# for it in ranges:
+	# 	print(hex(it.start), hex(it.end), it.props, it.end - it.start + 1)
