@@ -22,6 +22,7 @@ constexpr Code_Location make_code_location(s32 line, const char* file) {
 #if OS_WINDOWS
 	#define caller_loc() make_code_location(__builtin_LINE(), __builtin_FILE())
 #else
+	#include <source_location>
 	constexpr Code_Location make_code_location(const std::source_location cpp_loc) {
 		return {
 			.line = (s32) cpp_loc.line(),

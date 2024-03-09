@@ -1,6 +1,6 @@
 #pragma once
 
-#include "base.h"
+#include "../base.h"
 
 enum class Memory_Order: s32 {
 	Relaxed = 1,
@@ -29,7 +29,7 @@ consteval bool is_valid_write_memory_order(Memory_Order mo) {
 template <typename T>
 concept Atomic_Size =
 	sizeof(T) == 1 || sizeof(T) == 2 ||
-	sizeof(T) == 4 || sizeof(T) == 8;
+	sizeof(T) == 4 || sizeof(T) == 8 || sizeof(T) == 16;
 
 #if !COMPILER_MSVC
 	consteval int memory_order_to_gcc(Memory_Order mo) {
@@ -52,6 +52,11 @@ template <>      struct Atomic_Integral_Impl<2> { using Type = s16; };
 	template <>  struct Atomic_Integral_Impl<4> { using Type = s32; };
 #endif
 template <>      struct Atomic_Integral_Impl<8> { using Type = s64; };
+#if COMPILER_MSVC
+	template <>  struct Atomic_Integral_Impl<16> { using Type = struct { s64 low; s64 high; }; };
+#else
+	template <>  struct Atomic_Integral_Impl<16>{ using Type = __int128_t; };
+#endif
 
 template <typename T>
 using Atomic_Integral = Atomic_Integral_Impl<sizeof(T)>::Type;
@@ -63,31 +68,35 @@ T atomic_exchange(T* dst, T value) {
 
 	#if COMPILER_MSVC
 		#if ARCH_X64
-			#define INTERLOCKED_EXCHANGE(postfix) return _InterlockedExchange##postfix((N*) dst, bitcast<N>(value));
+			#define INTERLOCKED_EXCHANGE(postfix, ...) result = _InterlockedExchange##postfix((N*) dst, __VA_ARGS__);
 		#elif ARCH_ARM64
 			#define INTERLOCKED_EXCHANGE(postfix)\
-			if consteval(mo == Memory_Order::Relaxed) return _InterlockedExchange##postfix##_nf((N*) dst, bitcast<N>(value));\
-			if consteval(mo == Memory_Order::Consume) return _InterlockedExchange##postfix##_acq((N*) dst, bitcast<N>(value));\
-			if consteval(mo == Memory_Order::Acquire) return _InterlockedExchange##postfix##_acq((N*) dst, bitcast<N>(value));\
-			if consteval(mo == Memory_Order::Release) return _InterlockedExchange##postfix##_rel((N*) dst, bitcast<N>(value));\
-			if consteval(mo == Memory_Order::Acq_Rel) return _InterlockedExchange##postfix((N*) dst, bitcast<N>(value));\
-			if consteval(mo == Memory_Order::Seq_Cst) return _InterlockedExchange##postfix((N*) dst, bitcast<N>(value));\
+			if consteval(mo == Memory_Order::Relaxed) result = _InterlockedExchange##postfix##_nf((N*) dst, __VA_ARGS__);\
+			if consteval(mo == Memory_Order::Consume) result = _InterlockedExchange##postfix##_acq((N*) dst, __VA_ARGS__);\
+			if consteval(mo == Memory_Order::Acquire) result = _InterlockedExchange##postfix##_acq((N*) dst, __VA_ARGS__);\
+			if consteval(mo == Memory_Order::Release) result = _InterlockedExchange##postfix##_rel((N*) dst, __VA_ARGS__);\
+			if consteval(mo == Memory_Order::Acq_Rel) result = _InterlockedExchange##postfix((N*) dst, __VA_ARGS__);\
+			if consteval(mo == Memory_Order::Seq_Cst) result = _InterlockedExchange##postfix((N*) dst, __VA_ARGS__);\
 		#else
 			static_assert(false);
 		#endif
 
+		N prev;
 		if consteval (sizeof(T) == 1) {
-			INTERLOCKED_EXCHANGE(8);
+			INTERLOCKED_EXCHANGE(8, bitcast<N>(value), *(N*) *dst);
 		} else if consteval (sizeof(T) == 2) {
-			INTERLOCKED_EXCHANGE(16);
+			INTERLOCKED_EXCHANGE(16, bitcast<N>(value), *(N*) *dst);
 		} else if consteval (sizeof(T) == 4) {
-			INTERLOCKED_EXCHANGE();
+			INTERLOCKED_EXCHANGE(, bitcast<N>(value), *(N*) *dst);
 		} else if consteval (sizeof(T) == 8) {
-			INTERLOCKED_EXCHANGE(64);
+			INTERLOCKED_EXCHANGE(64, bitcast<N>(value), *(N*) *dst);
+		} else if consteval (sizeof(T) == 16) {
+			prev = *(N*)dst;
+			INTERLOCKED_EXCHANGE(128, bitcast<N>(value).high, bitcast<N>(value).low, &prev);
 		} else {
 			static_assert(false);
 		}
-
+		return bitcast<T>(prev);
 		#undef INTERLOCKED_EXCHANGE
 
 	#else

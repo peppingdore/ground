@@ -47,7 +47,7 @@ void os_mutex_destroy(Os_Mutex* mutex) {
 }
 
 #if OS_DARWIN
-	using Os_Semaphore = sem_t;
+	using Os_Semaphore = semaphore_t;
 
 	void os_semaphore_create(Os_Semaphore* sem, u32 initial_value) {
 		kern_return_t result = semaphore_create(current_task(), sem, SYNC_POLICY_FIFO, initial_value);
@@ -71,7 +71,7 @@ void os_mutex_destroy(Os_Mutex* mutex) {
 	}
 
 #else
-	using Os_Semaphore = semaphore_t;
+	using Os_Semaphore = sem_t;
 
 	void os_semaphore_create(Os_Semaphore* sem, u32 initial_value) {
 	    int result = sem_init(sem, 0, initial_value);
