@@ -1,6 +1,7 @@
 #pragma once
 
 #include "reflection.h"
+#include <initializer_list>
 
 template <typename... Args>
 struct Tuple;
@@ -95,8 +96,8 @@ struct Tuple<A, B, C, D, E, F, G, H> {
 };
 
 template <int N>
-struct Tuple_Getter;
-#define TUPLE_GET(N) template <> struct Tuple_Getter<N> { auto* operator()(auto* tuple) { return &tuple->_##N; } };
+struct TupleGetter;
+#define TUPLE_GET(N) template <> struct TupleGetter<N> { auto* operator()(auto* tuple) { return &tuple->_##N; } };
 TUPLE_GET(0);
 TUPLE_GET(1);
 TUPLE_GET(2);
@@ -108,7 +109,7 @@ TUPLE_GET(7);
 
 template <int N>
 auto* tuple_get_ptr(auto* tuple) {
-	return Tuple_Getter<N>{}(tuple);
+	return TupleGetter<N>{}(tuple);
 }
 
 template <int N>
@@ -121,7 +122,7 @@ auto make_tuple(auto... args) {
 }
 
 template <int Index>
-int tuple_reflect_member(Struct_Type* type, s64* capacity, auto* tuple) {
+int tuple_reflect_member(StructType* type, s64* capacity, auto* tuple) {
 	static char name[3];
 	strcpy(name, "_0");
 	name[1] = '0' + Index;
@@ -129,7 +130,7 @@ int tuple_reflect_member(Struct_Type* type, s64* capacity, auto* tuple) {
 	auto member = tuple_get_ptr<Index>(tuple);
 	auto offset = pointer_diff(member, tuple);
 	auto member_type = reflect.type_of<std::remove_pointer_t<decltype(member)>>();
-	auto m = Struct_Member {
+	auto m = StructMember {
 		.name = name, 
 		.type = member_type,
 		.offset = s32(offset),
@@ -143,7 +144,7 @@ void tuple_reflect_dummy(std::initializer_list<int> x) {
 }
 
 template <typename... Args>
-Struct_Type* reflect_type(Tuple<Args...>* tuple, Struct_Type* type) {
+StructType* reflect_type(Tuple<Args...>* tuple, StructType* type) {
 	s64 members_capacity = 0;
 	auto impl = [&]
 		<s64... Indices>

@@ -15,15 +15,16 @@
 
 #include "array_view.h"
 #include "tuple.h"
-// #include "function.h"
 #include "coroutine.h"
+#include "optional.h"
+#include "byte_order.h"
 
 template <typename T>
-concept String_Char = std::same_as<T, char> || std::same_as<T, char32_t>;
+concept StringChar = std::same_as<T, char> || std::same_as<T, char32_t>;
 
 // UTF-32 or UTF-8/ASCII.
-template <String_Char Char>
-struct Base_String {
+template <StringChar Char>
+struct BaseString {
 	Char* data   = NULL;
 	s64   length = 0;
 
@@ -33,7 +34,7 @@ struct Base_String {
 	}
 
 	template <typename T>
-	bool operator==(Base_String<T> rhs) {
+	bool operator==(BaseString<T> rhs) {
 		if (length != rhs.length) {
 			return false;
 		}
@@ -56,7 +57,7 @@ struct Base_String {
 		return cp;
 	}
 
-	Base_String<char32_t> copy_unicode_string(Allocator allocator = c_allocator) 
+	BaseString<char32_t> copy_UnicodeString(Allocator allocator = c_allocator) 
 		requires (std::is_same_v<Char, char>)
 	{
 		auto mem = allocator.alloc<char32_t>(length);
@@ -69,7 +70,7 @@ struct Base_String {
 	auto begin() { return data; }
 	auto end()   { return data + length; }
 
-	Base_String copy(Allocator allocator = c_allocator, Code_Location loc = caller_loc()) {
+	BaseString copy(Allocator allocator = c_allocator, CodeLocation loc = caller_loc()) {
 		auto cp = *this;
 		cp.data = allocator.alloc<Char>(length, loc);
 		memcpy(cp.data, data, length * sizeof(Char));
@@ -81,16 +82,16 @@ struct Base_String {
 	}
 };
 
-using String         = Base_String<char>;
-using Unicode_String = Base_String<char32_t>;
+using String         = BaseString<char>;
+using UnicodeString = BaseString<char32_t>;
 
-template <String_Char T>
-Base_String<T> make_string(const T* data, s64 length) {
+template <StringChar T>
+BaseString<T> make_string(const T* data, s64 length) {
 	return { .data = (T*) data, .length = length };
 }
 
-template <String_Char T>
-Base_String<T> make_string(const T* c_str) {
+template <StringChar T>
+BaseString<T> make_string(const T* c_str) {
 	auto ptr = c_str;
 	while (true) {
 		if (ptr[0] == '\0') {
@@ -104,30 +105,30 @@ Base_String<T> make_string(const T* c_str) {
 constexpr String operator""_b(const char* c_str, size_t length) {
 	return make_string(c_str, length);
 }
-constexpr Unicode_String operator""_b(const char32_t* c_str, size_t length) {
+constexpr UnicodeString operator""_b(const char32_t* c_str, size_t length) {
 	return make_string(c_str, length);
 }
 
-enum class String_Kind: s32 {
+enum class StringKind: s32 {
 	Ascii = 0,
 	Utf32 = 1,
 };
 
-struct String_Type: Type {
+struct StringType: Type {
 	constexpr static auto KIND = make_type_kind("string");
 
-	String_Kind string_kind;
+	StringKind string_kind;
 };
 
-String_Type* reflect_type(String* x, String_Type* type) {
+StringType* reflect_type(String* x, StringType* type) {
 	type->name = "String";
-	type->string_kind = String_Kind::Ascii;
+	type->string_kind = StringKind::Ascii;
 	return type;
 }
 
-String_Type* reflect_type(Unicode_String* x, String_Type* type) {
-	type->name = "Unicode_String";
-	type->string_kind = String_Kind::Utf32;
+StringType* reflect_type(UnicodeString* x, StringType* type) {
+	type->name = "UnicodeString";
+	type->string_kind = StringKind::Utf32;
 	return type;
 }
 
@@ -139,10 +140,6 @@ s32 utf8_char_size(char32_t c) {
 	                 return 4;
 }
 
-bool is_whitespace(char32_t c) {
-	return u_isUWhiteSpace(c);
-}
-
 bool is_line_break(char32_t c) {
 	return
 		c == U'\n'     || 
@@ -152,7 +149,7 @@ bool is_line_break(char32_t c) {
 		c == U'\x2029';   // Paragraph Separator
 }
 
-s64 utf8_length(Unicode_String str) {
+s64 utf8_length(UnicodeString str) {
 	s64 length = 0;
 	for (auto i: range(str.length)) {
 		length += utf8_char_size(str[i]);
@@ -160,7 +157,7 @@ s64 utf8_length(Unicode_String str) {
 	return length;
 }
 
-void encode_utf8(Unicode_String str, char* buf) {
+void encode_utf8(UnicodeString str, char* buf) {
 	char* ptr = buf;
 	for (auto i: range(str.length)) {
 		auto c = str[i];
@@ -191,7 +188,7 @@ void encode_utf8(Unicode_String str, char* buf) {
 }
 
 // Zero terminated, terminator is at index length, not length - 1.
-String encode_utf8(Allocator allocator, Unicode_String str, Code_Location loc = caller_loc()) {
+String encode_utf8(Allocator allocator, UnicodeString str, CodeLocation loc = caller_loc()) {
 	s64 length = utf8_length(str);
 	String result = {
 		.data   = allocator.alloc<char>(length + 1, loc),
@@ -202,7 +199,7 @@ String encode_utf8(Allocator allocator, Unicode_String str, Code_Location loc = 
 	return result;
 }
 
-String encode_utf8(Unicode_String str, Code_Location loc = caller_loc()) {
+String encode_utf8(UnicodeString str, CodeLocation loc = caller_loc()) {
 	return encode_utf8(c_allocator, str, loc);
 }
 
@@ -211,7 +208,7 @@ s32 utf16_char_size(char32_t c) {
 }
 
 // Zero terminated, terminator is at index length, not length - 1.
-Tuple<char16_t*, s64> encode_utf16(Allocator allocator, Unicode_String str, Code_Location loc = caller_loc()) {
+Tuple<char16_t*, s64> encode_utf16(Allocator allocator, UnicodeString str, CodeLocation loc = caller_loc()) {
 	
 	s64 length = 0;
 	for (auto i: range(str.length)) {
@@ -237,13 +234,13 @@ Tuple<char16_t*, s64> encode_utf16(Allocator allocator, Unicode_String str, Code
 	return make_tuple(data, length);
 }
 
-Tuple<char16_t*, s64> encode_utf16(Unicode_String str, Code_Location loc = caller_loc()) {
+Tuple<char16_t*, s64> encode_utf16(UnicodeString str, CodeLocation loc = caller_loc()) {
 	return encode_utf16(c_allocator, str, loc);
 }
 
-Unicode_String decode_utf8(Allocator allocator, String utf8, Code_Location loc = caller_loc()) {
+UnicodeString decode_utf8(Allocator allocator, String utf8, CodeLocation loc = caller_loc()) {
 
-	Unicode_String result;
+	UnicodeString result;
 	for (auto c: utf8) {
 		if ((c & 0xC0) == 0x80) {
 			continue;
@@ -300,15 +297,15 @@ Unicode_String decode_utf8(Allocator allocator, String utf8, Code_Location loc =
 	return result;
 }
 
-Unicode_String decode_utf8(Allocator allocator, const char* c_str, Code_Location loc = caller_loc()) {
+UnicodeString decode_utf8(Allocator allocator, const char* c_str, CodeLocation loc = caller_loc()) {
 	return decode_utf8(allocator, make_string(c_str), loc);
 }
 
-Unicode_String decode_utf8(const char* c_str, Code_Location loc = caller_loc()) {
+UnicodeString decode_utf8(const char* c_str, CodeLocation loc = caller_loc()) {
 	return decode_utf8(c_allocator, c_str, loc);
 }
 
-Unicode_String decode_utf16(Allocator allocator, const char16_t* str, s64 length = -1, Optional<Byte_Order> bo = {}, Code_Location loc = caller_loc()) {
+UnicodeString decode_utf16(Allocator allocator, const char16_t* str, s64 length = -1, Optional<ByteOrder> bo = {}, CodeLocation loc = caller_loc()) {
 
 	if (length < 0) {
 		auto ptr = str;
@@ -327,7 +324,7 @@ Unicode_String decode_utf16(Allocator allocator, const char16_t* str, s64 length
 	}
 	assert(bo.has_value);
 
-	Unicode_String result;
+	UnicodeString result;
 	for (auto i: range(length)) {
 		auto c = str[i];
 		if (bo != BYTE_ORDER_LITTLE_ENDIAN) {
@@ -368,7 +365,7 @@ Unicode_String decode_utf16(Allocator allocator, const char16_t* str, s64 length
 	return result;
 }
 
-Unicode_String decode_utf16(const char16_t* str, s64 length = -1, Optional<Byte_Order> bo = {}, Code_Location loc = caller_loc()) {
+UnicodeString decode_utf16(const char16_t* str, s64 length = -1, Optional<ByteOrder> bo = {}, CodeLocation loc = caller_loc()) {
 	return decode_utf16(c_allocator, str, length, bo, loc);
 }
 
@@ -445,7 +442,7 @@ bool contains(auto str, auto x) {
 	return false;
 }
 
-bool contains(auto str, String_Char auto c) {
+bool contains(auto str, StringChar auto c) {
 	for (auto it: str) {
 		if (it == c) {
 			return true;

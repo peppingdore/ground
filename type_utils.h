@@ -2,7 +2,7 @@
 
 #include <type_traits>
 
-struct Empty_Struct {};
+struct EmptyStruct {};
 
 template <typename T>
 constexpr bool does_type_have_padding() {

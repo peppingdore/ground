@@ -3,7 +3,7 @@
 #include "base.h"
 
 template <typename T = s64, bool Ascending = true>
-struct Numeric_Range {
+struct NumericRange {
 	T current;
 	T target;
 
@@ -19,7 +19,7 @@ struct Numeric_Range {
 		return target != current;
 	}
 
-	constexpr bool operator!=(Numeric_Range other) {
+	constexpr bool operator!=(NumericRange other) {
 		return (bool) *this;
 	}
 
@@ -31,15 +31,15 @@ struct Numeric_Range {
 		}
 	}
 
-	constexpr Numeric_Range& begin() {
+	constexpr NumericRange& begin() {
 		return *this;
 	}
 
-	constexpr Numeric_Range& end() {
+	constexpr NumericRange& end() {
 		return *this;
 	}
 
-	constexpr Numeric_Range<T, !Ascending> reverse() {
+	constexpr NumericRange<T, !Ascending> reverse() {
 		return {
 			.current = target,
 			.target  = current,
@@ -49,7 +49,7 @@ struct Numeric_Range {
 
 template <typename T>
 constexpr auto range(T start, T count) {
-	return Numeric_Range<T> {
+	return NumericRange<T> {
 		.current = start,
 		.target  = (T) (start + count),
 	};
@@ -63,7 +63,7 @@ constexpr auto range(T count) {
 constexpr auto range(s64 start, s64 count) {
 	assert(count >= 0);
 
-	Numeric_Range<> r = {
+	NumericRange<> r = {
 		.current = start,
 		.target  = start + count,
 	};
@@ -80,6 +80,6 @@ constexpr auto range_from_to(s64 start, s64 last_index_exclusive) {
 }
 
 template <typename T = s64, bool Ascending = true>
-constexpr auto reverse(Numeric_Range<T, Ascending> range) {
+constexpr auto reverse(NumericRange<T, Ascending> range) {
 	return range.reverse();
 }

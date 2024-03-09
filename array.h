@@ -9,15 +9,15 @@
 constexpr s64 DEFAULT_DYNAMIC_ARRAY_CAPACITY = 8;
 
 template <typename T>
-struct Array: public Array_View<T> {
-	using Array_View<T>::data;
-	using Array_View<T>::count;
-	using Array_View<T>::index_of;
-	using Array_View<T>::index_of_fast;
+struct Array: public ArrayView<T> {
+	using ArrayView<T>::data;
+	using ArrayView<T>::count;
+	using ArrayView<T>::index_of;
+	using ArrayView<T>::index_of_fast;
 
-	s64           capacity  = 0;
-	Allocator     allocator = c_allocator;
-	Code_Location loc       = caller_loc();
+	s64          capacity  = 0;
+	Allocator    allocator = c_allocator;
+	CodeLocation loc       = caller_loc();
 
 
 	Array& operator=(Array const& other) = default;
@@ -36,7 +36,7 @@ struct Array: public Array_View<T> {
 		data = allocator.alloc<T>(capacity, loc);
 	}
 
-	T* reserve_at_index(s64 index, s64 length, Code_Location loc = caller_loc()) {
+	T* reserve_at_index(s64 index, s64 length, CodeLocation loc = caller_loc()) {
 		assert(index >= 0 && index <= count);
 		
 		ensure_capacity(count + length, loc);
@@ -46,23 +46,23 @@ struct Array: public Array_View<T> {
 		return ptr;
 	}
 
-	T* reserve(Code_Location loc = caller_loc()) {
+	T* reserve(CodeLocation loc = caller_loc()) {
 		return reserve_at_index(count, 1, loc);
 	}
 
-	T* add(T item, Code_Location loc = caller_loc()) {
+	T* add(T item, CodeLocation loc = caller_loc()) {
 		auto item_location = reserve(loc);
 		memcpy(item_location, &item, sizeof(T));
 		return item_location;
 	}
 
-	T* add_at_index(s64 index, T item, Code_Location loc = caller_loc()) {
+	T* add_at_index(s64 index, T item, CodeLocation loc = caller_loc()) {
 		auto item_location = reserve_at_index(index, 1, loc);
 		memcpy(item_location, &item, sizeof(T));
 		return item_location;
 	}
 
-	bool add_or_replace_at_index(s64 index, T item, Code_Location loc = caller_loc()) {
+	bool add_or_replace_at_index(s64 index, T item, CodeLocation loc = caller_loc()) {
 		if (index < count) {
 			data[index] = item;
 			return false;
@@ -72,27 +72,27 @@ struct Array: public Array_View<T> {
 		}
 	}
 
-	void add_at_index(s64 index, T* src, s64 length, Code_Location loc = caller_loc()) {
+	void add_at_index(s64 index, T* src, s64 length, CodeLocation loc = caller_loc()) {
 
 		assert(index <= count);
 		T* dst = reserve_at_index(index, length, loc);
 		memcpy(dst, src, length * sizeof(T));
 	}
 
-	void add(T* item, s64 length, Code_Location loc = caller_loc()) {
+	void add(T* item, s64 length, CodeLocation loc = caller_loc()) {
 		add_at_index(count, item, length, loc);
 	}
 
-	void add(Array_View<T> other, Code_Location loc = caller_loc()) {
+	void add(ArrayView<T> other, CodeLocation loc = caller_loc()) {
 		add(other.data, other.count, loc);
 	}
 
-	void add(std::initializer_list<T> other, Code_Location loc = caller_loc()) {
+	void add(std::initializer_list<T> other, CodeLocation loc = caller_loc()) {
 		// (T*) cast is to remove const from other.begin(), so the compiler doesn't bitch.
 		add((T*) other.begin(), other.size(), loc);
 	}
 
-	void add_at_index(s64 index, Array_View<T> other, Code_Location loc = caller_loc()) {
+	void add_at_index(s64 index, ArrayView<T> other, CodeLocation loc = caller_loc()) {
 		add_at_index(index, other.data, other.count, loc);
 	}
 
@@ -138,11 +138,11 @@ struct Array: public Array_View<T> {
 		}
 	}
 
-	void clear(Code_Location loc = caller_loc()) {
+	void clear(CodeLocation loc = caller_loc()) {
 		count = 0;
 	}
 
-	void free(Code_Location loc = caller_loc()) {
+	void free(CodeLocation loc = caller_loc()) {
 		if (data) {
 			allocator.free(data, loc);
 			data  = NULL;
@@ -150,14 +150,14 @@ struct Array: public Array_View<T> {
 		}
 	}
 
-	T pop_last(Code_Location loc = caller_loc()) {
+	T pop_last(CodeLocation loc = caller_loc()) {
 		assert(count > 0);
 		count -= 1;
 		T result = data[count];
 		return result;
 	}
 
-	void ensure_capacity(s64 target_capacity, Code_Location loc = caller_loc()) {
+	void ensure_capacity(s64 target_capacity, CodeLocation loc = caller_loc()) {
 		if (data == NULL && target_capacity > capacity) {
 			capacity = target_capacity;
 		}
@@ -172,7 +172,7 @@ struct Array: public Array_View<T> {
 		}
 	}
 	
-	void shrink_to_capacity(s64 new_capacity, Code_Location loc = caller_loc()) {
+	void shrink_to_capacity(s64 new_capacity, CodeLocation loc = caller_loc()) {
 		if (!data) {
 			return;
 		}
@@ -186,7 +186,7 @@ struct Array: public Array_View<T> {
 		capacity = new_capacity;
 	}
 
-	Array<T> copy(Allocator allocator, Code_Location loc = caller_loc()) {
+	Array<T> copy(Allocator allocator, CodeLocation loc = caller_loc()) {
 		Array<T> copied;
 		copied.allocator = allocator;
 		copied.allocator.capacity = capacity;
@@ -197,7 +197,7 @@ struct Array: public Array_View<T> {
 };
 
 template <typename T>
-inline Array<T> make_array(Allocator allocator = c_allocator, s64 capacity = DEFAULT_DYNAMIC_ARRAY_CAPACITY, Code_Location loc = caller_loc()) {
+inline Array<T> make_array(Allocator allocator = c_allocator, s64 capacity = DEFAULT_DYNAMIC_ARRAY_CAPACITY, CodeLocation loc = caller_loc()) {
 	Array<T> result;
 	result.allocator = allocator;
 	result.capacity = capacity;
@@ -205,34 +205,34 @@ inline Array<T> make_array(Allocator allocator = c_allocator, s64 capacity = DEF
 }
 
 template <typename T>
-inline Array<T> make_array(Allocator allocator, Array_View<T> view, Code_Location loc = caller_loc()) {
+inline Array<T> make_array(Allocator allocator, ArrayView<T> view, CodeLocation loc = caller_loc()) {
 	auto arr = make_array<T>(allocator, view.count, loc);
 	arr.add(view);
 	return arr;
 }
 
 template <typename T>
-inline Array<T> make_array(Array_View<T> view, Code_Location loc = caller_loc()) {
+inline Array<T> make_array(ArrayView<T> view, CodeLocation loc = caller_loc()) {
 	return make_array(c_allocator, view, loc);
 }
 
 template <typename T>
-inline Array<T> make_array(Allocator allocator, std::initializer_list<T> list, Code_Location loc = caller_loc()) {
+inline Array<T> make_array(Allocator allocator, std::initializer_list<T> list, CodeLocation loc = caller_loc()) {
 	return make_array(allocator, make_array_view(list), loc);
 }
 
 template <typename T>
-inline Array<T> make_array(std::initializer_list<T> list, Code_Location loc = caller_loc()) {
+inline Array<T> make_array(std::initializer_list<T> list, CodeLocation loc = caller_loc()) {
 	return make_array(c_allocator, list, loc);
 }
 
 template <typename T>
-inline void make_array(Array<T>* array, Allocator allocator = c_allocator, s64 capacity = DEFAULT_DYNAMIC_ARRAY_CAPACITY, Code_Location loc = caller_loc()) {
+inline void make_array(Array<T>* array, Allocator allocator = c_allocator, s64 capacity = DEFAULT_DYNAMIC_ARRAY_CAPACITY, CodeLocation loc = caller_loc()) {
 	*array = make_array<T>(allocator, capacity, loc); 
 }
 
 template <typename T>
-Array_Type* reflect_type(Array<T>* x, Array_Type* type) {
+ArrayType* reflect_type(Array<T>* x, ArrayType* type) {
 	type->inner = reflect.type_of<T>();
 	type->name = heap_sprintf("Array<%s>", type->inner->name);
 	type->get_count = [](void* arr) {

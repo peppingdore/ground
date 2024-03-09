@@ -5,7 +5,7 @@
 #include <initializer_list>
 
 template <typename T>
-struct Array_View {
+struct ArrayView {
 
 	T*  data  = NULL;
 	s64 count = 0;
@@ -133,7 +133,7 @@ struct Array_View {
 		return data + count;
 	}
 
-	bool operator==(Array_View rhs) {
+	bool operator==(ArrayView rhs) {
 		if (count != rhs.count) {
 			return false;
 		}
@@ -151,7 +151,7 @@ struct Array_View {
 };
 
 template <typename T, s64 N>
-inline constexpr Array_View<T> make_array_view(const T (&literal)[N]) {
+inline constexpr ArrayView<T> make_array_view(const T (&literal)[N]) {
 	return {
 		.data = (T*) literal,
 		.count = N
@@ -159,7 +159,7 @@ inline constexpr Array_View<T> make_array_view(const T (&literal)[N]) {
 }
 
 template <typename T>
-inline constexpr Array_View<T> make_array_view(std::initializer_list<T> list) {
+inline constexpr ArrayView<T> make_array_view(std::initializer_list<T> list) {
 	return {
 		.data  = (T*) list.begin(),
 		.count = (s64) list.size()
@@ -167,7 +167,7 @@ inline constexpr Array_View<T> make_array_view(std::initializer_list<T> list) {
 }
 
 template <typename T>
-inline constexpr Array_View<T> make_array_view(T* data, s64 count) {
+inline constexpr ArrayView<T> make_array_view(T* data, s64 count) {
 	return {
 		.data = data,
 		.count = count
@@ -175,29 +175,26 @@ inline constexpr Array_View<T> make_array_view(T* data, s64 count) {
 }
 
 template <typename T>
-inline void reverse(Array_View<T> view) {
+inline void reverse(ArrayView<T> view) {
 	reverse(view.data, view.count);
 }
 
-struct Array_View_Type: Type {
-	constexpr static const char* KIND = "array_view";
-
-	Type* inner = NULL;
-	s64   (*get_count)   (Array_Type*, void* view) = NULL;
-	void* (*get_item)    (Array_Type*, void* view, s64 index) = NULL;
-};
-
 template <typename T>
-Array_View_Type* reflect_type(Array_View<T>* x, Array_View_Type* type) {
+ArrayType* reflect_type(ArrayView<T>* x, ArrayType* type) {
 	type->inner = reflect.type_of<T>();
-	type->name = heap_sprintf("Array_View<%s>", type->inner->name);
-	type->get_count = [](Array_View_Type* type, void* view) {
-		auto casted = (Array_View<int>*) view;
+	type->name = heap_sprintf("ArrayView<%s>", type->inner->name);
+	type->subkind = "ArrayView";
+	type->get_count = [](void* arr) {
+		auto casted = (ArrayView<int>*) arr;
 		return casted->count;
 	};
-	type->get_item = [](Array_View_Type* type, void* view, s64 index) {
-		auto casted = (Array_View<int>*) view;
-		void* item = ptr_add(casted->data, type->inner->size * index);
+	type->get_capacity = [](void* arr) {
+		auto casted = (ArrayView<int>*) arr;
+		return casted->count;
+	};
+	type->get_item = [](void* arr, s64 index) {
+		auto casted = (ArrayView<int>*) arr;
+		void* item = ptr_add(casted->data, sizeof(T) * index);
 		return item;
 	};
 	return type;

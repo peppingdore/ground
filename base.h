@@ -93,10 +93,6 @@ constexpr s64 s64_sign_mask   = s64(1LL << 63);
 constexpr f32 f32_epsilon = FLT_EPSILON;
 constexpr f64 f64_epsilon = DBL_EPSILON;
 
-using Byte_Order = bool;
-constexpr Byte_Order BYTE_ORDER_LITTLE_ENDIAN = false;
-constexpr Byte_Order BYTE_ORDER_BIG_ENDIAN    = true;
-
 template <typename T, u64 n>
 constexpr u64 static_array_count(T(&)[n]) {
 	return n;

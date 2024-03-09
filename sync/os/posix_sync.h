@@ -94,7 +94,7 @@ using Os_Thread = pthread_t;
 using Os_Thread_Return_Type = void*;
 
 bool os_thread_start(Os_Thread* thread, Os_Thread_Return_Type (*proc)(void*), void* data) {
-	pthread_t handle
+	pthread_t handle;
 	int result = pthread_create(&handle, NULL, proc, data);
 	if (result != 0) {
 		return false;

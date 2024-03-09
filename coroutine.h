@@ -4,7 +4,7 @@
 
 template <typename T>
 struct Generator {
-	using Item_Type = T;
+	using ItemType = T;
 
 	struct promise_type {
 		T stored_value;
@@ -84,19 +84,19 @@ struct Generator {
 };
 
 template <typename T>
-struct Is_Generator_Type: std::false_type {};
+struct IsGeneratorType: std::false_type {};
 template <typename T>
-struct Is_Generator_Type<Generator<T>>: std::true_type {};
+struct IsGeneratorType<Generator<T>>: std::true_type {};
 
 template <typename T>
-concept Has_Generator_Iterator = requires (T t) {
-	requires Is_Generator_Type<decltype(t.iterate())>::value;
+concept HasGeneratorIterator = requires (T t) {
+	requires IsGeneratorType<decltype(t.iterate())>::value;
 };
 
-auto begin(Has_Generator_Iterator auto t) {
+auto begin(HasGeneratorIterator auto t) {
 	return t.iterate();
 }
 
-int end(Has_Generator_Iterator auto t) {
+int end(HasGeneratorIterator auto t) {
 	return 0;
 }

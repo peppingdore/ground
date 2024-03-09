@@ -3,16 +3,16 @@
 #include "base.h"
 #include <string.h>
 
-struct Code_Location {
+struct CodeLocation {
 	s32         line;
 	const char* file;
 
-	bool operator==(Code_Location rhs) {
+	bool operator==(CodeLocation rhs) {
 		return line == rhs.line && (strcmp(file, rhs.file) == 0);
 	}
 };
 
-constexpr Code_Location make_code_location(s32 line, const char* file) {
+constexpr CodeLocation make_code_location(s32 line, const char* file) {
 	return {
 		.line = line,
 		.file = (char*) file,
@@ -23,7 +23,7 @@ constexpr Code_Location make_code_location(s32 line, const char* file) {
 	#define caller_loc() make_code_location(__builtin_LINE(), __builtin_FILE())
 #else
 	#include <source_location>
-	constexpr Code_Location make_code_location(const std::source_location cpp_loc) {
+	constexpr CodeLocation make_code_location(const std::source_location cpp_loc) {
 		return {
 			.line = (s32) cpp_loc.line(),
 			.file = (char*) cpp_loc.file_name()

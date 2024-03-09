@@ -13,9 +13,9 @@ struct Test {
 };
 
 struct Tester {
-	Array<Test>          tests;
-	Array<Code_Location> scope;
-	Test*                current_test = NULL;
+	Array<Test>         tests;
+	Array<CodeLocation> scope;
+	Test*               current_test = NULL;
 };
 inline Tester tester;
 
@@ -84,12 +84,12 @@ int main(int argc, char* argv[]) {
 
 BUILD_RUN("def add_test(name):\n\tif 'test' in globals(): test.cases[name] = tester.Case(name)")
 
-void tester_write_result_loc(Code_Location loc) {
+void tester_write_result_loc(CodeLocation loc) {
 	tester_write_result_str(make_string(loc.file));
 	tester_write_result_int(loc.line);
 }
 
-void test_expect(bool cond, const char* cond_str, String message, Code_Location loc = caller_loc()) {
+void test_expect(bool cond, const char* cond_str, String message, CodeLocation loc = caller_loc()) {
 	tester_write_result_line("TESTER_EXPECT"_b);
 	if (cond) {
 		tester.current_test->expect_succeeded += 1;
@@ -112,15 +112,15 @@ void test_expect(bool cond, const char* cond_str, String message, Code_Location 
 	Log("   %: %", loc.file, loc.line);
 }
 
-void test_expect(bool cond, const char* cond_str, Unicode_String message, Code_Location loc = caller_loc()) {
+void test_expect(bool cond, const char* cond_str, Unicode_String message, CodeLocation loc = caller_loc()) {
 	test_expect(cond, cond_str, encode_utf8(message), loc);
 }
 
-void test_expect(bool cond, const char* cond_str, Code_Location loc = caller_loc()) {
+void test_expect(bool cond, const char* cond_str, CodeLocation loc = caller_loc()) {
 	test_expect(cond, cond_str, sprint("Expected %", make_string(cond_str)), loc);
 }
 
-void tester_scope_push(Code_Location loc) {
+void tester_scope_push(CodeLocation loc) {
 	tester.scope.add(loc);
 }
 

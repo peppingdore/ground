@@ -10,17 +10,17 @@
 #include <type_traits>
 #include <limits>
 
-struct Small_String {
+struct SmallString {
 	char buf[127];
 	u8   length = 0;
 };
-static_assert(sizeof(Small_String) == 128);
+static_assert(sizeof(SmallString) == 128);
 
-String as_str(Small_String* x) {
+String as_str(SmallString* x) {
 	return make_string(x->buf, x->length);
 }
 
-void append(Small_String* res, char c) {
+void append(SmallString* res, char c) {
 	if (res->length >= array_count(res->buf)) {
 		return;
 	}
@@ -28,7 +28,7 @@ void append(Small_String* res, char c) {
 	res->length += 1;
 }
 
-void append(Small_String* res, const char* str) {
+void append(SmallString* res, const char* str) {
 	auto length = strlen(str);
 	for (auto i: range(length)) {
 		append(res, str[i]);
@@ -62,14 +62,14 @@ inline void print_integer_number_to_char_buffer(auto number, int base, bool uppe
 }
 
 
-struct Integer_String_Params {
+struct IntegerStringParams {
 	int  base = 10;
 	bool skip_base_prefix = false;
 	bool uppercase = false;
 };
 
 template <typename T> requires (std::numeric_limits<T>::is_integer)
-inline Small_String to_string(T num, Integer_String_Params p = {}) {
+inline SmallString to_string(T num, IntegerStringParams p = {}) {
 	static_assert(sizeof(T) <= 64 / 8);
 
 	p.base = clamp_s32(2, 16, p.base);
@@ -77,7 +77,7 @@ inline Small_String to_string(T num, Integer_String_Params p = {}) {
 		p.base = 10;
 	}
 
-	Small_String res;
+	SmallString res;
 
 	if (num < 0) {
 		append(&res, '-');
@@ -95,7 +95,7 @@ inline Small_String to_string(T num, Integer_String_Params p = {}) {
 }
 
 template <typename T> requires (std::is_floating_point_v<T>)
-inline Small_String to_string(T num, int max_decimal_digits = 99999999) {
+inline SmallString to_string(T num, int max_decimal_digits = 99999999) {
 	// Using implementation from:
 	// https://blog.benoitblanchon.fr/lightweight-float-to-string/
 
@@ -103,7 +103,7 @@ inline Small_String to_string(T num, int max_decimal_digits = 99999999) {
 	//    According to IEEE 754-1985, the longest notation for value represented
 	//    by double type (for example: -2.2250738585072020E-308) has 24 characters.
 
-	Small_String res;
+	SmallString res;
 
 	if (num == 0) {
 		if (signbit(num)) {
@@ -278,15 +278,15 @@ inline Small_String to_string(T num, int max_decimal_digits = 99999999) {
 	return res;
 }
 
-inline Small_String to_string(bool b) {
-	Small_String res;
+inline SmallString to_string(bool b) {
+	SmallString res;
 	append(&res, b ? "true" : "false");
 	return res;
 }
 
 
 
-struct Parse_Integer_Params {
+struct ParseIntegerParams {
 	// normal prefix (as in OpenDDL) = '0o' or '0O'
 	// c prefix = '0',
 	bool use_c_octal_prefix = false;
@@ -297,8 +297,8 @@ struct Parse_Integer_Params {
 
 
 // If number's base is not 10 than it's threated as unsigned.
-template <typename T, String_Char Char> requires (std::numeric_limits<T>::is_integer)
-inline bool parse_integer(Base_String<Char> str, T* result, Parse_Integer_Params params = {}) {
+template <typename T, StringChar Char> requires (std::numeric_limits<T>::is_integer)
+inline bool parse_integer(BaseString<Char> str, T* result, ParseIntegerParams params = {}) {
 	ZoneScoped;
 
 	static_assert(sizeof(T) == 1 || sizeof(T) == 2 || sizeof(T) == 4 || sizeof(T) == 8, "Integer size is not supported");
@@ -309,7 +309,7 @@ inline bool parse_integer(Base_String<Char> str, T* result, Parse_Integer_Params
 		return false;
 	}
 
-	using Unsigned_T = typename std::make_unsigned<T>::type;
+	using UnsignedT = typename std::make_unsigned<T>::type;
 
 	int base = 10;
 	int start = 0;
@@ -349,21 +349,21 @@ inline bool parse_integer(Base_String<Char> str, T* result, Parse_Integer_Params
 	//    and then bitcast it to a proper type.
 	if (!is_signed || base != 10) {
 
-		Unsigned_T number = 0;
-		Unsigned_T limit;
+		UnsignedT number = 0;
+		UnsignedT limit;
 
 #pragma push_macro("max")
 #undef max
 		if (base == 10) {
 			limit = std::numeric_limits<T>::max();
 		} else {
-			limit = std::numeric_limits<Unsigned_T>::max();
+			limit = std::numeric_limits<UnsignedT>::max();
 		}
 #pragma pop_macro("max")
 
 
-		Unsigned_T exponent_limit = limit / base;
-		Unsigned_T exponent = 1;
+		UnsignedT exponent_limit = limit / base;
+		UnsignedT exponent = 1;
 
 		bool did_exponent_overflow = false;
 
@@ -378,7 +378,7 @@ inline bool parse_integer(Base_String<Char> str, T* result, Parse_Integer_Params
 				}
 			}
 
-			Unsigned_T digit;
+			UnsignedT digit;
 			if (c >= '0' && c <= '9') {
 				digit = c - '0';
 			} else if (c >= 'A' && c <= 'F') {
@@ -403,7 +403,7 @@ inline bool parse_integer(Base_String<Char> str, T* result, Parse_Integer_Params
 				if (limit / digit < exponent) return fail();
 			#endif
 
-				Unsigned_T new_number = number + digit * exponent;
+				UnsignedT new_number = number + digit * exponent;
 				if (new_number < number) { 
 					return fail();
 				}
@@ -417,7 +417,7 @@ inline bool parse_integer(Base_String<Char> str, T* result, Parse_Integer_Params
 			exponent *= base;
 		}
 
-		*((Unsigned_T*) result) = number;
+		*((UnsignedT*) result) = number;
 		if (params.result_base) {
 			*params.result_base = base;
 		}
@@ -441,16 +441,16 @@ inline bool parse_integer(Base_String<Char> str, T* result, Parse_Integer_Params
 #undef min
 #undef max
 
-	Unsigned_T exponent = 1;
-	Unsigned_T limit;
+	UnsignedT exponent = 1;
+	UnsignedT limit;
 
 	if (negative) {
 		auto negative_limit = std::numeric_limits<T>::min();
 
-		limit = bitcast<Unsigned_T>(negative_limit);
+		limit = bitcast<UnsignedT>(negative_limit);
 		limit = ~limit + 1; // Two's complement negation.
 	} else {
-		limit = (Unsigned_T) std::numeric_limits<T>::max();
+		limit = (UnsignedT) std::numeric_limits<T>::max();
 	}
 
 #pragma pop_macro("max")
@@ -518,8 +518,8 @@ struct Float_Parsing_Params {
 	bool allow_underscores = true;
 };
 
-template <String_Char Char>
-inline bool parse_float(Base_String<Char> str, f64* result, Float_Parsing_Params params = {}) {
+template <StringChar Char>
+inline bool parse_float(BaseString<Char> str, f64* result, Float_Parsing_Params params = {}) {
 	if (str.length <= 0) {
 		return false;
 	}
