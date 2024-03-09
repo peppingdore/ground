@@ -10,5 +10,10 @@ import re
 def replace(path, **kwargs):
 	txt = Path(path).read_text()
 	for k, v in kwargs.items():
-		txt = re.sub(f"(\/\* %-{k} \*\/)(?s:.*?)(\/\* %-end \*\/)", f"\\1 {v} \\2", txt, flags=re.MULTILINE)
+		match = re.search(f"(\/\* %-{k} \*\/)(?s:.*?)(\/\* %-end \*\/)", txt, flags=re.MULTILINE)
+		pad = ''
+		if match:
+			if '\n' in txt[match.start():match.end()]:
+				pad = '\n'
+			txt = txt[:match.start()] + f"{match.group(1)}{pad}{v}{pad}{match.group(2)}" + txt[match.end():]
 	Path(path).write_text(txt, encoding='utf-8')
