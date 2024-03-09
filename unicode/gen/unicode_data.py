@@ -171,7 +171,10 @@ def generate(*, version):
 		non_uniform_ranges=',\n'.join(c_ranges),
 		uniform_ranges=',\n'.join(c_uniform_ranges),
 		offsets_into_packed=',\n'.join(map(hex, offset_into_packed)),
-		packed_codepoints=',\n'.join(c_packed_codepoints)
+		packed_codepoints=',\n'.join(c_packed_codepoints),
+		general_categories=',\n'.join(map(lambda it: f'\t{it[0]} = {it[1]}', categories.values.items())),
+		bidi_categories=',\n'.join(map(lambda it: f'\t{it[0]} = {it[1]}', bidi_categories.values.items())),
+		decomposition_tags=',\n'.join(map(lambda it: f'\t{it[0]} = {hex(0xffffffff - it[1])}', decomposition_tags.values.items())),
 	)
 
 if __name__ == "__main__":
