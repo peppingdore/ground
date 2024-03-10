@@ -75,8 +75,8 @@ class Codepoint:
 		maybe_pack_field(self.lowercase, 13)
 		maybe_pack_field(self.titlecase, 14)
 
-		nums[0] |= build_mask(CATEGORY_SHIFT, CATEGORY_SIZE) & (self.category_id << CATEGORY_SHIFT)
-		nums[0] |= build_mask(BIDI_CATEGORY_SHIFT, BIDI_CATEGORY_SIZE) & (self.bidi_category_id << BIDI_CATEGORY_SHIFT)
+		nums[0] |= (self.category_id << CATEGORY_SHIFT)
+		nums[0] |= (self.bidi_category_id << BIDI_CATEGORY_SHIFT)
 		return nums
 
 class UnicodeRange:
@@ -96,6 +96,7 @@ def generate(*, version):
 	ranges = [UnicodeRange()]
 	uniform_ranges = []
 	for i in range(len(lines)):
+	# for i in range(0, 1):
 		fields = lines[i].split(';')
 		codepoint = int(fields[0], base=16)
 		if fields[1].endswith(", First>"):
@@ -113,12 +114,16 @@ def generate(*, version):
 					ranges.append(UnicodeRange())
 			ranges[-1].codepoints.append(Codepoint(fields))
 
+	global CATEGORY_SHIFT
+	global CATEGORY_SIZE
+	global BIDI_CATEGORY_SHIFT
+	global BIDI_CATEGORY_SIZE
 
-	PACK_CURSOR = 15
-	CATEGORY_SHIFT = PACK_CURSOR
+	pack_cursor = 15
+	CATEGORY_SHIFT = pack_cursor
 	CATEGORY_SIZE = max(categories.values.values()).bit_length()
-	PACK_CURSOR += CATEGORY_SIZE
-	BIDI_CATEGORY_SHIFT = PACK_CURSOR
+	pack_cursor += CATEGORY_SIZE
+	BIDI_CATEGORY_SHIFT = pack_cursor
 	BIDI_CATEGORY_SIZE = max(bidi_categories.values.values()).bit_length()
 
 	names = []

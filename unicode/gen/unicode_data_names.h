@@ -1,3 +1,6 @@
+#pragma once
+
+const char* UNICODE_CODEPOINT_NAMES[] = {
 /* %-codepoint_names */
 "<control>",
 "<control>",
@@ -46440,3 +46443,4 @@
 "Plane 15 Private Use",
 "Plane 16 Private Use"
 /* %-end */
+};
