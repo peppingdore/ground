@@ -99,10 +99,6 @@ inline SmallString to_string(T num, int max_decimal_digits = 99999999) {
 	// Using implementation from:
 	// https://blog.benoitblanchon.fr/lightweight-float-to-string/
 
-	// Comment from stackoverlflow:
-	//    According to IEEE 754-1985, the longest notation for value represented
-	//    by double type (for example: -2.2250738585072020E-308) has 24 characters.
-
 	SmallString res;
 
 	if (num == 0) {

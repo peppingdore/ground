@@ -133,7 +133,7 @@ void tester_scope_pop() {
 #define TEST(name)\
 BUILD_RUN("add_test(\"" #name "\")");\
 void test_##name ();\
-EXECUTE_ONCE([](){ register_test(&test_##name, #name); })\
+int register_test_##name = []() { register_test(&test_##name, #name); return 0; }();\
 inline void test_##name()
 
 #define EXPECT(cond, ...) test_expect(cond, #cond, __VA_ARGS__);

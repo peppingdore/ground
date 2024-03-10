@@ -5,6 +5,7 @@
 #include "build.h"
 #include "heap_sprintf.h"
 #include <stdio.h>
+#include <stdlib.h>
 
 struct Test {
 	Test*               next = NULL;
@@ -37,7 +38,7 @@ void register_test(void(*proc)(), const char* name) {
 	Test* test = new Test();
 	test->proc = proc;
 	test->name = name;
-	if (tester.first_test) {
+	if (!tester.first_test) {
 		tester.first_test = test;
 	} else {
 		test->next = tester.first_test;
@@ -70,6 +71,7 @@ void tester_write_result_str(const char* str) {
 		if (*ptr == '\n') {
 			line_count += 1;
 		}
+		ptr += 1;
 	}
 	tester_write_result_int(line_count);
 	tester_write_result_line(str);
@@ -120,20 +122,20 @@ void test_expect(bool cond, const char* cond_str, const char* message, CodeLocat
 	tester_write_result_str(cond_str);
 	tester_write_result_str(message);
 	int scope_count = 0;
-	auto ptr = tester.scope;
+	TestScopeNode* ptr = tester.scope;
 	while (ptr) {
 		scope_count += 1;
 		ptr = ptr->next;
 	}
 	tester_write_result_int(scope_count);
-	auto ptr = tester.scope;
+	ptr = tester.scope;
 	while (ptr) {
 		tester_write_result_loc(ptr->loc);
-		printf("   %s: %s\n", ptr->loc.file, ptr->loc.line);
+		printf("   %s: %d\n", ptr->loc.file, ptr->loc.line);
 		ptr = ptr->next;
 	}
 	tester_write_result_loc(loc);
-	printf("   %s: %s\n", loc.file, loc.line);
+	printf("   %s: %d\n", loc.file, loc.line);
 }
 
 // void test_expect(bool cond, const char* cond_str, Unicode_String message, CodeLocation loc = caller_loc()) {
@@ -166,7 +168,7 @@ void tester_scope_pop() {
 #define TEST(name)\
 BUILD_RUN("add_test(\"" #name "\")");\
 void test_##name ();\
-EXECUTE_ONCE([](){ register_test(&test_##name, #name); })\
+int register_test_##name = []() { register_test(&test_##name, #name); return 0; }();\
 inline void test_##name()
 
 #define EXPECT(cond, ...) test_expect(cond, #cond, __VA_ARGS__);

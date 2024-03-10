@@ -57,7 +57,7 @@ struct BaseString {
 		return cp;
 	}
 
-	BaseString<char32_t> copy_UnicodeString(Allocator allocator = c_allocator) 
+	BaseString<char32_t> copy_unicode_string(Allocator allocator = c_allocator) 
 		requires (std::is_same_v<Char, char>)
 	{
 		auto mem = allocator.alloc<char32_t>(length);
@@ -82,7 +82,7 @@ struct BaseString {
 	}
 };
 
-using String         = BaseString<char>;
+using String        = BaseString<char>;
 using UnicodeString = BaseString<char32_t>;
 
 template <StringChar T>
@@ -140,13 +140,31 @@ s32 utf8_char_size(char32_t c) {
 	                 return 4;
 }
 
+bool is_whitespace(char32_t c) {
+	// Hardcoded from Unicode's PropList.txt White_Space property list.
+	if (c >= 0x0009 && c <= 0x000d) return true;
+	if (c == 0x0020) return true;
+	if (c == 0x0085) return true;
+	if (c == 0x00A0) return true;
+	if (c == 0x1680) return true;
+	if (c >= 0x2000 && c <= 0x200a) return true;
+	if (c == 0x2028) return true;
+	if (c == 0x2029) return true;
+	if (c == 0x202f) return true;
+	if (c == 0x205f) return true;
+	if (c == 0x3000) return true;
+	return false;
+}
+
 bool is_line_break(char32_t c) {
-	return
-		c == U'\n'     || 
-		c == U'\x000C' || // Form Feed
-		c == U'\x0085' || // Next Line
-		c == U'\x2028' || // Line Separator
-		c == U'\x2029';   // Paragraph Separator
+	if (c == 0x000a) return true; // line feed
+	if (c == 0x000b) return true; // vertical tab
+	if (c == 0x000c) return true; // form feed
+	// if (c == 0x000d) return true; // carriage return
+	if (c == 0x0085) return true; // next line
+	if (c == 0x2028) return true; // line separator
+	if (c == 0x2029) return true; // paragraph separator
+	return false;
 }
 
 s64 utf8_length(UnicodeString str) {
