@@ -3,7 +3,7 @@
 #include "base.h"
 
 template <typename... Args>
-const char* heap_sprintf(const char* format, Args... args) {
+char* heap_sprintf(const char* format, Args... args) {
 	char buf[256];
 	int written = snprintf(buf, sizeof(buf), format, args...);
 	if (written < 0) {
@@ -24,7 +24,7 @@ const char* heap_sprintf(const char* format, Args... args) {
 	return str;
 }
 
-const char* heap_join(const char* start, const char* joiner, const char* end, auto... args) {
+char* heap_join(const char* start, const char* joiner, const char* end, auto... args) {
 	char buf[512];
 	int  cursor = 0;
 
