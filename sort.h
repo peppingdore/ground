@@ -4,14 +4,14 @@
 #include "array_view.h"
 #include "range.h"
 
-void quick_sort(s64 start, s64 length, auto less, auto swap) {
+void quick_sort(s64 start, s64 length, auto* arr, auto less, auto swap) {
 	if (length == 0) {
 		return;
 	}
 
 	auto find_greater_on_the_left = [&] (s64 anchor_index) -> s64 {
 		for (auto i: range(anchor_index)) {
-			if (!less(i, anchor_index)) {
+			if (!less(arr, i, anchor_index)) {
 				return i;
 			}
 		}
@@ -20,7 +20,7 @@ void quick_sort(s64 start, s64 length, auto less, auto swap) {
 
 	auto find_lower_on_the_right = [&] (s64 anchor_index) -> s64 {
 		for (auto i: range_from_to(anchor_index, view.count)) {
-			if (!less(i, anchor_index)) {
+			if (!less(arr, i, anchor_index)) {
 				return i;
 			}
 		}
@@ -38,30 +38,26 @@ void quick_sort(s64 start, s64 length, auto less, auto swap) {
 		}
 
 		if (left_greater == -1) {
-			swap(anchor_index, right_lower);
+			swap(arr, anchor_index, right_lower);
 			anchor_index = right_lower;
 		} else if (right_lower == -1) {
-			swap(anchor_index, left_greater);
+			swap(arr, anchor_index, left_greater);
 			anchor_index = left_greater;
 		} else {
-			swap(left_greater, right_lower);
+			swap(arr, left_greater, right_lower);
 		}
 	}
 
-	quick_sort(0, anchor_index, less, swap);
-	quick_sort(anchor_index + 1, length - anchor_index - 1, less, swap);
+	quick_sort(0, anchor_index, arr, less, swap);
+	quick_sort(anchor_index + 1, length - anchor_index - 1, arr, less, swap);
 }
 
-void sort(s64 length, auto less, auto swap) {
-	quick_sort(0, length, less, swap);
+void sort(auto* arr, auto less, auto swap) {
+	quick_sort(0, len(*arr), arr, less, swap);
 }
 
-void sort(auto arr, auto less, auto swap) {
-	sort(len(arr), less, swap);
-}
-
-void sort(auto arr, auto less) {
-	auto swap = [&] (s64 a, s64 b) {
+void sort(auto* arr, auto less) {
+	auto swap = [](auto* arr, s64 a, s64 b) {
 		auto temp = *arr[a];
 		*arr[a] = *arr[b];
 		*arr[b] = temp;
@@ -69,21 +65,23 @@ void sort(auto arr, auto less) {
 	sort(arr, less, swap);
 }
 
-void sort(auto arr) {
-	auto less = [&] (s64 a, s64 b) {
-		return *arr[a] < *arr[b];
+void sort(auto* arr) {
+	auto less = [] (auto* arr, s64 a, s64 b) {
+		return *arr->operator[](a) < *arr->operator[](b);
 	};
 	sort(arr, less);
 }
 
 auto sort_key(auto* arr, auto key) {
-	auto less = [](s64 a, s64 b) {
+	auto less = [](auto* arr, s64 a, s64 b) {
 		return key(*arr->operator[](a)) < key(*arr->operator[](b));
 	};
 	return less;
 }
 
-auto sort_reverse(auto less_proc) {
+auto sort_reverse(auto less_proc = [](auto* arr, s64 a, s64 b) { 
+	return *arr->operator[](a) < *arr->operator[](b);
+}) {
 	auto less = [less_proc] (s64 a, s64 b) {
 		return less_proc(b, a);
 	};
