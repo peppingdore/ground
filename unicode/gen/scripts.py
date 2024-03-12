@@ -3,8 +3,9 @@ import requests
 from deduplicator import *
 from replace import replace
 from pathlib import Path
+import unicode_version
 
-def generate(version):
+def generate(version=unicode_version.UNICODE_VERSION):
 	r = requests.get("https://www.unicode.org/Public/{version}/ucd/Scripts.txt".format(version=version))
 	r.raise_for_status()
 	script_ranges = ucd.parse(r.text)

@@ -3,6 +3,7 @@ import requests
 from pathlib import Path
 from deduplicator import *
 import replace
+import unicode_version
 
 categories = Deduplicator(file=Path(__file__).parent / "category_values.txt")
 bidi_categories = Deduplicator(file=Path(__file__).parent / "bidi_categories.txt")
@@ -89,9 +90,10 @@ class UnicodeUniformRange:
 		self.end = end
 		self.codepoint = codepoint
 
-def generate(*, version):
+def generate(*, version=unicode_version.UNICODE_VERSION):
 	r = requests.get(f"https://www.unicode.org/Public/{version}/ucd/UnicodeData.txt")
 	r.raise_for_status()
+	(Path(__file__).parent / "UnicodeData.txt").write_text(r.text)
 	lines = r.text.splitlines()
 	ranges = [UnicodeRange()]
 	uniform_ranges = []
@@ -183,4 +185,4 @@ def generate(*, version):
 	)
 
 if __name__ == "__main__":
-	generate(version="15.0.0")
+	generate()
