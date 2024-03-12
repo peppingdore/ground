@@ -2,14 +2,13 @@
 
 #include "allocator.h"
 #include "reflection.h"
+#include "hash.h"
 #include <initializer_list>
 
 template <typename T>
 struct ArrayView {
-
 	T*  data  = NULL;
 	s64 count = 0;
-
 
 	void advance(s64 length) {
 		assert(length <= count);
@@ -177,6 +176,19 @@ inline constexpr ArrayView<T> make_array_view(T* data, s64 count) {
 template <typename T>
 inline void reverse(ArrayView<T> view) {
 	reverse(view.data, view.count);
+}
+
+template <typename T>
+s64 len(ArrayView<T> view) {
+	return view.count;
+}
+
+template <typename T>
+void type_hash(Hasher* hasher, ArrayView<T> array) {
+	hasher->hash(array.count);
+	for (auto item: array) {
+		hasher->hash(item);
+	}
 }
 
 template <typename T>

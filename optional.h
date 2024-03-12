@@ -1,5 +1,8 @@
 #pragma once
 
+#include "reflection.h"
+#include "string_def.h"
+
 template <typename T>
 struct Optional {
 	T    value;
@@ -47,4 +50,25 @@ auto make_optional() -> Optional<T> {
 template <typename T>
 auto make_optional(T value) -> Optional<T> {
 	return Optional<T>(value);
+}
+
+template <typename T>
+void type_format(Formatter* formatter, Optional<T>* opt, String spec) {
+	if (opt->has_value) {
+		format(formatter, "Optional{%}", opt->value);
+	} else {
+		format(formatter, "Optional{}");
+	}
+}
+
+struct Optional_Type: Type {
+	constexpr static auto KIND = make_type_kind("opt");
+
+	Type* inner = NULL;
+};
+
+template <typename T>
+Optional_Type* reflect_type(Optional<T>* opt, Optional_Type* type) {
+	type->inner = reflect.type_of<T>();
+	return type;
 }

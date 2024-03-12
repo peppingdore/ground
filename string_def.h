@@ -1,8 +1,9 @@
 #pragma once
 
 #include "base.h"
-#include "array_view.h"
 #include "hash.h"
+#include "allocator.h"
+#include "pointer_math.h"
 
 // #if OS_WINDOWS
 // 	#define U_STATIC_IMPLEMENTATION
@@ -95,7 +96,7 @@ BaseString<T> make_string(const T* c_str) {
 		}
 		ptr += 1;
 	}
-	return { .data = (T*) c_str, .length = pointer_diff(ptr, c_str) };
+	return { .data = (T*) c_str, .length = ptr_diff(ptr, c_str) };
 }
 
 constexpr String operator""_b(const char* c_str, size_t length) {

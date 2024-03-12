@@ -21,7 +21,7 @@ String as_str(SmallString* x) {
 }
 
 void append(SmallString* res, char c) {
-	if (res->length >= array_count(res->buf)) {
+	if (res->length >= static_array_count(res->buf)) {
 		return;
 	}
 	res->buf[res->length] = c;
@@ -295,8 +295,6 @@ struct ParseIntegerParams {
 // If number's base is not 10 than it's threated as unsigned.
 template <typename T, StringChar Char> requires (std::numeric_limits<T>::is_integer)
 inline bool parse_integer(BaseString<Char> str, T* result, ParseIntegerParams params = {}) {
-	ZoneScoped;
-
 	static_assert(sizeof(T) == 1 || sizeof(T) == 2 || sizeof(T) == 4 || sizeof(T) == 8, "Integer size is not supported");
 
 	constexpr bool is_signed = std::numeric_limits<T>::is_signed;
@@ -453,8 +451,8 @@ inline bool parse_integer(BaseString<Char> str, T* result, ParseIntegerParams pa
 #pragma pop_macro("min")
 
 
-	Unsigned_T accumulator = 0;
-	Unsigned_T exponent_limit = limit / base;
+	UnsignedT accumulator = 0;
+	UnsignedT exponent_limit = limit / base;
 
 	bool did_exponent_overflow = false;
 
@@ -479,7 +477,7 @@ inline bool parse_integer(BaseString<Char> str, T* result, ParseIntegerParams pa
 				return fail();
 			}
 
-			Unsigned_T new_number = accumulator + digit * exponent;
+			UnsignedT new_number = accumulator + digit * exponent;
 			if (new_number > limit || new_number < accumulator) {
 				return false;
 			}

@@ -19,8 +19,8 @@ void quick_sort(s64 start, s64 length, auto* arr, auto less, auto swap) {
 	};
 
 	auto find_lower_on_the_right = [&] (s64 anchor_index) -> s64 {
-		for (auto i: range_from_to(anchor_index, view.count)) {
-			if (!less(arr, i, anchor_index)) {
+		for (auto i: range_from_to(anchor_index, length)) {
+			if (less(arr, i, anchor_index)) {
 				return i;
 			}
 		}
@@ -58,9 +58,9 @@ void sort(auto* arr, auto less, auto swap) {
 
 void sort(auto* arr, auto less) {
 	auto swap = [](auto* arr, s64 a, s64 b) {
-		auto temp = *arr[a];
-		*arr[a] = *arr[b];
-		*arr[b] = temp;
+		auto temp = *arr->operator[](a);
+		*arr->operator[](a) = *arr->operator[](b);
+		*arr->operator[](b) = temp;
 	};
 	sort(arr, less, swap);
 }
@@ -73,7 +73,7 @@ void sort(auto* arr) {
 }
 
 auto sort_key(auto* arr, auto key) {
-	auto less = [](auto* arr, s64 a, s64 b) {
+	auto less = [key](auto* arr, s64 a, s64 b) {
 		return key(*arr->operator[](a)) < key(*arr->operator[](b));
 	};
 	return less;

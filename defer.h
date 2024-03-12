@@ -4,9 +4,9 @@
 
 template<typename T>
 struct DeferScope {
-	T lambda;
-	DeferScope(T lambda): lambda(lambda) {}
-	~DeferScope() { lambda(); }
+	T f;
+	DeferScope(T f): f(f) {}
+	~DeferScope() { f(); }
 	DeferScope(const DeferScope&);
 	DeferScope& operator=(const DeferScope&);
 };

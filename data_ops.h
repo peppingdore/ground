@@ -15,3 +15,8 @@ void reverse(T* data, u64 length) {
 		swap(data + i, data + (length - i - 1));
 	}
 }
+
+template <typename Return_Type, typename T> requires (sizeof(Return_Type) == sizeof(T))
+Return_Type bitcast(T thing) {
+	return *reinterpret_cast<Return_Type*>(&thing);
+}

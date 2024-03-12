@@ -1,7 +1,7 @@
 #pragma once
 
 #include "string_def.h"
-#include "../optional.h"
+#include "optional.h"
 #include "byte_order.h"
 #include "tuple.h"
 #include "code_location.h"

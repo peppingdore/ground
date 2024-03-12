@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../base.h"
+#include "../data_ops.h"
 
 enum class Memory_Order: s32 {
 	Relaxed = 1,

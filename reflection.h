@@ -591,7 +591,8 @@ void fill_struct_type_members(StructType* type, s32 offset, StructMember* member
 }
 
 void reflect_add_tag(Type* type, auto value, s64* tags_capacity) {
-	auto copied = copy(c_allocator, value);
+	auto copied = new decltype(value)();
+	*copied = value;
 	auto tag = make_any(copied);
 
 	if (auto casted = type->as<StructType>()) {
