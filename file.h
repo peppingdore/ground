@@ -1,6 +1,11 @@
 #pragma once
 
 #include "error.h"
+#include "io.h"
+
+#if IS_POSIX
+	#include <fcntl.h>
+#endif
 
 using OpenFileFlag = u32;
 constexpr OpenFileFlag FILE_READ       = 1;
@@ -54,6 +59,8 @@ Tuple<File, Error*> open_file(UnicodeString path, OpenFileFlag flags = FILE_READ
 	return { file_from_native_handle(handle), NULL };
 }
 
+// @TODO: implement os_read_file(return 0 if EOF is reached), os_write_file.
+
 #elif IS_POSIX
 
 Tuple<File, Error*> open_file(UnicodeString path, OpenFileFlag flags = FILE_READ, u32 unix_perm = 0777) {
@@ -85,4 +92,84 @@ Tuple<File, Error*> open_file(UnicodeString path, OpenFileFlag flags = FILE_READ
 	return { fd, NULL };
 }
 
+Tuple<s64, Error*> os_write_file(File* file, void* data, s64 size) {
+	ssize_t result = write(file->handle, data, (u64) size);
+	if (result == -1) {
+		return { -1, posix_error() };
+	}
+	return { result, NULL };
+}
+
+// Returns 0, NULL if EOF is reached.
+Tuple<s64, Error*> os_read_file(File* file, void* buf, s64 size) {
+	ssize_t result = read(file->handle, buf, (u64) size);
+	if (result == -1) {
+		return { -1, posix_error() };
+	}
+	return { result, NULL };
+}
+
 #endif
+
+Error* write_file(File* file, void* data, s64 size) {
+	s64 total_written = 0;
+	while (total_written < size) {
+		auto [written, e] = os_write_file(file, ptr_add(data, total_written), size - total_written);
+		if (e) {
+			return e;
+		}
+		total_written += written;
+	}
+	return NULL;
+}
+
+Tuple<s64, Error*> read_file(File* file, void* buf, s64 size) {
+	s64 total_read = 0;
+	while (total_read < size) {
+		auto [read, e] = os_read_file(file, ptr_add(buf, total_read), size - total_read);
+		if (e) {
+			return { total_read, e };
+		}
+		if (read == 0) {
+			break;
+		}
+		total_read += read;
+	}
+	return { total_read, NULL };
+}
+
+Writer file_writer(File* file) {
+	Writer w = {
+		.item = file,
+		.write_proc = +[] (void* item, void* data, s64 size) -> Error* {
+			return write_file((File*) item, data, size);
+		}
+	};
+	return w;
+}
+
+Reader file_reader(File* file) {
+	Reader r = {
+		.item = file,
+		.read_proc = +[] (void* item, void* buf, s64 size) -> Tuple<s64, Error*> {
+			return os_read_file((File*) item, buf, size);
+		}
+	};
+	return r;
+}
+
+Tuple<String, Error*> read_text_at_path(Allocator allocator, UnicodeString path) {
+	auto [f, e] = open_file(path);
+	if (e) {
+		return { {}, e };
+	}
+	auto [text, err] = read_text(file_reader(&f));
+	if (err) {
+		return { {}, err };
+	}
+	return { text, NULL };
+}
+
+Tuple<String, Error*> read_text_at_path(UnicodeString path) {
+	return read_text_at_path(c_allocator, path);
+}
