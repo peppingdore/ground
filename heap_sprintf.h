@@ -1,6 +1,8 @@
 #pragma once
 
 #include "base.h"
+#include "math.h"
+#include <stdio.h>
 
 template <typename... Args>
 char* heap_sprintf(const char* format, Args... args) {
