@@ -366,7 +366,7 @@ HashMapType* reflect_type(HashMap<K, V>* map, HashMapType* type) {
 		return casted->capacity();
 	};
 
-	type->iterate = [](void* map) -> Generator<Map_Type::Item*> {
+	type->iterate = [](void* map) -> Generator<MapType::Item*> {
 		auto casted_map = (Map*) map;
 
 		HashMapType::Item item;
