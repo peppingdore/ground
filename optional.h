@@ -52,15 +52,6 @@ auto make_optional(T value) -> Optional<T> {
 	return Optional<T>(value);
 }
 
-template <typename T>
-void type_format(Formatter* formatter, Optional<T>* opt, String spec) {
-	if (opt->has_value) {
-		format(formatter, "Optional{%}", opt->value);
-	} else {
-		format(formatter, "Optional{}");
-	}
-}
-
 struct Optional_Type: Type {
 	constexpr static auto KIND = make_type_kind("opt");
 
