@@ -1,7 +1,9 @@
 #pragma once
+
 #include "allocator.h"
 #include "array_view.h"
 #include "reflection.h"
+#include "coroutine.h"
 
 #include <string.h>
 #include <initializer_list>
@@ -249,4 +251,18 @@ ArrayType* reflect_type(Array<T>* x, ArrayType* type) {
 		return item;
 	};
 	return type;
+}
+
+template <typename T>
+Array<T> to_array(Allocator allocator, Generator<T>&& generator) {
+	Array<T> arr = { .allocator = allocator };
+	for (auto it: generator) {
+		arr.add(it);
+	}
+	return arr;
+}
+
+template <typename T>
+Array<T> to_array(Generator<T>&& generator) {
+	return to_array(c_allocator, std::move(generator));
 }
