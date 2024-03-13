@@ -1036,3 +1036,12 @@ void format_fixed_array_as_c_string(Formatter* formatter, Any thing) {
 
 	format(formatter, "%", thing);
 }
+
+template <typename T>
+void type_format(Formatter* formatter, Optional<T>* opt, String spec) {
+	if (opt->has_value) {
+		format(formatter, "Optional{%}", opt->value);
+	} else {
+		format(formatter, "Optional{}");
+	}
+}
