@@ -133,3 +133,11 @@ template <typename T>
 void type_hash(Hasher* hasher, BaseString<T> string) {
 	hasher->hash(string.data, sizeof(T) * string.length);
 }
+
+s64 len(String str) {
+	return str.length;
+}
+
+s64 len(UnicodeString str) {
+	return str.length;
+}
