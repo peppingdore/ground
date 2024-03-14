@@ -154,17 +154,13 @@ auto split(auto str, auto predicate) -> Generator<decltype(str)> {
 	for (auto i: range(str.length)) {
 		if (predicate(str[i])) {
 			auto x = slice(str, cursor, i - cursor);
-			if (x.length > 0) {
-				co_yield x;
-			}
+			co_yield x;
 			cursor = i + 1;
 		}
 	}
 
 	auto x = slice(str, cursor, str.length - cursor);
-	if (x.length > 0) {
-		co_yield x;
-	}
+	co_yield x;
 }
 
 auto split2(auto str, auto predicate) {
