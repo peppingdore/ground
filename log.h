@@ -77,7 +77,7 @@ inline void LogAtLogger(Logger* logger, LogInfo info, UnicodeString text) {
 }
 
 inline void LogAtLogger(Logger* logger, LogInfo info, auto... args) {
-	auto str = sprint(logger->allocator, args...);
+	auto str = sprint_unicode(logger->allocator, args...);
 	LogAtLogger(logger, info, str);
 }
 

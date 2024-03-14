@@ -289,7 +289,7 @@ void format(Formatter* formatter, BaseString<T> format_str, Args... args) {
 
 	Any things[] = { make_any(&args)... };
 
-	String short_specs[] = { "P"_b, "p"_b, "h"_b, "b"_b, "B"_b };
+	String short_specs[] = { "p"_b, "P"_b, "h"_b, "H"_b, "b"_b, "B"_b };
 
 	FormatFlag flags[] = {
 		{
@@ -1001,15 +1001,24 @@ void print(auto... args) {
 	print(text);
 }
 
-template <StringChar T = char32_t>
+template <StringChar T = char>
 BaseString<T> sprint(Allocator allocator, auto... args) {
 	auto builder = build_string<T>();
 	format(&builder, allocator, args...);
 	return builder.get_string();
 }
 
-UnicodeString sprint(auto... args) {
+template <StringChar T = char>
+BaseString<T> sprint(auto... args) {
 	return sprint(c_allocator, args...);
+}
+
+UnicodeString sprint_unicode(Allocator allocator, auto... args) {
+	return sprint<char32_t>(allocator, args...);
+}
+
+UnicodeString sprint_unicode(auto... args) {
+	return sprint<char32_t>(c_allocator, args...);
 }
 
 
