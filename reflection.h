@@ -91,6 +91,10 @@ struct PrimitiveValue {
 		char32_t char32_value;
 		// @NewPrimitive
 	};
+
+	bool operator==(PrimitiveValue other) {
+		return memcmp(this, &other, sizeof(*this)) == 0;
+	}
 };
 
 PrimitiveValue make_primitive_value(auto thing) {
