@@ -2,6 +2,7 @@
 
 #include "../base.h"
 #include "../data_ops.h"
+#include <string.h>
 
 enum class Memory_Order: s32 {
 	Relaxed = 1,
