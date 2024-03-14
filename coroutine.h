@@ -63,24 +63,29 @@ struct Generator {
 		return *this;
 	}
 
+
+	struct Range {
+		Generator* gen = NULL;
+
+		bool operator!=(int rhs /*ignored*/) {
+			return !gen->handle.done();
+		}
+
+		void operator++() {
+			gen->handle.resume();
+		}
+
+		T operator*() {
+			return gen->handle.promise().stored_value;
+		}
+	};
+
 	auto begin() {
-		return std::move(*this);
+		return Range{ .gen = this };
 	}
 
 	int end() {
 		return 0;
-	}
-
-	bool operator!=(int rhs /*ignored*/) {
-		return !handle.done();
-	}
-
-	void operator++() {
-		handle.resume();
-	}
-
-	T operator*() {
-		return handle.promise().stored_value;
 	}
 };
 
