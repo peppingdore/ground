@@ -34,10 +34,9 @@ class Codepoint:
 		self.category_id = categories.get(og_fields[2])
 		self.combining_class = int(og_fields[3]) if og_fields[3] else None
 		self.bidi_category_id = bidi_categories.get(og_fields[4])
-		self.decomposition_mapping = []
 		mapping_fields = og_fields[5].split()
+		self.decomposition_mapping = [len(mapping_fields)]
 		for it in mapping_fields:
-			self.decomposition_mapping.append(len(mapping_fields))
 			if it.startswith("<") and it.endswith(">"):
 				tag = it.removeprefix("<").removesuffix(">")
 				self.decomposition_mapping.append(0xffffffff-decomposition_tags.get(tag))
@@ -64,10 +63,12 @@ class Codepoint:
 		if self.combining_class:
 			nums[0] |= 1 << 3
 			nums.append(self.combining_class)
-		if self.decomposition_mapping:
+		if self.decomposition_mapping[0] > 0:
 			nums[0] |= 1 << 5
 			nums.extend(self.decomposition_mapping)
-		maybe_pack_field(self.decimal_digit, 6)
+		if self.decimal_digit != None:
+			nums[0] |= 1 << 6
+			nums.append(self.decimal_digit)
 		maybe_pack_field(self.digit, 7)
 		maybe_pack_field(self.numeric, 8)
 		if self.mirrored:
@@ -180,8 +181,11 @@ def generate(*, version=unicode_version.UNICODE_VERSION):
 		offsets_into_packed=',\n'.join(map(hex, offset_into_packed)),
 		packed_codepoints=',\n'.join(c_packed_codepoints),
 		general_categories=',\n'.join(map(lambda it: f'\t{it[0]} = {it[1]}', categories.values.items())),
+		general_categories_reflect='\n'.join(map(lambda it: f'\tENUM_VALUE({it});', categories.values.keys())),
 		bidi_categories=',\n'.join(map(lambda it: f'\t{it[0]} = {it[1]}', bidi_categories.values.items())),
+		bidi_categories_reflect='\n'.join(map(lambda it: f'\tENUM_VALUE({it});', bidi_categories.values.keys())),
 		decomposition_tags=',\n'.join(map(lambda it: f'\t{it[0]} = {hex(0xffffffff - it[1])}', decomposition_tags.values.items())),
+		decomposition_tags_reflect='\n'.join(map(lambda it: f'\tENUM_VALUE({it});', decomposition_tags.values.keys())),
 	)
 
 if __name__ == "__main__":
