@@ -289,6 +289,7 @@ struct ParseIntegerParams {
 	// Underscores can be placed between numbers for visual clarity.
 	bool allow_underscores = true;
 	s32* result_base = NULL;
+	s32  base = 0;
 };
 
 
@@ -309,31 +310,40 @@ inline bool parse_integer(BaseString<Char> str, T* result, ParseIntegerParams pa
 	int start = 0;
 	int end = str.length - 1;
 
-	auto fail = [&]() -> bool {
-		return false;
-	};
-
-
-	// Check [hex|binary] literal possibility.
-	if (str.length > 2 && str[start] == '0') {
-		if (str[start + 1] == 'b' || str[start + 1] == 'B') {
+	if (params.base == 0) {
+		if (starts_with(str, "0b"_b) || starts_with(str, "0B"_b)) {
 			base   = 2;
 			start += 2;
-		} else if (str[start + 1] == 'x' || str[start + 1] == 'X') {
+		} else if (starts_with(str, "0x"_b) || starts_with(str, "0X"_b)) {
 			base   = 16;
 			start += 2;
+		} else {
+			if (params.use_c_octal_prefix) {
+				if (starts_with(str, "0"_b)) {
+					base   = 8;
+					start += 1;
+				}
+			} else {
+				if (starts_with(str, "0o"_b) || starts_with(str, "0O"_b)) {
+					base   = 8;
+					start += 2;
+				}
+			}
 		}
-	}
-
-	if (base == 10) {
-		if (params.use_c_octal_prefix) {
-			if (starts_with(str, "0"_b)) {
-				base   = 8;
+	} else {
+		base = params.base;
+		if (base == 2) {
+			if (starts_with(str, "0b"_b) || starts_with(str, "0B"_b)) {
 				start += 2;
 			}
-		} else {
+		} else if (base == 8) {
 			if (starts_with(str, "0o"_b) || starts_with(str, "0O"_b)) {
-				base   = 8;
+				start += 2;
+			} else if (starts_with(str, "0"_b)) {
+				start += 1;
+			}
+		} else if (base == 16) {
+			if (starts_with(str, "0x"_b) || starts_with(str, "0X"_b)) {
 				start += 2;
 			}
 		}
@@ -380,26 +390,26 @@ inline bool parse_integer(BaseString<Char> str, T* result, ParseIntegerParams pa
 			} else if (c >= 'a' && c <= 'f') {
 				digit = c - 'a' + 10;
 			} else {
-				return fail();
+				return false;
 			}
 
 			if (digit >= base) {
-				return fail();
+				return false;
 			}
 
 			if (digit != 0) {
 				if (did_exponent_overflow) {
-					return fail();
+					return false;
 				}
 				
 			#if 0
 				// Why do we need this? And do we?
-				if (limit / digit < exponent) return fail();
+				if (limit / digit < exponent) return false;
 			#endif
 
 				UnsignedT new_number = number + digit * exponent;
 				if (new_number < number) { 
-					return fail();
+					return false;
 				}
 				number = new_number;
 			}
@@ -469,12 +479,12 @@ inline bool parse_integer(BaseString<Char> str, T* result, ParseIntegerParams pa
 		T digit = c - '0';
 
 		if (digit < 0 || digit > 9) {
-			return fail();
+			return false;
 		}
 
 		if (digit != 0) {
 			if (did_exponent_overflow) {
-				return fail();
+				return false;
 			}
 
 			UnsignedT new_number = accumulator + digit * exponent;
@@ -579,7 +589,7 @@ inline bool parse_float(BaseString<Char> str, f64* result, Float_Parsing_Params 
 			auto c = significand_part[i];
 
 			auto add_digit = [&](u8 digit) -> bool {
-				if (digits_count == array_count(digits)) {
+				if (digits_count == static_array_count(digits)) {
 					return false;
 				}
 
