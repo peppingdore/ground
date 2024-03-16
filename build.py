@@ -194,7 +194,7 @@ def build_compile_cmdline(unit, params, out_path):
 		args.append(resolve_compiler_flag(it, params.compiler))
 	args.append(unit)
 	verbose(args)
-	return ' '.join(args)
+	return ' '.join(map(str, args))
 
 class Compile_Result:
 	def __init__(self, unit, process, elapsed, out_path):
