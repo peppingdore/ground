@@ -187,3 +187,17 @@ auto iterate_lines(auto str, bool include_line_breaks = true) -> Generator<declt
 	}
 	co_yield slice(str, cursor);
 }
+
+auto remove_prefix(auto str, auto prefix) {
+	if (starts_with(str, prefix)) {
+		return slice(str, len(prefix));
+	}
+	return str;
+}
+
+auto remove_suffix(auto str, auto suffix) {
+	if (ends_with(str, suffix)) {
+		return slice(str, 0, len(str) - len(suffix));
+	}
+	return str;
+}
