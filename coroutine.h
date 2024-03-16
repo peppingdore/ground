@@ -63,6 +63,14 @@ struct Generator {
 		return *this;
 	}
 
+	bool next(T* out_value) {
+		if (handle.done()) {
+			return false;
+		}
+		handle.resume();
+		*out_value = handle.promise().stored_value;
+		return true;
+	}
 
 	struct Range {
 		Generator* gen = NULL;
