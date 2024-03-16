@@ -142,9 +142,9 @@ def resolve_compiler_flag(flag, compiler):
 	x = tuple(it.removeprefix("passthrough_clang_cl:") for it in x)
 	return ' '.join(x)
 
-def run(cmd, *, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, shell=True):
+def run(cmd, *, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, shell=True, cwd=None):
 	start = time.perf_counter()
-	process = subprocess.run(str(cmd), stdout=stdout, stderr=stderr, stdin=stdin, shell=shell)
+	process = subprocess.run(str(cmd), stdout=stdout, stderr=stderr, stdin=stdin, shell=shell, cwd=cwd)
 	elapsed = time.perf_counter() - start
 	return (process, elapsed)
 
@@ -533,7 +533,7 @@ def build_main():
 	if not builder.did_link_successfully(link_result):
 		return 1
 	if args.run:
-		builder.run(link_result.output_path, stdout=sys.stdout, stdin=sys.stdin)
+		builder.run(Path(link_result.output_path).resolve(), stdout=sys.stdout, stdin=sys.stdin, cwd=Path(link_result.output_path).parent)
 	return builder.Runnable_Executable(link_result.output_path)
 """
 
