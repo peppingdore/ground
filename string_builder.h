@@ -72,6 +72,8 @@ struct StringBuilder {
 
 	// Does not copy the string.
 	BaseString<T> get_string() {
+		append("\0"_b);
+		arr.count -= 1;
 		return make_string(arr.data, arr.count);
 	}
 };
