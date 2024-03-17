@@ -124,6 +124,8 @@ REFLECT(UnicodeBidiCategory) {
 /* %-end */
 };
 
+#undef small // Windows's <rpcndr.h> has #define small char...
+
 enum class UnicodeDecompositionTag: unsigned int {
 /* %-decomposition_tags */
 	noBreak = 0xfffffffe,
