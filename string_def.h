@@ -141,3 +141,15 @@ s64 len(String str) {
 s64 len(UnicodeString str) {
 	return str.length;
 }
+
+// template <StringChar T>
+// s64 len(const T* str) {
+// 	if (str == NULL) {
+// 		return 0;
+// 	}
+// 	auto ptr = str;
+// 	while (*ptr) {
+// 		ptr += 1;
+// 	}
+// 	return (ptr - str);
+// }
