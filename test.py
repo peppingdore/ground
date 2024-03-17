@@ -14,13 +14,13 @@ import threading
 ARGS = None
 
 class Tester:
-	def __init__(self, path):
+	def __init__(self, path, blacklist=[]):
 		self.tests = []
 		self.path = path
 		self.msg_queue = Queue()
 		self.parallel = True
-		ARGS.blacklist.extend((Path(path) / "test_ignore.txt").read_text(errors='ignore').splitlines())
-		self.verbose(f'ARGS.blacklist = {ARGS.blacklist}')
+		self.blacklist = blacklist
+		self.verbose(f'blacklist = {self.blacklist}')
 
 	def run_exec(self, cmd, *, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, shell=True):
 		self.verbose(f'Running: {cmd}')
@@ -51,9 +51,9 @@ class Tester:
 
 	def should_ignore(self, entry):
 		if entry.is_dir():
-			if entry.name in map(lambda x: x.removeprefix('/'), filter(lambda x: x.startswith('/'), ARGS.blacklist)):
+			if entry.name in map(lambda x: x.removeprefix('/'), filter(lambda x: x.startswith('/'), self.blacklist)):
 				return True
-		if entry.name in filter(lambda x: not x.startswith('/'), ARGS.blacklist):
+		if entry.name in filter(lambda x: not x.startswith('/'), self.blacklist):
 			return True
 		return False
 
@@ -178,7 +178,7 @@ class CppTest(Test):
 
 	def parse_results(self, output):
 		lines = output.decode('utf-8').splitlines()
-		self.tester.verbose(f"Lines {self.path}: \n" + str(lines))
+		self.tester.verbose(f"Lines {self.path}:\n {chr(10).join(lines)}")
 		def read_line():
 			nonlocal lines
 			if len(lines) == 0:
@@ -252,7 +252,7 @@ def main():
 	parser.add_argument('--verbose', action='store_true')
 	parser.add_argument('--blacklist', nargs='*', default=[])
 	ARGS = parser.parse_args()
-	tester = Tester(Path(__file__).parent)
+	tester = Tester(Path(__file__).parent, blacklist=ARGS.blacklist)
 	return tester.run()
 
 if __name__ == "__main__":

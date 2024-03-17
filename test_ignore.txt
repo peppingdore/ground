@@ -1,4 +1,0 @@
-/b_lib
-/.git
-/.vscode
-/__pycache__

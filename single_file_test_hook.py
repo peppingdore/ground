@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 from pathlib import Path, PurePosixPath
 import os
-import sys
+import shutil
 
 CPP_CONTENT = '''
 #pragma once
@@ -19,8 +19,6 @@ path.mkdir(parents=True, exist_ok=True)
 to_build = []
 
 blacklist = ['.git', '.vscode', 'third_party', 'b_lib', 'testing.h']
-if sys.platform != 'win32':
-	blacklist.append('win_sync.h')
 
 def gen(dir, level=1):
 	for it in os.scandir(Path(__file__).parent / dir):
@@ -39,4 +37,5 @@ def gen(dir, level=1):
 			)
 
 def run_hook(tester):
+	shutil.rmtree(path, ignore_errors=True)
 	gen(Path('.'))
