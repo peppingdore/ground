@@ -59,7 +59,29 @@ Tuple<File, Error*> open_file(UnicodeString path, OpenFileFlag flags = FILE_READ
 	return { file_from_native_handle(handle), NULL };
 }
 
-// @TODO: implement os_read_file(return 0 if EOF is reached), os_write_file.
+Tuple<s64, Error*> os_write_file(File* file, void* data, s64 size) {
+	DWORD to_write = clamp_u64(0, u32_max, size);
+	DWORD written = 0;
+	BOOL  result = WriteFile(file->handle, data, to_write, &written, NULL);
+	if (!result) {
+		return { -1, windows_error() };
+	}
+	return { written, NULL };
+}
+
+// Returns 0, NULL if EOF is reached.
+Tuple<s64, Error*> os_read_file(File* file, void* buf, s64 size) {
+	DWORD to_read = clamp_u64(0, u32_max, size);
+	DWORD read;
+	BOOL  result = ReadFile(file->handle, buf, to_read, &read, NULL);
+	if (!result) {
+		if (GetLastError() == ERROR_HANDLE_EOF) {
+			return { 0, NULL };
+		}
+		return { -1, windows_error() };
+	}
+	return { read, NULL };
+}
 
 #elif IS_POSIX
 
