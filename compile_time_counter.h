@@ -1,5 +1,7 @@
 #pragma once
 
+#include "base.h"
+
 template <auto tag = []{}>
 struct CTCounter {
 	// Stolen from: https://mc-deltat.github.io/articles/stateful-metaprogramming-cpp20

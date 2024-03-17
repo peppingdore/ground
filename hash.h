@@ -1,6 +1,8 @@
 #pragma once
 
 #include "third_party/spooky_hash.h"
+#include "type_utils.h"
+#include <math.h>
 
 using Hash64 = u64;
 

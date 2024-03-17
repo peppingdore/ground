@@ -3,6 +3,7 @@
 #include "base.h"
 #include "math.h"
 #include <stdio.h>
+#include <string.h>
 
 template <typename... Args>
 char* heap_sprintf(const char* format, Args... args) {

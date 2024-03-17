@@ -1,6 +1,7 @@
 #pragma once
 
 #include "reflection.h"
+#include "string.h"
 
 struct Formatter;
 

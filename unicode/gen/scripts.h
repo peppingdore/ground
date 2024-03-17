@@ -1,7 +1,5 @@
 #pragma once
 
-#include "../unicode_table_types.h"
-
 enum class UnicodeScript {
 /* %-script_codes */
 	Common = 1,

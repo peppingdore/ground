@@ -4,6 +4,7 @@
 #include "array.h"
 #include "code_location.h"
 #include "reflection.h"
+#include "optional.h"
 
 constexpr s64    DEFAULT_HASH_MAP_CAPACITY = 16;
 constexpr Hash64 HASH_MAP_HASH_EMPTY = 0;
