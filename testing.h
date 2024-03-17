@@ -100,8 +100,6 @@ int main(int argc, char* argv[]) {
 	return 0;
 }
 
-BUILD_RUN("def add_test(name):\n\tif 'test' in globals(): test.cases[name] = tester.Case(name)")
-
 void tester_write_result_loc(CodeLocation loc) {
 	tester_write_result_str(loc.file);
 	tester_write_result_int(loc.line);
@@ -115,7 +113,10 @@ void test_expect(bool cond, const char* cond_str, const char* message, CodeLocat
 		tester_write_result_int(1);
 	} else {
 		tester.current_test->expect_failed += 1;
-		printf("  %s - failed\n", cond_str);
+		if (strcmp(cond_str, "") != 0) {
+			printf("  %s - failed\n", cond_str);
+		}
+		printf("  %s\n", message);
 		tester_write_result_int(0);
 	}
 
@@ -128,13 +129,13 @@ void test_expect(bool cond, const char* cond_str, const char* message, CodeLocat
 		ptr = ptr->next;
 	}
 	tester_write_result_int(scope_count);
+	tester_write_result_loc(loc);
 	ptr = tester.scope;
 	while (ptr) {
 		tester_write_result_loc(ptr->loc);
 		printf("   %s: %d\n", ptr->loc.file, ptr->loc.line);
 		ptr = ptr->next;
 	}
-	tester_write_result_loc(loc);
 	printf("   %s: %d\n", loc.file, loc.line);
 }
 
@@ -143,7 +144,7 @@ void test_expect(bool cond, const char* cond_str, const char* message, CodeLocat
 // }
 
 void test_expect(bool cond, const char* cond_str, CodeLocation loc = caller_loc()) {
-	char* str = heap_sprintf("Expected %s", cond_str);
+	char* str = heap_sprintf("Expected '%s'", cond_str);
 	test_expect(cond, cond_str, str, loc);
 	free(str);
 }
@@ -166,11 +167,13 @@ void tester_scope_pop() {
 }
 
 #define TEST(name)\
-BUILD_RUN("add_test(\"" #name "\")");\
+BUILD_RUN("if 'test' in globals(): test.get_case(\"" #name "\")");\
 void test_##name ();\
 int register_test_##name = []() { register_test(&test_##name, #name); return 0; }();\
 inline void test_##name()
 
-#define EXPECT(cond, ...) test_expect(cond, #cond, __VA_ARGS__);
-#define EXPECT_OP(a, op, b, ...) EXPECT(a op b, sprint("Expected % " #op " %", a, b), __VA_ARGS__);
-#define EXPECT_EQ(a, b, ...) EXPECT_OP(a, ==, b, __VA_ARGS__)
+#define FAIL(message) test_expect(false, "", message)
+#define EXPECT(cond, ...) test_expect(cond, #cond, ## __VA_ARGS__);
+// Requires "format.h"
+// #define EXPECT_OP(a, op, b, ...) EXPECT(a op b, sprint("Expected % " #op " %", a, b), ## __VA_ARGS__);
+// #define EXPECT_EQ(a, b, ...) EXPECT_OP(a, ==, b, ## __VA_ARGS__)
