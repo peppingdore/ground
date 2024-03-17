@@ -47,21 +47,40 @@ class Tester:
 		self.scan(self.path)
 		self.print(f"Collected {len(self.tests)} tests.")
 		# chr(10) is newline. this way because f-string can't contain \n literal.
-		self.verbose(f"Tests: \n{chr(10).join(map(lambda it: it.path, self.tests))}") 
+		self.verbose(f"Tests: \n{chr(10).join(map(lambda it: it.path, self.tests))}")
+
+	def should_ignore(self, entry):
+		if entry.is_dir():
+			if entry.name in map(lambda x: x.removeprefix('/'), filter(lambda x: x.startswith('/'), ARGS.blacklist)):
+				return True
+		if entry.name in filter(lambda x: not x.startswith('/'), ARGS.blacklist):
+			return True
+		return False
+
+	def run_hook(self, path):
+		import importlib.machinery
+		module = importlib.machinery.SourceFileLoader(path, path).load_module()
+		module.run_hook(self)
+
+	def scan_and_run_hooks(self, dir):
+		self.verbose(f"Scanning and running hooks in {dir}")
+		for it in os.scandir(dir):
+			if self.should_ignore(it): continue
+			if it.is_dir():
+				self.scan_and_run_hooks(it.path)
+				continue
+			if it.name.lower().endswith("_test_hook.py"):
+				self.run_hook(it.path)
 
 	def scan(self, dir):
-		self.verbose(f'Collecting tests from {dir}')
+		self.verbose(f'Scanning for tests in {dir}')
 		for it in os.scandir(dir):
+			if self.should_ignore(it): continue
 			if it.is_dir():
-				if not it.name in map(lambda x: x.removeprefix('/'), filter(lambda x: x.startswith('/'), ARGS.blacklist)):
-					self.scan(os.path.join(dir, it))
+				self.scan(it.path)
 				continue
-			if it.name in filter(lambda x: not x.startswith('/'), ARGS.blacklist): continue
 			if it.name.lower().endswith(("_test.h", "_test.cpp", "_test.hpp", "_test.c")):
 				self.add(CppTest(it.path, self))
-			# if it.name.lower().endswith("_test.py"):
-			# 	self.add(PyTest(it.path, self))
-			
 
 	def cases(self):
 		cases = []
@@ -69,6 +88,7 @@ class Tester:
 		return cases
 
 	def run(self):
+		self.scan_and_run_hooks(self.path)
 		self.collect_tests()
 		exit_code = -1
 		def runner_thread():
@@ -81,6 +101,7 @@ class Tester:
 			try:
 				pool.map(lambda test: test.build(), self.tests)
 				pool.map(lambda test: run_test(test), filter(lambda it: it.build_ok, self.tests))
+				self.print(" -- Summary -- ")
 				for test in self.tests:
 					if not test.build_ok:
 						self.print(f"Test {test.path}: failed to build")
@@ -131,7 +152,7 @@ class Test:
 		self.build_ok = False
 
 	def is_ok(self):
-		return all(map(lambda it: it.is_ok(), self.cases.values()))
+		return self.build_ok and all(map(lambda it: it.is_ok(), self.cases.values()))
 
 	def get_case(self, name):
 		if name in self.cases: return self.cases[name]
@@ -149,15 +170,6 @@ class TestCaseExpect:
 		self.scope = scope
 
 class ParseResultsException(Exception): pass
-
-# class PyTest(Test):
-# 	def __init__(self, path, tester):
-# 		super().__init__(path, tester)
-	
-# 	def run(self):
-# 		import importlib.machinery
-# 		module = importlib.machinery.SourceFileLoader(self.path, self.path).load_module()
-# 		module.run(self.tester)
 
 class CppTest(Test):
 	def __init__(self, path, tester):
