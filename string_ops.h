@@ -24,7 +24,7 @@ bool is_line_break(char32_t c) {
 	if (c == 0x000a) return true; // line feed
 	if (c == 0x000b) return true; // vertical tab
 	if (c == 0x000c) return true; // form feed
-	// if (c == 0x000d) return true; // carriage return
+	if (c == 0x000d) return true; // carriage return
 	if (c == 0x0085) return true; // next line
 	if (c == 0x2028) return true; // line separator
 	if (c == 0x2029) return true; // paragraph separator
@@ -179,11 +179,19 @@ auto split(Allocator allocator, auto str, auto predicate) {
 
 auto iterate_lines(auto str, bool include_line_breaks = true) -> Generator<decltype(str)> {
 	s64 cursor = 0;
-	for (auto i: range(str.length)) {
+	s64 i = 0;
+	while (i < str.length) {
 		if (is_line_break(str[i])) {
-			co_yield slice(str, cursor, i - cursor + (include_line_breaks ? 1 : 0));
-			cursor = i + 1;
+			if (str[i] == '\r' && (i + 1 < str.length && str[i+1] == '\n')) {
+				co_yield slice(str, cursor, i - cursor + (include_line_breaks ? 2 : 0));
+				cursor = i + 2;
+				i += 1;
+			} else {
+				co_yield slice(str, cursor, i - cursor + (include_line_breaks ? 1 : 0));
+				cursor = i + 1;
+			}
 		}
+		i += 1;
 	}
 	co_yield slice(str, cursor);
 }
