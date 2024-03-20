@@ -3,7 +3,7 @@
 #include "base.h"
 #include "range.h"
 #include "code_location.h"
-#include "math.h"
+#include "math/basic_functions.h"
 
 #include <cstdlib>
 #include <new>

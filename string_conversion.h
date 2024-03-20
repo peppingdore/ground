@@ -5,7 +5,7 @@
 #include "string.h"
 #include "reflection.h"
 #include "string_builder.h"
-#include "math.h"
+#include "math/basic_functions.h"
 
 #include <type_traits>
 #include <limits>
