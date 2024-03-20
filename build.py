@@ -499,6 +499,7 @@ class Default_Build_Params:
 		self.compile_params.include_dirs.append(dir)
 
 	def add_lib(self, lib):
+		if lib in self.link_params.libraries: return
 		self.link_params.libraries.append(lib)
 
 class Runnable_Executable:
