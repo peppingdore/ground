@@ -1,3 +1,8 @@
 b_lib
 __pycache__
 build_temp
+single_file_compilation_tests
+.vs
+.vscode
+*.pdb
+*.exe
