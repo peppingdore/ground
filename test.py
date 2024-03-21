@@ -129,7 +129,7 @@ class Tester:
 				self.print("Success!" if exit_code == 0 else "Failed.")
 			finally:
 				self.msg_queue.put(None)
-		threading.Thread(target=runner_thread).start()
+		threading.Thread(target=runner_thread, daemon=True).start()
 		while it := self.msg_queue.get():
 			print(it)
 		return exit_code
