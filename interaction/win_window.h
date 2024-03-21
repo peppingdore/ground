@@ -157,7 +157,7 @@ LRESULT ground_wnd_proc(HWND h, UINT m, WPARAM wParam, LPARAM lParam) {
 		case WM_NCCREATE: {
 			CREATESTRUCTW* createstruct = (CREATESTRUCTW*) lParam;
 			SetWindowLongPtrW(h, GWLP_USERDATA, (LONG_PTR) createstruct->lpCreateParams);
-			return DefWindowProc(h, m, wParam, lParam);
+			return DefWindowProcW(h, m, wParam, lParam);
 		}
 		break;
 		
@@ -210,7 +210,7 @@ LRESULT ground_wnd_proc(HWND h, UINT m, WPARAM wParam, LPARAM lParam) {
 		}
 		break;
 	}
-	return DefWindowProc(h, m, wParam, lParam);
+	return DefWindowProcW(h, m, wParam, lParam);
 }
 
 f64 get_windows_time_from_start(DWORD message_time) {
