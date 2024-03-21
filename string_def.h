@@ -4,6 +4,7 @@
 #include "hash.h"
 #include "allocator.h"
 #include "pointer_math.h"
+#include "reflection.h"
 
 // #if OS_WINDOWS
 // 	#define U_STATIC_IMPLEMENTATION

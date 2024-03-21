@@ -1,7 +1,6 @@
 #pragma once
 
 #include "base.h"
-#include "reflection.h"
 #include "hash.h"
 #include <string.h>
 
@@ -13,11 +12,6 @@ struct CodeLocation {
 		return line == rhs.line && (strcmp(file, rhs.file) == 0);
 	}
 };
-
-REFLECT(CodeLocation) {
-	MEMBER(file);
-	MEMBER(line);
-}
 
 constexpr CodeLocation make_code_location(s32 line, const char* file) {
 	return {

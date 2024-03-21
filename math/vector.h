@@ -2,6 +2,7 @@
 
 #include "../base.h"
 #include "../range.h"
+#include "../reflection.h"
 
 template <typename T>
 struct Vector_Members1 {
