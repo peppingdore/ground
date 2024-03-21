@@ -13,7 +13,7 @@ struct ScopedRestoreImpl {
 	T& dst;
 	T  value;
 
-	ScopedRestore(T& dst): dst(dst), value(dst) {};
-	~ScopedRestore() { dst = value; };
+	ScopedRestoreImpl(T& dst): dst(dst), value(dst) {};
+	~ScopedRestoreImpl() { dst = value; };
 };
 #define ScopedRestore(x) ScopedRestoreImpl CONCAT(__scoped_restore, __LINE__)(x);

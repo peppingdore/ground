@@ -86,7 +86,7 @@ struct Base_Vector: Vector_Members<N, T> {
 
 	template <typename... Pack>
 	static Base_Vector make(Pack... args) {
-		T arr[N] = { args... };
+		T arr[N] = { (T) args... };
 		Base_Vector vec;
 		for (auto i: range(N)) {
 			vec.components[i] = arr[i];

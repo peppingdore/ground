@@ -99,7 +99,7 @@ struct PrimitiveValue {
 
 PrimitiveValue make_primitive_value(auto thing) {
 	PrimitiveValue v = {};
-	static_assert(sizeof(thing) < sizeof(v));
+	static_assert(sizeof(thing) <= sizeof(v));
 	memcpy(&v, &thing, sizeof(thing));
 	return v;
 }
