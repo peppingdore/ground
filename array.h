@@ -188,7 +188,7 @@ struct Array: public ArrayView<T> {
 		capacity = new_capacity;
 	}
 
-	Array<T> copy(Allocator allocator, CodeLocation loc = caller_loc()) {
+	Array<T> copy(Allocator allocator = c_allocator, CodeLocation loc = caller_loc()) {
 		Array<T> copied;
 		copied.allocator = allocator;
 		copied.allocator.capacity = capacity;
