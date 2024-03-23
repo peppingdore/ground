@@ -398,6 +398,35 @@ struct Reflection {
 	Type* type_of(T& value) {
 		return type_of<std::remove_reference_t<T>>();
 	}
+
+	// const char* resolve_type_name_alias(const char* name) {
+	// 	if (strcmp(name, "float") == 0) {
+	// 		return "f32";
+	// 	}
+	// 	if (strcmp(name, "double") == 0) {
+	// 		return "f32";
+	// 	}
+	// 	if (strcmp(name, "int") == 0) {
+	// 		return "s32";
+	// 	}
+	// 	if (strcmp(name, "long") == 0) {
+	// 		return "s32";
+	// 	}
+	// 	if (strcmp(name, "long long") == 0) {
+	// 		return "s64";
+	// 	}
+	// }
+
+	Type* find_type(const char* name) {
+		ScopedLock(lock);
+		// name = resolve_type_name_alias(name);
+		for (s64 i = 0; i < types_count; i++) {
+			if (strcmp(types[i]->name, name) == 0) {
+				return types[i];
+			}
+		}
+		return NULL;
+	}
 };
 
 inline static Reflection reflect;
