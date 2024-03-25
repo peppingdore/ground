@@ -48,6 +48,11 @@ struct BaseString {
 		return true;
 	}
 
+	template <StringChar T, s64 N>
+	bool operator==(const T (&rhs)[N]) {
+		return operator==(BaseString<T>{ .data = (T*) rhs, .length = N - 1 });
+	}
+
 	Char* copy_c_str(Allocator allocator = c_allocator) {
 		auto cp = allocator.alloc<Char>(length + 1);
 		memcpy(cp, data, length * sizeof(Char));
