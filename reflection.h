@@ -511,7 +511,7 @@ Type* get_pointer_inner_type_with_indirection_level(PointerType* pointer_type, s
 	return pointer_type->inner;
 }
 
-bool does_type_inherit(Type* derived, Type* base) {
+bool does_type_inherit(Type* derived, Type* base, s32* out_offset) {
 	if (derived->kind != StructType::KIND ||
 		base->kind    != StructType::KIND) {
 		return false;
@@ -523,9 +523,11 @@ bool does_type_inherit(Type* derived, Type* base) {
 	for (auto it: der->unflattened_members) {
 		if (it.kind == STRUCT_MEMBER_KIND_BASE) {
 			if (it.type == b) {
+				*out_offset = it.offset;
 				return true;
 			}
-			if (does_type_inherit(it.type, b)) {
+			if (does_type_inherit(it.type, b, out_offset)) {
+				*out_offset = *out_offset + it.offset;
 				return true;
 			}
 		}
@@ -533,36 +535,34 @@ bool does_type_inherit(Type* derived, Type* base) {
 	return false;
 }
 
-bool does_type_convert_to(Type* derived, Type* base) {
+bool does_type_convert_to(Type* derived, Type* base, s32* out_offset) {
 	if (derived == base) {
 		return true;
 	}
-	return does_type_inherit(derived, base);
+	return does_type_inherit(derived, base, out_offset);
 }
 
-// @TODO: we have to add or subtract base member offset here, not just cast.
 template <typename T>
-T* as(auto* x) {
-	if (does_type_convert_to(x->type, reflect.type_of<T>())) {
+T* reflect_cast(auto* x) {
+	s32 offset;
+	if (does_type_convert_to(x->type, reflect.type_of<T>(), &offset)) {
 		return (T*) x;
 	}
 	return NULL;
 }
 
 template <typename T>
-T* as(Any any) {
-	if (does_type_convert_to(any.type, reflect.type_of<T>())) {
-		return (T*) any.ptr;
+T* reflect_cast(Any any) {
+	s32 offset;
+	if (does_type_convert_to(any.type, reflect.type_of<T>(), &offset)) {
+		return (T*) ptr_add(any.ptr, -offset);
 	}
 	return NULL;
 }
 
 template <typename T>
-T* as(Any* any) {
-	if (does_type_convert_to(any->type, reflect.type_of<T>())) {
-		return (T*) any->ptr;
-	}
-	return NULL;
+T* reflect_cast(Any* any) {
+	return reflect_cast<T>(*any);
 }
 
 template <typename T, typename X>
@@ -571,7 +571,7 @@ template <typename T, typename X>
 		std::is_same_v<X, EnumValue>)
 T* find_tag(X* x) {
 	for (auto it: x->tags) {
-		auto casted = as<T>(it);
+		auto casted = reflect_cast<T>(it);
 		if (casted) {
 			return casted;
 		}
