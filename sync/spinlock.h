@@ -11,7 +11,7 @@ static_assert(
 );
 using Spinlock_Num_Type = std::conditional<sizeof(ThreadId) == 4, s32, s64>::type;
 struct alignas(sizeof(ThreadId) * 2) SpinlockAtomicData {
-	ThreadId         locking_thread_id = 0;
+	ThreadId          locking_thread_id = 0;
 	Spinlock_Num_Type lock_count = 0;
 };
 static_assert(
@@ -27,12 +27,11 @@ struct Spinlock {
 		auto current = atomic_load(&data);
 		auto thread_id = current_thread_id();
 
-		if (current.locking_thread_id == current_thread_id() && data.lock_count != 0) {
+		if (current.locking_thread_id == thread_id && data.lock_count != 0) {
 			assert(data.lock_count > 0);
 			atomic_load_add<Spinlock_Num_Type>(&data.lock_count, 1);
 			return;
 		}
-
 
 		SpinlockAtomicData store_value = {
 			.locking_thread_id = thread_id,
