@@ -2,12 +2,14 @@
 
 #include "key.h"
 
+BUILD_RUN("params.add_lib('user32.lib')");
+
 // stolen from: https://stackoverflow.com/questions/15966642/how-do-you-tell-lshift-apart-from-rshift-in-wm-keydown-events
 WPARAM map_windows_left_and_right_keys(WPARAM wParam, LPARAM lParam) {
 	UINT   scancode = (lParam & 0x00ff0000) >> 16;
 	int    extended = (lParam & 0x01000000) != 0;
 	switch (wParam) {
-		case VK_SHIFT:   return MapVirtualKey(scancode, MAPVK_VSC_TO_VK_EX);
+		case VK_SHIFT:   return MapVirtualKeyW(scancode, MAPVK_VSC_TO_VK_EX);
 		case VK_CONTROL: return extended ? VK_RCONTROL : VK_LCONTROL;
 		case VK_MENU:    return extended ? VK_RMENU : VK_LMENU;
 	}
