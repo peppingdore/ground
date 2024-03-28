@@ -478,6 +478,9 @@ class Default_Build_Params:
 		self.compile_params = compile_params
 		self.link_params = link_params
 
+	def set_optimization_level(self, level):
+		self.compile_params.optimization_level = level
+
 	def set_compiler(self, compiler):
 		self.compile_params.compiler = compiler
 		self.link_params.compiler = compiler
@@ -519,10 +522,12 @@ def build_main():
 	argparser = argparse.ArgumentParser()
 	argparser.add_argument('--run', '-r', action='store_true', help="Runs executable after successful compiling")
 	argparser.add_argument('--compiler')
+	argparser.add_argument('--opt_level', type=int, default=0, help="Optimization level")
 	args, _ = argparser.parse_known_args()
 
 	if args.compiler:
 		params.set_compiler(args.compiler)
+	params.set_optimization_level(args.opt_level)
 
 	compile_results = builder.compile_units_parallel(params.units, params.compile_params)
 	builder.print_compile_results(stdout, compile_results)
