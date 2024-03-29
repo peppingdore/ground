@@ -42,7 +42,7 @@ Array<String> synth_codepoint_unicode_data(u32 codepoint) {
 
 	for (auto i: range(cp.decomposition.fields_count)) {
 		auto field = cp.decomposition.fields[i];
-		auto type = (EnumType*) reflect.type_of<UnicodeDecompositionTag>();
+		auto type = (EnumType*) reflect_type_of<UnicodeDecompositionTag>();
 		auto matching_value = find_matching_enum_value(type, make_primitive_value(field));
 		if (matching_value.has_value) {
 			sb.append("<");

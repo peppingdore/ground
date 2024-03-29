@@ -9,9 +9,35 @@
 #include "scoped.h"
 #include "heap_sprintf.h"
 
-using Type_Id = u32;
+template <typename T>
+struct ReflectArray {
+	T*  data     = NULL;
+	s64 count    = 0;
+	s64 capacity = 0;
 
-struct Formatter;
+	T* operator[](s64 index) {
+		assert(index >= 0 && index < count);
+		return data + index;
+	}
+
+	void add(T thing) {
+		if (data == NULL) {
+			capacity = 8;
+			data = (T*) malloc(sizeof(T) * capacity);
+		} else if (count == capacity) {
+			capacity *= 2;
+			data = (T*) realloc(data, sizeof(T) * capacity);
+		}
+		data[count] = thing;
+		count += 1;
+	}
+
+	T* begin() { return data; }
+	T* end()   { return data + count; }
+};
+
+
+using TypeId = u32;
 
 // TypeKind is safe to cast to C string.
 using TypeKind = u64;
@@ -33,7 +59,7 @@ struct Type {
 	const char* name    = "<unnamed>";
 	TypeKind    kind    = 0;
 	u32         size    = 0;
-	Type_Id     id      = 0;
+	TypeId      id      = 0;
 
 	template <typename T>
 	T* as() {
@@ -45,32 +71,6 @@ struct Any {
 	Type* type = NULL;
 	void* ptr  = NULL;
 };
-
-
-template <typename T>
-struct ReflectArray {
-	T*  data  = NULL;
-	s64 count = 0;
-
-	T* begin() { return data; }
-	T* end()   { return data + count; }
-};
-
-template <typename T>
-void reflect_add_array(ReflectArray<T>* arr, s64* capacity, T thing) {
-	if (arr->data == NULL) {
-		*capacity = 8;
-		arr->data = (T*) malloc(sizeof(T) * *capacity);
-	} else if (arr->count == *capacity) {
-		*capacity *= 2;
-		arr->data = (T*) realloc(arr->data, sizeof(T) * *capacity);
-	}
-
-	arr->data[arr->count] = thing;
-	arr->count += 1;
-}
-
-
 
 struct PrimitiveValue {
 	union {
@@ -217,6 +217,9 @@ struct FunctionType: Type {
 	ReflectArray<Type*> arg_types;
 };
 
+template <typename T>
+PrimitiveType* reflect_primitive_type(const char* name, PrimitiveKind kind);
+
 #define REFLECTION_REFLECT_PRIMITIVE(TYPE, KIND) PrimitiveType* reflect_type(TYPE* x, PrimitiveType* type) {\
 	type->name = #TYPE;\
 	type->primitive_kind = PrimitiveKind::P_##KIND;\
@@ -239,11 +242,8 @@ REFLECTION_REFLECT_PRIMITIVE(char32_t, char32);
 #undef REFLECTION_REFLECT_PRIMITIVE
 // @NewPrimitive
 
-PrimitiveType* reflect_type(bool* x, PrimitiveType* type) {
-	type->name = "bool";
-	type->primitive_kind = PrimitiveKind::P_bool;
-	return type;
-}
+
+PrimitiveType* reflect_type(bool* x, PrimitiveType* type);
 
 template <typename T, s64 N>
 FixedArrayType* reflect_type(T (*arr)[N], FixedArrayType* type);
@@ -257,180 +257,152 @@ FunctionType* reflect_type(T* thing, FunctionType* type);
 using ReflectionHookCounter = CTCounter<>;
 
 template <u64 _N>
-struct ReflectionHookIndexTag {
+struct ReflectHookIndexTag {
 	constexpr static u64 N = _N;
 };
 
-
 template <typename T, u64 N>
-struct CallNextHook {
-	CallNextHook() {
-		reflection_hook<T>(ReflectionHookIndexTag<N>{});
+struct CallNextReflectHook {
+	CallNextReflectHook() {
+		reflect_hook<T>(ReflectHookIndexTag<N>{});
 	}
 };
 
 #define REFLECTION_REFLECT_HOOK(type_name)\
 template <typename type_name>\
-void reflection_hook(\
-	ReflectionHookIndexTag<ReflectionHookCounter::Increment<>> t,\
-	CallNextHook<type_name, ReflectionHookCounter::Read<> + 1> next = { })
+void reflect_hook(\
+	ReflectHookIndexTag<ReflectionHookCounter::Increment<>> t,\
+	CallNextReflectHook<type_name, ReflectionHookCounter::Read<> + 1> next = { })
 
 template <typename T, u64 N>
-void reflection_hook(ReflectionHookIndexTag<N> tag, EmptyStruct x = {}) {
+void reflect_hook(ReflectHookIndexTag<N> tag, EmptyStruct x = {}) {
 	if constexpr (N == 0) {
-		reflection_hook<T>(ReflectionHookIndexTag<N + 1>{});
+		reflect_hook<T>(ReflectHookIndexTag<N + 1>{});
 	}
 }
 
 
 template <typename T>
-concept ReflectionMemberReflectable = requires(T a) { 
+concept MemberReflect = requires(T a) { 
 	{ T::reflect_type(&a, NULL) };
 };
 
 template <typename T>
-concept ReflectionGlobalReflectable = requires(T a) { 
+concept GlobalReflect = requires(T a) { 
 	{ reflect_type(&a, NULL) };
 };
 
-
 struct Reflection {
-	Spinlock lock;
-	Type**   types;
-	s64      types_count;
-	s64      types_capacity;
-
-
-	template <typename T>
-	struct TypeMapper {
-		inline static Type* type = NULL;
-	};
-
-	template <typename T>
-	constexpr u32 get_type_size() {
-		return sizeof(T);
-	}
-
-	template <>
-	constexpr u32 get_type_size<void>() {
-		return 0;
-	}
-
-	template <typename T, typename TypeT>
-	TypeT* add_type() {
-		ScopedLock(lock);
-		if (types == NULL) {
-			types_capacity = 16;
-			types = (Type**) malloc(sizeof(Type*) * types_capacity);
-		} else if (types_count == types_capacity) {
-			types_capacity *= 2;
-			types = (Type**) realloc(types, sizeof(Type*) * types_capacity);
-		}
-		auto* type = new TypeT();
-		TypeMapper<T>::type = type;
-		types[types_count] = type;
-		type->size = get_type_size<T>();
-		type->id = types_count;
-		type->kind = TypeT::KIND;
-		types_count += 1;
-		return type;
-	}
-
-	template <ReflectionMemberReflectable T>
-	Type* inner_reflect() {
-		using TypeT = std::remove_cvref_t<decltype(*T::reflect_type((T*) NULL, NULL))>;
-		TypeT* type = add_type<T, TypeT>();
-		T::reflect_type((T*) NULL, type);
-		return type;
-	}
-
-	template <ReflectionGlobalReflectable T>
-		requires (!ReflectionMemberReflectable<T>)
-	Type* inner_reflect() {
-		using TypeT = std::remove_cvref_t<decltype(*reflect_type((T*) NULL, NULL))>;
-		TypeT* type = add_type<T, TypeT>();
-		reflect_type((T*) NULL, type);
-		return type;
-	}
-
-	// Every type pointer auto casts to void*, that's why
-	//  we can't have global reflect_type(void*, ) to reflect type 'void'.
-	template <typename T> requires (std::is_same_v<T, void>)
-	Type* inner_reflect() {
-		auto* type = add_type<void, PrimitiveType>();
-		type->name = "void";
-		type->primitive_kind = PrimitiveKind::P_void;
-		return type;
-	}
-
-	template <typename T>
-	Type* inner_reflect() {
-		auto type = add_type<T, UnregisteredType>();
-		type->name = "unregistered";
-		return type;
-	}
-
-	template <typename T>
-	struct remove_all_const: std::remove_const<T> {};
-	template <typename T>
-	struct remove_all_const<T*> {
-		using type = typename remove_all_const<T>::type*;
-	};
-	template <typename T>
-	struct remove_all_const<T* const> {
-		using type = typename remove_all_const<T>::type*;
-	};
-
-	template <typename T>
-	Type* type_of() {
-		ScopedLock(lock);
-		using XT = remove_all_const<T>::type;
-		using Mapper = TypeMapper<XT>;
-		if (!Mapper::type) {
-			auto type = inner_reflect<XT>();
-			reflection_hook<XT, 0>({});
-		}
-		assert(Mapper::type);
-		return Mapper::type;
-	}
-
-	template <typename T>
-	Type* type_of(T& value) {
-		return type_of<std::remove_reference_t<T>>();
-	}
-
-	// const char* resolve_type_name_alias(const char* name) {
-	// 	if (strcmp(name, "float") == 0) {
-	// 		return "f32";
-	// 	}
-	// 	if (strcmp(name, "double") == 0) {
-	// 		return "f32";
-	// 	}
-	// 	if (strcmp(name, "int") == 0) {
-	// 		return "s32";
-	// 	}
-	// 	if (strcmp(name, "long") == 0) {
-	// 		return "s32";
-	// 	}
-	// 	if (strcmp(name, "long long") == 0) {
-	// 		return "s64";
-	// 	}
-	// }
-
-	Type* find_type(const char* name) {
-		ScopedLock(lock);
-		// name = resolve_type_name_alias(name);
-		for (s64 i = 0; i < types_count; i++) {
-			if (strcmp(types[i]->name, name) == 0) {
-				return types[i];
-			}
-		}
-		return NULL;
-	}
+	Spinlock                lock;
+	Type**                  types;
+	s64                     types_count;
+	s64                     types_capacity;
 };
-
 inline static Reflection reflect;
 
+template <typename T>
+struct TypeMapper {
+	inline static Type* type = NULL;
+};
+
+template <typename T>
+constexpr u32 reflect_get_type_size() {
+	return sizeof(T);
+}
+
+template <>
+constexpr u32 reflect_get_type_size<void>() {
+	return 0;
+}
+
+template <typename T, typename TypeT>
+TypeT* reflect_add_type(TypeT* type) {
+	ScopedLock(reflect.lock);
+	if (reflect.types == NULL) {
+		reflect.types_capacity = 16;
+		reflect.types = (Type**) malloc(sizeof(Type*) * reflect.types_capacity);
+	} else if (reflect.types_count == reflect.types_capacity) {
+		reflect.types_capacity *= 2;
+		reflect.types = (Type**) realloc(reflect.types, sizeof(Type*) * reflect.types_capacity);
+	}
+	TypeMapper<T>::type = type;
+	reflect.types[reflect.types_count] = type;
+	type->size = reflect_get_type_size<T>();
+	type->id = reflect.types_count;
+	type->kind = TypeT::KIND;
+	reflect.types_count += 1;
+	return type;
+}
+
+template <typename T, typename TypeT>
+TypeT* reflect_add_type_named(const char* name) {
+	ScopedLock(reflect.lock);
+	static TypeT type;
+	reflect_add_type<T, TypeT>(&type);
+	type.name = name;
+	return &type;
+}
+
+template <MemberReflect T>
+Type* reflect_type_internal() {
+	using TypeT = std::remove_cvref_t<decltype(*T::reflect_type((T*) NULL, NULL))>;
+	auto type = reflect_add_type_named<T, TypeT>("");
+	return T::reflect_type((T*) NULL, type);
+}
+
+template <GlobalReflect T>
+	requires (!MemberReflect<T>)
+Type* reflect_type_internal() {
+	using TypeT = std::remove_cvref_t<decltype(*reflect_type((T*) NULL, NULL))>;
+	auto type = reflect_add_type_named<T, TypeT>("");
+	return reflect_type((T*) NULL, type);
+}
+
+// Every type pointer auto casts to void*, that's why
+//  we can't have global reflect_type(void*, ) to reflect type 'void'.
+template <typename T> requires (std::is_same_v<T, void>)
+Type* reflect_type_internal() {
+	auto* type = reflect_add_type_named<void, PrimitiveType>("");
+	type->name = "void";
+	type->primitive_kind = PrimitiveKind::P_void;
+	return type;
+}
+
+template <typename T>
+Type* reflect_type_internal() {
+	auto type = reflect_add_type_named<T, UnregisteredType>("");
+	type->name = "unregistered";
+	return type;
+}
+
+template <typename T>
+struct remove_all_const: std::remove_const<T> {};
+template <typename T>
+struct remove_all_const<T*> {
+	using type = typename remove_all_const<T>::type*;
+};
+template <typename T>
+struct remove_all_const<T* const> {
+	using type = typename remove_all_const<T>::type*;
+};
+
+template <typename T>
+Type* reflect_type_of() {
+	ScopedLock(reflect.lock);
+	using XT = remove_all_const<T>::type;
+	using Mapper = TypeMapper<XT>;
+	if (!Mapper::type) {
+		auto type = reflect_type_internal<XT>();
+		reflect_hook<XT, 0>({});
+	}
+	assert(Mapper::type);
+	return Mapper::type;
+}
+
+template <typename T>
+Type* reflect_type_of(T& value) {
+	return reflect_type_of<std::remove_reference_t<T>>();
+}
 
 Any make_any(Type* type, void* ptr) {
 	return { .type = type, .ptr = ptr };
@@ -446,7 +418,7 @@ Any make_any(Any* any) {
 
 template <typename T>
 Any make_any(T* thing) {
-	auto type = reflect.type_of<T>();
+	auto type = reflect_type_of<T>();
 	return make_any(type, thing);
 }
 
@@ -455,11 +427,33 @@ Any make_any(T& thing) {
 	return make_any(&thing);
 }
 
+const char* resolve_type_name_alias(const char* name) {
+	if (strcmp(name, "int") == 0) return "s32";
+	if (strcmp(name, "long") == 0) return "s32";
+	if (strcmp(name, "long long") == 0) return "s64";
+	if (strcmp(name, "unsigned") == 0) return "u32";
+	if (strcmp(name, "unsigned int") == 0) return "u32";
+	if (strcmp(name, "unsigned long") == 0) return "u32";
+	if (strcmp(name, "char") == 0) return "s8";
+	if (strcmp(name, "short") == 0) return "s16";
+	if (strcmp(name, "unsigned short") == 0) return "u16";
+	if (strcmp(name, "char") == 0) return "s8";
+	if (strcmp(name, "unsigned char") == 0) return "u8";
+	if (strcmp(name, "float") == 0) return "f32";
+	if (strcmp(name, "double") == 0) return "f64";
+	if (strcmp(name, "unsigned long long") == 0) return "u64";
+	return name;
+}
 
+PrimitiveType* reflect_type(bool* x, PrimitiveType* type) {
+	type->name = "bool";
+	type->primitive_kind = PrimitiveKind::P_bool;
+	return type;
+}
 
 template <typename T> requires(!std::is_function_v<T>)
 PointerType* reflect_type(T** thing, PointerType* type) {
-	type->inner = reflect.type_of<T>();
+	type->inner = reflect_type_of<T>();
 	auto inner_name_length = strlen(type->inner->name);
 	auto name = (char*) malloc(inner_name_length + 2);
 	memcpy(name, type->inner->name, inner_name_length);
@@ -470,7 +464,7 @@ PointerType* reflect_type(T** thing, PointerType* type) {
 
 template <typename T, s64 N>
 FixedArrayType* reflect_type(T (*arr)[N], FixedArrayType* type) {
-	type->inner = reflect.type_of<T>();
+	type->inner = reflect_type_of<T>();
 	type->array_size = N;
 	type->subkind = "fixed_array";
 	type->name = heap_sprintf("%s[%lld]", type->inner->name, N);
@@ -488,17 +482,17 @@ FixedArrayType* reflect_type(T (*arr)[N], FixedArrayType* type) {
 
 template <typename R, typename... Args>
 FunctionType* reflect_type(R (**function)(Args...), FunctionType* type) {
-	type->return_type = reflect.type_of<R>();
-	Type* arg_types[] = { reflect.type_of<Args>()... };
+	// @TODO: set name.
+	type->return_type = reflect_type_of<R>();
+	Type* arg_types[] = { reflect_type_of<Args>()... };
 	s64 capacity = 0;
 	for (Type* arg_type: arg_types) {
-		reflect_add_array(&type->arg_types, &capacity, arg_type);		
+		type->arg_types.add(arg_type);
 	}
 	return type;
 }
 
-Type* get_pointer_inner_type_with_indirection_level(PointerType* pointer_type, s32* result_indirection_level) {
-	
+Type* reflect_get_pointer_inner_type_with_indirection_level(PointerType* pointer_type, s32* result_indirection_level) {
 	s32 indirection_level = 1;
 	while (pointer_type->inner->kind == make_type_kind("pointer")) {
 		indirection_level += 1;
@@ -511,7 +505,7 @@ Type* get_pointer_inner_type_with_indirection_level(PointerType* pointer_type, s
 	return pointer_type->inner;
 }
 
-bool does_type_inherit(Type* derived, Type* base, s32* out_offset) {
+bool reflect_does_type_inherit(Type* derived, Type* base, s32* out_offset) {
 	if (derived->kind != StructType::KIND ||
 		base->kind    != StructType::KIND) {
 		return false;
@@ -526,7 +520,7 @@ bool does_type_inherit(Type* derived, Type* base, s32* out_offset) {
 				*out_offset = it.offset;
 				return true;
 			}
-			if (does_type_inherit(it.type, b, out_offset)) {
+			if (reflect_does_type_inherit(it.type, b, out_offset)) {
 				*out_offset = *out_offset + it.offset;
 				return true;
 			}
@@ -535,17 +529,17 @@ bool does_type_inherit(Type* derived, Type* base, s32* out_offset) {
 	return false;
 }
 
-bool does_type_convert_to(Type* derived, Type* base, s32* out_offset) {
+bool reflect_can_cast(Type* derived, Type* base, s32* out_offset) {
 	if (derived == base) {
 		return true;
 	}
-	return does_type_inherit(derived, base, out_offset);
+	return reflect_does_type_inherit(derived, base, out_offset);
 }
 
 template <typename T>
 T* reflect_cast(auto* x) {
 	s32 offset;
-	if (does_type_convert_to(x->type, reflect.type_of<T>(), &offset)) {
+	if (reflect_can_cast(x->type, reflect_type_of<T>(), &offset)) {
 		return (T*) x;
 	}
 	return NULL;
@@ -554,7 +548,7 @@ T* reflect_cast(auto* x) {
 template <typename T>
 T* reflect_cast(Any any) {
 	s32 offset;
-	if (does_type_convert_to(any.type, reflect.type_of<T>(), &offset)) {
+	if (reflect_can_cast(any.type, reflect_type_of<T>(), &offset)) {
 		return (T*) ptr_add(any.ptr, -offset);
 	}
 	return NULL;
@@ -579,20 +573,56 @@ T* find_tag(X* x) {
 	return NULL;
 }
 
-void reflect_struct_type_add_member(Type* type, s64* capacity, StructMember member) {
+void reflect_flatten_struct_members(Type* type, s32 offset, StructMember member) {
 	if (type->kind != StructType::KIND) {
 		return;
 	}
 	auto t = (StructType*) type;
-	reflect_add_array(&t->unflattened_members, capacity, member);
+	if (member.kind == STRUCT_MEMBER_KIND_BASE) {
+		if (auto member_type = member.type->as<StructType>()) {
+			for (auto it: member_type->unflattened_members) {
+				reflect_flatten_struct_members(type, offset + it.offset, it);
+			}
+		}
+	} else if (member.kind == STRUCT_MEMBER_KIND_PLAIN) {
+		member.offset = offset;
+		t->members.add(member);
+	}
 }
 
-void reflect_enum_type_add_value(Type* type, s64* capacity, EnumValue v) {
+void reflect_struct_type_add_member(Type* type, StructMember member) {
+	if (type->kind != StructType::KIND) {
+		return;
+	}
+	auto t = (StructType*) type;
+	t->unflattened_members.add(member);
+	reflect_flatten_struct_members(type, member.offset, member);
+}
+
+void reflect_enum_type_add_value(Type* type, EnumValue v) {
 	if (type->kind != EnumType::KIND) {
 		return;
 	}
 	auto t = (EnumType*) type;
-	reflect_add_array(&t->values, capacity, v);
+	t->values.add(v);
+}
+
+void reflect_add_tag(Type* type, auto value) {
+	auto copied = new decltype(value)();
+	*copied = value;
+	auto tag = make_any(copied);
+
+	if (auto casted = type->as<StructType>()) {
+		if (casted->unflattened_members.count > 0) {
+			auto* member = &casted->unflattened_members.data[casted->unflattened_members.count - 1];
+			member->tags.add(tag);
+		}
+	} else if (auto casted = type->as<EnumType>()) {
+		if (casted->values.count > 0) {
+			auto* val = &casted->values.data[casted->values.count - 1];
+			val->tags.add(tag);
+		}
+	}
 }
 
 template <typename From, typename To, typename = void>
@@ -607,106 +637,45 @@ struct is_virtual_base_of<Base, Derived, typename std::enable_if<
     !can_static_cast<Base*, Derived*>::value
 >::type>: std::true_type{ };
 
-void fill_struct_type_members(StructType* type, s32 offset, StructMember* members, s64* count) {
-	for (auto member: type->unflattened_members) {
-		if (member.kind == STRUCT_MEMBER_KIND_BASE) {
-			if (member.type->kind == make_type_kind("struct")) {
-				fill_struct_type_members((StructType*) member.type, offset + member.offset, members, count);
-			}
-		} else if (member.kind == STRUCT_MEMBER_KIND_PLAIN) {
-			if (members) {
-				member.offset += offset;
-				members[*count] = member;
-			}
-			*count += 1;
-		}
-	}
-}
-
-void reflect_add_tag(Type* type, auto value, s64* tags_capacity) {
-	auto copied = new decltype(value)();
-	*copied = value;
-	auto tag = make_any(copied);
-
-	if (auto casted = type->as<StructType>()) {
-		if (casted->unflattened_members.count > 0) {
-			auto* member = &casted->unflattened_members.data[casted->unflattened_members.count - 1];
-			reflect_add_array(&member->tags, tags_capacity, tag);
-		}
-	} else if (auto casted = type->as<EnumType>()) {
-		if (casted->values.count > 0) {
-			auto* val = &casted->values.data[casted->values.count - 1];
-			reflect_add_array(&val->tags, tags_capacity, tag);
-		}
-	}
-}
-
 template <typename T>
 using ReflectMacroPickType = std::conditional_t<std::is_class_v<T>, StructType, EnumType>;
 
-
-#define REFLECT_NAME(_type, _name)\
-template <typename __T = _type> requires(std::is_class_v<__T> && std::is_same_v<__T, _type>)\
-inline static StructType* reflect_type(__T* x, StructType* type) {\
+#define REFLECT_NAME(_T, _name)\
+template <typename __T = _T> requires(std::is_same_v<_T, __T>)\
+inline static ReflectMacroPickType<__T>* reflect_type(__T* x, ReflectMacroPickType<__T>* type) {\
 	type->name = _name;\
-	s64 capacity = 0;\
-	s64 tags_capacity = 0;\
-	reflect_fill_type(x, type, &capacity, &tags_capacity);\
-	s64 members_capacity = 0;\
-	fill_struct_type_members(type, 0, NULL, &members_capacity);\
-	type->members.data = (StructMember*) malloc(sizeof(StructMember) * members_capacity);\
-	type->members.count = members_capacity;\
-	members_capacity = 0;\
-	fill_struct_type_members(type, 0, type->members.data, &members_capacity);\
+	reflect_fill_type(x, type);\
 	return type;\
 }\
-template <typename __T = _type> requires(std::is_enum_v<__T> && std::is_same_v<__T, _type>)\
-inline static EnumType* reflect_type(__T* x, EnumType* type) {\
-	type->name = #_type;\
-	s64 capacity = 0;\
-	s64 tags_capacity = 0;\
-	reflect_fill_type(x, type, &capacity, &tags_capacity);\
-	return type;\
-}\
-inline static void reflect_fill_type(_type* x, ReflectMacroPickType<_type>* type, s64* capacity, s64* tags_capacity)
+inline static void reflect_fill_type(_T* x, ReflectMacroPickType<_T>* type)
 
-#define REFLECT(_type) REFLECT_NAME(_type, #_type)
+#define REFLECT(_T) REFLECT_NAME(_T, #_T)
 
 #define MEMBER_AS(member, member_type) \
 static_assert(sizeof(member_type) == sizeof(x->member));\
-reflect_struct_type_add_member(type, capacity, StructMember{\
+reflect_struct_type_add_member(type, StructMember{\
 	#member,\
-	reflect.type_of<member_type>(),\
+	reflect_type_of<member_type>(),\
 	STRUCT_MEMBER_KIND_PLAIN,\
 	(s32) OFFSETOF(std::remove_pointer_t<decltype(x)>, member)\
-});\
-*tags_capacity = 0;
+});
 
 #define MEMBER(member) MEMBER_AS(member, decltype(x->member))
 
-#define TAG(value) reflect_add_tag(type, value, tags_capacity);
+#define TAG(value) reflect_add_tag(type, value);
 
-#define ENUM_VALUE(value) reflect_enum_type_add_value(type, capacity, EnumValue{ #value, make_primitive_value(std::remove_pointer_t<decltype(x)>::value) });\
-*tags_capacity = 0;
+#define ENUM_VALUE(value) reflect_enum_type_add_value(type, EnumValue{ #value, make_primitive_value(std::remove_pointer_t<decltype(x)>::value) });
 
 #define BASE_TYPE(base)\
-assert((((s32) ((u8*) ((base*) ((decltype(x)) 0x100000)) - (u8*) ((decltype(x)) 0x100000))) == 0) && "non-zero offset base is not supported");\
+/*assert((((s32) ((u8*) ((base*) ((decltype(x)) 0x10000000)) - (u8*) ((decltype(x)) 0x10000000))) == 0) && "non-zero offset base is not supported");*/\
 static_assert(std::is_base_of_v<base, std::remove_pointer_t<decltype(x)>>);\
 static_assert(!is_virtual_base_of<base, std::remove_pointer_t<decltype(x)>>::value);\
-reflect_struct_type_add_member(type, capacity, StructMember{\
-	reflect.type_of<base>()->name,\
-	reflect.type_of<base>(),\
+reflect_struct_type_add_member(type, StructMember{\
+	reflect_type_of<base>()->name,\
+	reflect_type_of<base>(),\
 	STRUCT_MEMBER_KIND_BASE,\
-	((s32) ((u8*) ((base*) ((decltype(x)) 0x100000)) - (u8*) ((decltype(x)) 0x100000))),\
+	((s32) ((u8*) ((base*) ((decltype(x)) 0x10000000)) - (u8*) ((decltype(x)) 0x10000000))),\
 });
-
-
-REFLECT(Type) {
-	MEMBER(name);
-	MEMBER(kind);
-	MEMBER(size);
-	MEMBER(id);
-}
 
 struct RealTypeMember {};
 
@@ -726,4 +695,53 @@ Type* get_real_type(Type* type, void* ptr) {
 		}
 	}
 	return type;
+}
+
+REFLECT(Type) {
+	MEMBER(name);
+	MEMBER(kind);
+	MEMBER(size);
+	MEMBER(id);
+}
+
+template <typename T>
+ArrayType* reflect_type(ReflectArray<T>* x, ArrayType* type) {
+	type->inner = reflect_type_of<T>();
+	type->subkind = "reflect_array";
+	type->name = heap_sprintf("ReflectArray<%s>", type->inner->name);
+	type->get_count = [](void* arr) {
+		return ((ReflectArray<T>*) arr)->count;
+	};
+	type->get_capacity = [](void* arr) {
+		return ((ReflectArray<T>*) arr)->capacity;
+	};
+	type->get_item = [](void* arr, s64 index) -> void* {
+		return ((ReflectArray<T>*) arr)->operator[](index);
+	};
+	return type;
+}
+
+REFLECT(StructMemberKind) {
+	ENUM_VALUE(STRUCT_MEMBER_KIND_PLAIN);
+	ENUM_VALUE(STRUCT_MEMBER_KIND_BASE);
+}
+
+REFLECT(StructMember) {
+	MEMBER(name);
+	MEMBER(type);
+	MEMBER(kind);
+	MEMBER(offset);
+	MEMBER(tags);
+}
+
+REFLECT(StructType) {
+	BASE_TYPE(Type);
+	MEMBER(unflattened_members);
+	MEMBER(members);
+	MEMBER(subkind);
+}
+
+REFLECT(Any) {
+	MEMBER(type);
+	MEMBER(ptr);
 }

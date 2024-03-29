@@ -3,7 +3,7 @@
 #include "hash.h"
 #include "array.h"
 #include "code_location.h"
-#include "reflection.h"
+#include "reflect.h"
 #include "optional.h"
 
 constexpr s64    DEFAULT_HASH_MAP_CAPACITY = 16;
@@ -343,9 +343,9 @@ struct HashMapType: MapType {
 };
 
 template <typename K, typename V>
-HashMapType* reflect_type(HashMap<K, V>* map, HashMapType* type) {
-	type->key   = reflect.type_of<K>();
-	type->value = reflect.type_of<V>();
+HashMapType* reflect_type(HashMap<K, V>* x, HashMapType* type) {
+	type->key   = reflect_type_of<K>();
+	type->value = reflect_type_of<V>();
 	type->name  = heap_sprintf("HashMap<%s, %s>", type->key->name, type->value->name);
 	type->subkind = "hash_map";
 
@@ -382,6 +382,5 @@ HashMapType* reflect_type(HashMap<K, V>* map, HashMapType* type) {
 			}
 		}
 	};
-
 	return type;
 }

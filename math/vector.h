@@ -2,7 +2,7 @@
 
 #include "../base.h"
 #include "../range.h"
-#include "../reflection.h"
+#include "../reflect.h"
 
 template <typename T>
 struct Vector_Members1 {
@@ -168,7 +168,7 @@ struct Base_Vector: Vector_Members<N, T> {
 
 
 	REFLECT_NAME(Base_Vector,
-		heap_sprintf("Vector%d<%s>", N, reflect.type_of<T>()->name)
+		heap_sprintf("Vector%d<%s>", N, reflect_type_of<T>()->name)
 	) {
 		MEMBER(components);
 	}

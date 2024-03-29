@@ -1,7 +1,7 @@
 #pragma once
 
 #include "allocator.h"
-#include "reflection.h"
+#include "reflect.h"
 #include "hash.h"
 #include <initializer_list>
 
@@ -193,7 +193,7 @@ void type_hash(Hasher* hasher, ArrayView<T> array) {
 
 template <typename T>
 ArrayType* reflect_type(ArrayView<T>* x, ArrayType* type) {
-	type->inner = reflect.type_of<T>();
+	type->inner = reflect_type_of<T>();
 	type->name = heap_sprintf("ArrayView<%s>", type->inner->name);
 	type->subkind = "ArrayView";
 	type->get_count = [](void* arr) {

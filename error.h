@@ -58,7 +58,7 @@ template <typename T = Error>
 T* make_error(String text, CodeLocation loc = caller_loc()) {
 	auto e = make<T>();
 	e->text = text;
-	e->type = reflect.type_of<T>();
+	e->type = reflect_type_of<T>();
 	e->loc  = loc;
 	return e;
 }

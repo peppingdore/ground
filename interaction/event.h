@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../reflection.h"
+#include "../reflect.h"
 #include "key.h"
 
 struct Event {
@@ -13,6 +13,6 @@ REFLECT(Event) {
 template <typename T>
 T* make_event() {
 	auto event = make<T>();
-	event->type = reflect.type_of<T>();
+	event->type = reflect_type_of<T>();
 	return event;
 }

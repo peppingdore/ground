@@ -57,7 +57,7 @@ Tuple<WindowsWindow*, Error*> os_create_window(WindowParams params) {
 	AdjustWindowRect(&window_rect, window_style, false);
 
 	auto window = make<WindowsWindow>();
-	window->type = reflect.type_of<WindowsWindow>();
+	window->type = reflect_type_of<WindowsWindow>();
 	window->params = params;
 	window->utf16_title = (wchar_t*) encode_utf16(params.title)._0;
 	

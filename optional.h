@@ -1,6 +1,6 @@
 #pragma once
 
-#include "reflection.h"
+#include "reflect.h"
 #include "string_def.h"
 
 template <typename T>
@@ -52,14 +52,15 @@ auto make_optional(T value) -> Optional<T> {
 	return Optional<T>(value);
 }
 
-struct Optional_Type: Type {
+struct OptionalType: Type {
 	constexpr static auto KIND = make_type_kind("opt");
 
 	Type* inner = NULL;
 };
 
 template <typename T>
-Optional_Type* reflect_type(Optional<T>* opt, Optional_Type* type) {
-	type->inner = reflect.type_of<T>();
+OptionalType* reflect_type(Optional<T>* x, OptionalType* type) {
+	type->name = heap_sprintf("Optional<%s>", type->inner->name);
+	type->inner = reflect_type_of<T>();
 	return type;
 }

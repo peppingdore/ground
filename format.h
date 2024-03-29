@@ -1,7 +1,7 @@
 #pragma once
 
 #include "string_conversion.h"
-#include "reflection.h"
+#include "reflect.h"
 #include "hash_map.h"
 #include "sort.h"
 #include "defer.h"
@@ -37,7 +37,7 @@ REFLECTION_REFLECT_HOOK(T) {
 		if (!type_format_procs) {
 			type_format_procs = make<HashMap<Type*, Type_Format_Type_Erased*>>();
 		}
-		type_format_procs->put(reflect.type_of<T>(), proc);
+		type_format_procs->put(reflect_type_of<T>(), proc);
 	}
 }
 
@@ -784,7 +784,7 @@ void format_c_string(Formatter* formatter, T* c_str, String spec) {
 
 void format_pointer(Formatter* formatter, PointerType* type, void* thing, String spec) {
 	s32  indir_level;
-	auto inner_type = get_pointer_inner_type_with_indirection_level(type, &indir_level);
+	auto inner_type = reflect_get_pointer_inner_type_with_indirection_level(type, &indir_level);
 
 	char stars_buf[64];
 	auto stars_count = min_u32(static_array_count(stars_buf), indir_level);
@@ -830,7 +830,7 @@ void format_pointer(Formatter* formatter, PointerType* type, void* thing, String
 	}
 	// Can't deref void type.
 	if (deref) {
-		if (inner_type == reflect.type_of<void>()) {
+		if (inner_type == reflect_type_of<void>()) {
 			deref = false;
 		}
 	}
@@ -841,13 +841,13 @@ void format_pointer(Formatter* formatter, PointerType* type, void* thing, String
 		return;
 	}
 
-	if (inner_type == reflect.type_of<char>()) {
+	if (inner_type == reflect_type_of<char>()) {
 		format_c_string(formatter, (char*) ptr, spec);
-	} else if (inner_type == reflect.type_of<wchar_t>()) {
+	} else if (inner_type == reflect_type_of<wchar_t>()) {
 		format_c_string(formatter, (wchar_t*) ptr, spec);
-	} else if (inner_type == reflect.type_of<char16_t>()) {
+	} else if (inner_type == reflect_type_of<char16_t>()) {
 		format_c_string(formatter, (char16_t*) ptr, spec);
-	} else if (inner_type == reflect.type_of<char32_t>()) {
+	} else if (inner_type == reflect_type_of<char32_t>()) {
 		format_c_string(formatter, (char32_t*) ptr, spec);
 	} else {
 		auto inner = make_any(inner_type, ptr);
@@ -926,11 +926,11 @@ void format_item(Formatter* formatter, Type* type, void* thing, String spec) {
 
 		case PointerType::KIND: {
 			auto casted = (PointerType*) real_type;
-			auto inner_type = get_pointer_inner_type_with_indirection_level(casted, NULL);
-			if (inner_type == reflect.type_of<char>() ||
-				inner_type == reflect.type_of<wchar_t>() ||
-				inner_type == reflect.type_of<char16_t>() ||
-				inner_type == reflect.type_of<char32_t>()) {
+			auto inner_type = reflect_get_pointer_inner_type_with_indirection_level(casted, NULL);
+			if (inner_type == reflect_type_of<char>() ||
+				inner_type == reflect_type_of<wchar_t>() ||
+				inner_type == reflect_type_of<char16_t>() ||
+				inner_type == reflect_type_of<char32_t>()) {
 				formatter->quote_inner_string = saved_quote_string;
 			}
 			format_pointer(formatter, casted, thing, spec);
@@ -1027,7 +1027,7 @@ void format_fixed_array_as_c_string(Formatter* formatter, Any thing) {
 		auto casted = (ArrayType*) thing.type;
 		if (strcmp(casted->subkind, "fixed_array") == 0) {
 			auto casted = (FixedArrayType*) thing.type;
-			if (casted->inner == reflect.type_of<char>()) {
+			if (casted->inner == reflect_type_of<char>()) {
 				auto ptr = (char*) thing.ptr;
 				s64 length = 0;
 				for (auto i: range(casted->array_size)) {
@@ -1053,4 +1053,13 @@ void type_format(Formatter* formatter, Optional<T>* opt, String spec) {
 	} else {
 		format(formatter, "Optional{}");
 	}
+}
+
+void type_format(Formatter* formatter, CodeLocation* loc, String spec) {
+	format(formatter, "%: %", make_string(loc->file), loc->line);
+}
+
+REFLECT(CodeLocation) {
+	MEMBER(file);
+	MEMBER(line);
 }

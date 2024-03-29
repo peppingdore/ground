@@ -2,7 +2,7 @@
 
 #include "allocator.h"
 #include "array_view.h"
-#include "reflection.h"
+#include "reflect.h"
 #include "coroutine.h"
 
 #include <string.h>
@@ -235,7 +235,7 @@ inline void make_array(Array<T>* array, Allocator allocator = c_allocator, s64 c
 
 template <typename T>
 ArrayType* reflect_type(Array<T>* x, ArrayType* type) {
-	type->inner = reflect.type_of<T>();
+	type->inner = reflect_type_of<T>();
 	type->name = heap_sprintf("Array<%s>", type->inner->name);
 	type->get_count = [](void* arr) {
 		auto casted = (Array<int>*) arr;

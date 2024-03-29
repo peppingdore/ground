@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../reflection.h"
+#include "../reflect.h"
 
 enum class WindowsMessageCode {
 	_WM_NULL = 0x0000,

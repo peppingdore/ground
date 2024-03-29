@@ -1,6 +1,6 @@
 #pragma once
 
-#include "reflection.h"
+#include "reflect.h"
 #include <initializer_list>
 
 template <typename... Args>
@@ -129,7 +129,7 @@ int tuple_reflect_member(StructType* type, s64* capacity, auto* tuple) {
 
 	auto member = tuple_get_ptr<Index>(tuple);
 	auto offset = pointer_diff(member, tuple);
-	auto member_type = reflect.type_of<std::remove_pointer_t<decltype(member)>>();
+	auto member_type = reflect_type_of<std::remove_pointer_t<decltype(member)>>();
 	auto m = StructMember {
 		.name = name, 
 		.type = member_type,
@@ -150,7 +150,7 @@ StructType* reflect_type(Tuple<Args...>* tuple, StructType* type) {
 		<s64... Indices>
 		(std::integer_sequence<s64, Indices...>) {
 		type->name = heap_join("Tuple<", "%s", ">",
-			reflect.type_of<
+			reflect_type_of<
 				std::remove_pointer_t<
 					decltype(tuple_get_ptr<Indices>(tuple))
 				>
