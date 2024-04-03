@@ -1,0 +1,932 @@
+#pragma once
+
+#include "mini_ast.h"
+#include "../error.h"
+#include "../math/vector.h"
+
+struct CLikeProgram: AstNode {
+	Array<AstNode*> globals;
+
+	REFLECT(CLikeProgram) {
+		BASE_TYPE(AstNode);
+		MEMBER(globals);
+	}
+};
+
+struct CLikeParser {
+	CLikeProgram*   program;
+	Array<AstNode*> scope;
+	UnicodeString   str;
+	s64             cursor = 0;
+	bool            is_current_token_number = false;
+	UnicodeString   current_token;
+};
+
+struct AstSymbol: AstNode {
+	UnicodeString name;
+
+	REFLECT(AstSymbol) {
+		BASE_TYPE(AstNode);
+		MEMBER(name);
+	}
+};
+
+struct AstVar: AstSymbol {
+	
+	REFLECT(AstVar) {
+		BASE_TYPE(AstSymbol);
+	}
+};
+
+struct CTypeAlias: AstSymbol {
+	Type*  alias_type;
+
+	REFLECT(CTypeAlias) {
+		BASE_TYPE(AstSymbol);
+		MEMBER(alias_type);
+	}
+};
+
+struct ShaderIntrinVar: AstVar {
+
+	REFLECT(ShaderIntrinVar) {
+		BASE_TYPE(AstVar);
+	}
+};
+
+struct AstFunctionArg: AstNode {
+	UnicodeString name;
+	Type*         arg_type = NULL;
+
+	REFLECT(AstFunctionArg) {
+		BASE_TYPE(AstNode);
+		MEMBER(name);
+		MEMBER(arg_type);
+	}
+};
+
+struct AstFunction: AstSymbol {
+	Array<AstFunctionArg*> args;
+	AstBlock*              block = NULL;
+
+	REFLECT(AstFunction) {
+		BASE_TYPE(AstSymbol);
+		MEMBER(args);
+		MEMBER(block);
+	}
+};
+
+struct ShaderIntrinFunc: AstFunction {
+
+	REFLECT(ShaderIntrinFunc) {
+		BASE_TYPE(AstFunction);
+	}
+};
+
+void add_type_alias(CLikeParser* p, Type* type, UnicodeString name) {
+	auto node = make_ast_node<CTypeAlias>();
+	node->alias_type = type;
+	node->name = name;
+	p->program->globals.add(node);
+}
+
+void add_shader_intrinsic_var(CLikeParser* p, UnicodeString name) {
+	auto node = make_ast_node<ShaderIntrinVar>();
+	node->name = name;
+	p->program->globals.add(node);
+}
+
+void add_shader_intrinsic_func(CLikeParser* p, UnicodeString name) {
+	auto node = make_ast_node<ShaderIntrinFunc>();
+	node->name = name;
+	p->program->globals.add(node);
+}
+
+struct CUnaryExpr: AstExpr {
+	AstExpr*      expr;
+	UnicodeString op;
+
+	REFLECT(CUnaryExpr) {
+		BASE_TYPE(AstExpr);
+		MEMBER(expr);
+		MEMBER(op);
+	}
+};
+
+struct CBinaryExpr: AstExpr {
+	AstExpr*      lhs;
+	AstExpr*      rhs;
+	UnicodeString op;
+
+	REFLECT(CBinaryExpr) {
+		BASE_TYPE(AstExpr);
+		MEMBER(lhs);
+		MEMBER(rhs);
+		MEMBER(op);
+	}
+};
+
+struct AstVarDecl: AstVar { 
+	Type*         var_type;
+	s64           id = 0;
+	AstExpr*      init = NULL;
+
+	REFLECT(AstVarDecl) {
+		BASE_TYPE(AstVar);
+		MEMBER(var_type);
+		MEMBER(id);
+		MEMBER(init);
+	}
+};
+
+
+struct AstVarDeclGroup: AstNode {
+	Array<AstVarDecl*> var_decls;
+
+	REFLECT(AstVarDeclGroup) {
+		BASE_TYPE(AstNode);
+		MEMBER(var_decls);
+	}
+};
+
+struct AstVarMemberAccess: AstNode {
+	AstNode*      lhs;
+	UnicodeString member;
+
+	REFLECT(AstVarMemberAccess) {
+		BASE_TYPE(AstNode);
+		MEMBER(lhs);
+		MEMBER(member);
+	}
+};
+
+struct AstArrayAccess: AstNode {
+	AstNode*      lhs;
+	AstExpr*      index;
+
+	REFLECT(AstArrayAccess) {
+		BASE_TYPE(AstNode);
+		MEMBER(lhs);
+		MEMBER(index);
+	}
+};
+
+struct CAstLiteral: AstNode {
+	UnicodeString value;
+
+	REFLECT(CAstLiteral) {
+		BASE_TYPE(AstNode);
+		MEMBER(value);
+	}
+};
+
+
+struct CLikeParserError: Error {
+	s64 start;
+	s64 end;
+
+	REFLECT(CLikeParserError) {
+		BASE_TYPE(Error);
+		MEMBER(start);
+		MEMBER(end);
+	}
+};
+
+CLikeParserError* parser_error(CLikeParser* p, UnicodeString str, CodeLocation loc = caller_loc()) {
+	if (p->current_token.data == NULL) {
+		return format_error_t(CLikeParserError, "current_token is not set!");
+	}
+	s64 idx = p->current_token.data - p->str.data;
+	
+	s64 bottom_lines_count = 0;
+	s64 top_lines_count = 0;
+	s64 end = len(p->str);
+	s64 start = 0;
+	for (auto i: range_from_to(idx, len(p->str))) {
+		if (is_line_break(p->str[i])) {
+			bottom_lines_count += 1;
+			if (bottom_lines_count >= 3) {
+				end = i + 1;
+				break;
+			}
+		}
+	}
+	for (auto i: range(idx).reverse()) {
+		if (is_line_break(p->str[i])) {
+			top_lines_count += 1;
+			if (top_lines_count >= 3) {
+				start = i;
+				break;
+			}
+		}
+	}
+
+	auto sb = build_unicode_string();
+	defer { sb.free(); };
+	auto local_text = slice(p->str, start, end - start);
+	auto pre_text = slice(local_text, 0, idx - start);
+	auto highlight_text = slice(local_text, idx - start, len(p->current_token));
+	auto post_text = slice(local_text, idx - start + len(p->current_token));
+	sb.append('\n');
+	sb.append(str);
+	sb.append('\n');
+	sb.append("\x1b[0;97m");
+	sb.append(pre_text);
+	sb.append("\x1b[0m");
+	sb.append("\x1b[4;31m");
+	sb.append(highlight_text);
+	sb.append("\x1b[0m");
+	sb.append("\x1b[0;97m");
+	sb.append(post_text);
+	sb.append("\x1b[0m");
+	auto error = format_error<CLikeParserError>(loc, sb.get_string());
+	error->start = idx;
+	error->end = idx + len(p->current_token);
+	return error;
+}
+
+UnicodeString set_current_token(CLikeParser* p, s64 end, bool is_number = false) {
+	defer { p->cursor = end; };
+	p->is_current_token_number = is_number;
+	return p->current_token = slice(p->str, p->cursor, end - p->cursor);
+}
+
+s64 maybe_eat_floating_point_literal(CLikeParser* p) {
+	s64 c = p->cursor;
+
+	for (auto i: range_from_to(c, len(p->str))) {
+		if (p->str[i] >= '0' && p->str[i] <= '9') {
+			c = i + 1;
+			continue;
+		}
+		c = i;
+		break;
+	}
+
+	if (c >= len(p->str)) {
+		return 0;
+	}
+
+	if (p->str[c] == '.') {
+		c += 1;
+		for (auto i: range_from_to(c, len(p->str))) {
+			if (p->str[i] >= '0' && p->str[i] <= '9') {
+				c = i + 1;
+				continue;
+			}
+			c = i;
+			break;
+		}
+	}
+
+	if (c == p->cursor) {
+		return 0;
+	}
+
+	if (c >= len(p->str)) {
+		return c;
+	}
+
+	if (p->str[c] == 'e' || p->str[c] == 'E') {
+		c += 1;
+		if (c >= len(p->str)) {
+			return 0;
+		}
+		if (p->str[c] == '+' || p->str[c] == '-') {
+			c += 1;
+			if (c >= len(p->str)) {
+				return 0;
+			}
+		}
+
+		for (auto i: range_from_to(c, len(p->str))) {
+			if (p->str[i] >= '0' && p->str[i] <= '9') {
+				c = i + 1;
+				continue;
+			}
+			c = i;
+			break;
+		}
+	}
+
+	if (c >= len(p->str)) {
+		return c;
+	}
+	if (p->str[c] == 'f' || p->str[c] == 'F' || p->str[c] == 'd' || p->str[c] == 'D') {
+		c += 1;
+	}
+	return c;
+}
+
+s64 maybe_eat_number_literal(CLikeParser* p) {
+	s64 fp = maybe_eat_floating_point_literal(p);
+	if (fp != 0) {
+		return fp;
+	}
+
+	auto start = slice(p->str, p->cursor);
+
+	s32 prefix_len = 0;
+	if (starts_with(start, U"0x"_b) ||
+		starts_with(start, U"0X"_b) ||
+		starts_with(start, U"0b"_b) ||
+		starts_with(start, U"0B"_b) ||
+		starts_with(start, U"0o"_b) ||
+		starts_with(start, U"0O"_b))
+	{
+		prefix_len = 2;
+	}
+
+	for (auto i: range_from_to(p->cursor + prefix_len, len(p->str))) {
+		if (p->str[i] >= '0' && p->str[i] <= '9') {
+			continue;
+		}
+		// @Hack
+		if (prefix_len == 2) {
+			if (p->str[i] >= 'a' && p->str[i] <= 'f') {
+				continue;
+			}
+			if (p->str[i] >= 'A' && p->str[i] <= 'F') {
+				continue;
+			}
+		}
+		return i != p->cursor ? i : 0;
+	}
+	return prefix_len > 0 ? len(p->str) : 0;
+}
+
+UnicodeString next(CLikeParser* p) {
+	static char32_t break_characters[] = {
+		',',
+		';',
+		'/',
+		'.',
+		'-',
+		'=',
+		'(',
+		')',
+		'?',
+		':',
+		'+',
+		'*',
+		'-',
+		'<',
+		'>',
+	};
+
+	for (auto i: range_from_to(p->cursor, len(p->str))) {
+		if (is_whitespace(p->str[i])) {
+			if (p->cursor < i) {
+				return set_current_token(p, i);
+			} else {
+				p->cursor = i + 1;
+				continue;
+			}
+		}
+
+		s64 num_ptr = maybe_eat_number_literal(p);
+		if (num_ptr != 0) {
+			return set_current_token(p, num_ptr, true);
+		}
+
+		for (auto c: break_characters) {
+			if (p->str[i] == c) {
+				if (p->cursor < i) {
+					return set_current_token(p, i);
+				} else {
+					// parse multichar operators.
+					auto txt = slice(p->str, i);
+					if (starts_with(txt, U"=="_b)) return set_current_token(p, i + 2);
+					if (starts_with(txt, U"!="_b)) return set_current_token(p, i + 2);
+					if (starts_with(txt, U"+="_b)) return set_current_token(p, i + 2);
+					if (starts_with(txt, U"-="_b)) return set_current_token(p, i + 2);
+					if (starts_with(txt, U"*="_b)) return set_current_token(p, i + 2);
+					if (starts_with(txt, U"/="_b)) return set_current_token(p, i + 2);
+					if (starts_with(txt, U"%="_b)) return set_current_token(p, i + 2);
+					return set_current_token(p, i + 1);
+				}
+			}
+		}
+		if (i - 1 == len(p->str)) {
+			return set_current_token(p, len(p->str));
+		}
+	}
+	return {};
+}
+
+UnicodeString peek(CLikeParser* p) {
+	if (len(p->current_token) == 0) {
+		return next(p);
+	}
+	return p->current_token;
+}
+
+AstNode* resolve_symbol(AstNode* node, UnicodeString name) {
+	if (auto sym = reflect_cast<AstSymbol>(node)) {
+		if (sym->name == name) {
+			return sym;
+		}
+	}
+	if (auto var_decl_group = reflect_cast<AstVarDeclGroup>(node)) {
+		for (auto it: var_decl_group->var_decls) {
+			if (auto symbol = resolve_symbol(it, name)) {
+				return symbol;
+			}
+		}
+	}
+	return NULL;
+}
+
+AstNode* lookup_symbol(CLikeParser* p, UnicodeString name) {
+	for (auto i: range(len(p->scope)).reverse()) {
+		auto scope = *p->scope[i];
+		if (auto program = reflect_cast<CLikeProgram>(scope)) {
+			for (auto child: program->globals) {
+				if (auto symbol = resolve_symbol(child, name)) {
+					return symbol;
+				}
+			}
+		}
+		if (auto block = reflect_cast<AstBlock>(scope)) {
+			for (auto child: block->statements) {
+				if (auto symbol = resolve_symbol(child, name)) {
+					return symbol;
+				}
+			}
+		}
+	}
+	return NULL;
+}
+
+Type* find_type(CLikeParser* p, UnicodeString name) {
+	auto symbol = lookup_symbol(p, name);
+	if (symbol) {
+		if (auto tp = reflect_cast<CTypeAlias>(symbol)) {
+			return tp->alias_type;
+		}
+	}
+	return NULL;
+}
+
+Tuple<Type*, Error*> parse_type(CLikeParser* p) {
+	auto tok = peek(p);
+	auto c_str = encode_utf8(tok);
+	defer { c_str.free(); };
+	Type* type = find_type(p, tok);
+	if (!type) {
+		return { NULL, parser_error(p, U"Could not find type."_b) };
+	}
+	next(p);
+	return { type, NULL };
+}
+
+Tuple<UnicodeString, Error*> parse_ident(CLikeParser* p) {
+	auto tok = peek(p);
+	if (len(tok) > 0) {
+		next(p);
+		return { tok, NULL };
+	}
+	return { {}, parser_error(p, U"Expected an identifier."_b) };
+}
+
+Tuple<AstNode*, Error*> parse_primary_expr(CLikeParser* p);
+Tuple<AstNode*, Error*> parse_expr(CLikeParser* p, s32 min_prec);
+
+Tuple<AstNode*, Error*> parse_var_decl(CLikeParser* p, Type* type, UnicodeString first_ident) {
+	Array<AstVarDecl*> var_decls;
+	defer { var_decls.free(); };
+
+	auto current_ident = first_ident;
+	while (true) {
+		auto node = make_ast_node<AstVarDecl>();
+		node->var_type = type;
+		node->name = current_ident;
+		var_decls.add(node);
+
+		auto tok = peek(p);
+		if (tok == U","_b) {
+			next(p);
+			auto [ident, e] = parse_ident(p);
+			if (e) {
+				return { NULL, e };
+			}
+			current_ident = ident;
+		} else if (tok == U";"_b) {
+			break;
+		} else if (tok == U"="_b) {
+			next(p);
+			auto [expr, e] = parse_expr(p, 0);
+			if (e) {
+				return { NULL, e };
+			}
+			for (auto it: var_decls) {
+				it->init = (AstExpr*) expr;
+			}
+			break;
+		} else {
+			return { NULL, parser_error(p, U"Expected , or ;"_b) };
+		}
+	}
+
+	if (len(var_decls) > 1) {
+		auto node = make_ast_node<AstVarDeclGroup>();
+		node->var_decls = var_decls;
+		var_decls = {};
+		return { node, NULL };
+	} else {
+		return { *var_decls[0], NULL };
+	}
+}
+
+Tuple<AstNode*, Error*> parse_unary_expr(CLikeParser* p, UnicodeString op, s32 min_prec) {
+	auto [expr, e] = parse_expr(p, min_prec);
+	if (e) {
+		return { NULL, e };
+	}
+	auto unary = make_ast_node<CUnaryExpr>();
+	unary->expr = (AstExpr*) expr;
+	unary->op = op;
+	return { unary, NULL };
+}
+
+Tuple<AstNode*, Error*> parse_var(CLikeParser* p, AstNode* lhs) {
+	auto tok = peek(p);
+	if (tok == ".") {
+		next(p);
+		auto [ident, e] = parse_ident(p);
+		if (e) {
+			return { NULL, e };
+		}
+		auto node = make_ast_node<AstVarMemberAccess>();
+		node->lhs = lhs;
+		node->member = ident;
+		return parse_var(p, node);
+	}
+	// @TODO: parse array access
+	// @TODO: parse pointer access.
+	return { lhs, NULL };
+}
+
+
+Tuple<s32, bool> get_unary_operator_prec_assoc(UnicodeString op) {
+	if (op == "!" || op == "~") {
+		return { 15, false };
+	}
+	if (op == "+" || op == "-") { 
+		return { 15, false };
+	}
+	if (op == "++" || op == "--") {
+		return { 15, false };
+	}
+	if (op == "*" || op == "&") {
+		return { 15, false };
+	}
+	if (op == "++" || op == "--") {
+		return { 15, false };
+	}
+	return { 0, false };
+}
+
+Tuple<s32, bool> get_binary_operator_prec_assoc(UnicodeString op) { 
+	if (op == "+=" ||
+		op == "-=" ||
+		op == "*=" ||
+		op == "/=" ||
+		op == "%=" ||
+		op == "=") {
+		return { 4, false };
+	}
+
+	if (op == "||") {
+		return { 5, true };
+	}
+	if (op == "&&") {
+		return { 6, true };
+	}
+	if (op == "|") {
+		return { 7, true };
+	}
+	if (op == "^") {
+		return { 8, true };
+	}
+	if (op == "&") {
+		return { 9, true };
+	}
+	if (op == "==" || op == "!=") {
+		return { 10, true };
+	}
+	if (op == "<" || op == ">" || op == "<=" || op == ">=") {
+		return { 11, true };
+	}
+	if (op == "<<" || op == ">>") {
+		return { 12, true };
+	}
+	if (op == "+" || op == "-") {
+		return { 13, true };
+	}
+	if (op == "*" || op == "/" || op == "%") {
+		return { 14, true };
+	}
+	return { 0, false };
+}
+
+Tuple<AstNode*, Error*> parse_function_call(CLikeParser* p, AstFunction* f) {
+	auto tok = peek(p);
+	if (tok != "("_b) {
+		return { NULL, parser_error(p, U"Expected ("_b) };
+	}
+	next(p);
+	while (true) {
+		auto tok = peek(p);
+		if (tok == ")"_b) {
+			next(p);
+			break;
+		}
+		auto [expr, e] = parse_expr(p, 0);
+		if (e) {
+			return { NULL, e };
+		}
+}
+
+Tuple<AstNode*, Error*> parse_primary_expr(CLikeParser* p) {
+	auto tok = peek(p);
+
+	if (p->is_current_token_number) {
+		auto literal = make_ast_node<CAstLiteral>();
+		literal->value = p->current_token;
+		next(p);
+		return { literal, NULL };
+	}
+
+	auto [unary_op_prec, _] = get_unary_operator_prec_assoc(tok);
+	if (unary_op_prec > 0) {
+		next(p);
+		auto [expr, e] = parse_expr(p, unary_op_prec);
+		if (e) {
+			return { NULL, e };
+		}
+		auto unary = make_ast_node<CUnaryExpr>();
+		unary->expr = (AstExpr*) expr;
+		unary->op = tok;
+		return { unary, NULL };
+	}
+
+	if (tok == "("_b) {
+		next(p);
+		auto [expr, e] = parse_expr(p, 0);
+		if (e) {
+			return { NULL, e };
+		}
+		if (peek(p) != ")"_b) {
+			return { NULL, parser_error(p, U"Expected a )"_b) };
+		}
+		next(p);
+		return { expr, NULL };
+	}
+
+	AstNode* lhs = NULL;
+
+	auto sym = lookup_symbol(p, tok);
+	if (sym) {
+		if (auto var = reflect_cast<AstVar>(sym)) {
+			next(p);
+			lhs = var;
+		}
+		if (auto function = reflect_cast<AstFunction>(sym)) {
+			next(p);
+			// @TODO: parse function call
+			return { NULL, parser_error(p, U"TODO: parse function call"_b) };
+		}
+	}
+
+	if (!lhs) {
+		return { NULL, parser_error(p, U"Unknown expression"_b) };
+	}
+
+	while (true) {
+		auto tok = peek(p);
+		if (tok == "."_b) {
+			next(p);
+			auto [ident, e] = parse_ident(p);
+			if (e) {
+				return { NULL, e };
+			}
+			auto node = make_ast_node<AstVarMemberAccess>();
+			node->lhs = lhs;
+			node->member = ident;
+			lhs = node;
+			continue;
+		}
+		if (tok == "["_b) {
+			next(p);
+			auto [expr, e] = parse_expr(p, 0);
+			if (e) {
+				return { NULL, e };
+			}
+			if (peek(p) != "]"_b) {
+				return { NULL, parser_error(p, U"Expected a ]"_b) };
+			}
+			next(p);
+			auto node = make_ast_node<AstArrayAccess>();
+			node->lhs = lhs;
+			node->index = (AstExpr*) expr;
+			lhs = node;
+			continue;
+		}
+		break;
+	}
+
+	return { lhs, NULL };
+}
+
+Tuple<AstNode*, Error*> parse_expr(CLikeParser* p, s32 min_prec) {
+	auto [lhs, e] = parse_primary_expr(p);
+	if (e) {
+		return { NULL, e };
+	}
+
+	while (true) {
+		auto tok = peek(p);
+		auto [prec, left_assoc] = get_binary_operator_prec_assoc(tok);
+		if (prec == 0) {
+			break;
+		}
+		if (prec < min_prec) {
+			break;
+		}
+		next(p);
+		s32 next_min_prec = left_assoc ? prec + 1 : prec;
+		auto [rhs, e] = parse_expr(p, next_min_prec);
+		if (e) {
+			return { NULL, e };
+		}
+		auto node = make_ast_node<CBinaryExpr>();
+		node->lhs = reflect_cast<AstExpr>(lhs);
+		node->rhs = reflect_cast<AstExpr>(rhs);
+		node->op = tok;
+		lhs = node;
+	}
+	return { lhs, NULL };
+}
+
+Tuple<AstNode*, Error*> parse_if(CLikeParser* p) {
+	if (peek(p) != "("_b) {
+		return { NULL, parser_error(p, U"Expected ("_b) };
+	}
+	next(p);
+	auto [expr, e] = parse_expr(p, 0);
+	if (e) {
+		return { NULL, e };
+	}
+	return { NULL, parser_error(p, U"TODO: parse if"_b) };
+}
+
+Tuple<AstNode*, Error*> parse_stmt(CLikeParser* p) {
+	auto tok = peek(p);
+	if (tok == "if"_b) {
+		next(p);
+		auto [_if, e] = parse_if(p);
+		return { _if, e };
+	}
+	//  else if (tok == "for"_b) {
+	// 	auto [_for, e] = parse_for(p);
+	// 	return { _for, e };
+	// }
+
+	auto type = find_type(p, tok);
+	if (type) {
+		next(p);
+		auto [ident, e] = parse_ident(p);
+		if (e) {
+			return { NULL, e };
+		}
+		auto [decl, ee] = parse_var_decl(p, type, ident);
+		if (ee) {
+			return { NULL, ee };
+		}
+		return { decl, NULL };
+	}
+	return parse_expr(p, 0);
+}
+
+Tuple<AstNode*, Error*> parse_block(CLikeParser* p) {
+	auto tok = peek(p);
+	if (tok != U"{"_b) {
+		return { NULL, parser_error(p, U"Expected a {"_b) };
+	}
+	next(p);
+	auto block = make_ast_node<AstBlock>();
+	p->scope.add(block);
+	defer { p->scope.pop_last(); };
+	
+	while (true) {
+		auto tok = peek(p);
+		if (tok == U"}"_b) {
+			next(p);
+			break;
+		}
+		auto [stmt, e] = parse_stmt(p);
+		if (e) {
+			return { NULL, e };
+		}
+		tok = peek(p);
+		if (tok != U";"_b) {
+			return { NULL, parser_error(p, U"Expected ;"_b) };
+		}
+		next(p);
+		block->statements.add(stmt);
+	}
+	return { block, NULL };
+}
+
+Tuple<AstNode*, Error*> parse_function(CLikeParser* p, Type* return_type, UnicodeString name) {
+	Array<AstFunctionArg*> args;
+	defer { args.free(); };
+
+	while (true) {
+		auto tok = next(p);
+		if (tok == U")"_b) {
+			next(p);
+			break;
+		} else if (tok != U","_b) {
+			return { NULL, parser_error(p, U"Expected ')' or ','"_b) };
+		}
+		next(p);
+		auto [type, e] = parse_type(p);
+		if (e) {
+			return { NULL, e };
+		}
+		auto [arg_name, e2] = parse_ident(p);
+		if (e2) {
+			return { NULL, e2 };
+		}
+		auto arg_node = make_ast_node<AstFunctionArg>();
+		arg_node->name = arg_name;
+		arg_node->arg_type = type;
+		args.add(arg_node);
+	}
+
+	auto f = make_ast_node<AstFunction>();
+
+	auto tok = peek(p);
+	if (tok == ";") {
+		next(p);
+		f->name = name;
+		f->args = args;
+		return { f, NULL };
+	}
+	if (tok == "{") {
+		auto [block, e] = parse_block(p);
+		if (e) {
+			return { NULL, e };
+		}
+		f->block = (AstBlock*) block;
+		return { f, NULL };
+	}
+
+	return { NULL, parser_error(p, U"Expected ; or { after function header"_b) }; 
+}
+
+Tuple<AstNode*, Error*> parse_top_level(CLikeParser* p) {
+	auto tok = peek(p);
+	auto [type, error] = parse_type(p);
+	if (error) {
+		return { NULL, error };
+	}
+	auto [ident, e] = parse_ident(p);
+	if (e) {
+		return { NULL, e };
+	}
+	tok = peek(p);
+	if (tok == U"("_b) {
+		return parse_function(p, type, ident);
+	} else if (tok == U","_b || tok == U";"_b) {
+		return parse_var_decl(p, type, ident);
+	} else {
+		return { NULL, parser_error(p, U"Expected ( or , or ;"_b) };
+	}
+}
+
+Tuple<AstNode*, Error*> parse_c_like(UnicodeString str) {
+	CLikeParser p;
+	p.program = make_ast_node<CLikeProgram>();
+	p.str = str;
+	p.scope.add(p.program);
+
+	add_type_alias(&p, reflect_type_of<float>(), U"float"_b);
+	add_type_alias(&p, reflect_type_of<void>(), U"void"_b);
+	add_type_alias(&p, reflect_type_of<Vector3>(), U"vec3"_b);
+
+	add_shader_intrinsic_var(&p, U"FC"_b); // frag coord
+	add_shader_intrinsic_var(&p, U"r"_b); // resolution
+	add_shader_intrinsic_func(&p, U"hsv"_b);
+
+	while (peek(&p) != ""_b) {
+		auto [node, e] = parse_top_level(&p);
+		if (e) {
+			return { NULL, e };
+		}
+		p.program->globals.add(node);
+	}
+	return { p.program, NULL };
+}
