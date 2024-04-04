@@ -49,3 +49,29 @@ TEST(reflect_struct_offset) {
 	EXPECT(casted->members[3]->offset == sizeof(int) * 3);
 	EXPECT(casted->members[4]->offset == sizeof(int) * 4);
 }
+
+
+struct Base {
+	Type* type;
+
+	REFLECT(Base) {
+		MEMBER(type); TAG(RealTypeMember{});
+	}
+};
+
+struct Derived: Base {
+
+	REFLECT(Derived) {
+		BASE_TYPE(Base);
+	}
+};
+
+TEST(reflect_real_type_test) {
+	Derived d;
+	d.type = reflect_type_of<decltype(d)>();
+
+	Base* b = &d;
+
+	auto type = get_real_type(reflect_type_of(*b), b);
+	EXPECT(type == reflect_type_of<Derived>());
+}
