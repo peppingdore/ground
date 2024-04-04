@@ -103,7 +103,7 @@ void add_shader_intrinsic_func(CLikeParser* p, UnicodeString name) {
 }
 
 struct CUnaryExpr: AstExpr {
-	AstExpr*      expr;
+	AstNode*      expr;
 	UnicodeString op;
 
 	REFLECT(CUnaryExpr) {
@@ -114,8 +114,8 @@ struct CUnaryExpr: AstExpr {
 };
 
 struct CBinaryExpr: AstExpr {
-	AstExpr*      lhs;
-	AstExpr*      rhs;
+	AstNode*      lhs = NULL;
+	AstNode*      rhs = NULL;
 	UnicodeString op;
 
 	REFLECT(CBinaryExpr) {
@@ -403,6 +403,8 @@ UnicodeString next(CLikeParser* p) {
 					if (starts_with(txt, U"*="_b)) return set_current_token(p, i + 2);
 					if (starts_with(txt, U"/="_b)) return set_current_token(p, i + 2);
 					if (starts_with(txt, U"%="_b)) return set_current_token(p, i + 2);
+					if (starts_with(txt, U"++"_b)) return set_current_token(p, i + 2);
+					if (starts_with(txt, U"--"_b)) return set_current_token(p, i + 2);
 					return set_current_token(p, i + 1);
 				}
 			}
@@ -411,7 +413,7 @@ UnicodeString next(CLikeParser* p) {
 			return set_current_token(p, len(p->str));
 		}
 	}
-	return {};
+	return set_current_token(p, len(p->str));
 }
 
 UnicodeString peek(CLikeParser* p) {
@@ -567,8 +569,14 @@ Tuple<AstNode*, Error*> parse_var(CLikeParser* p, AstNode* lhs) {
 	return { lhs, NULL };
 }
 
+Tuple<s32, bool> get_postfix_unary_operator_prec_assoc(UnicodeString op) {
+	if (op == "++" || op == "--") {
+		return { 16, false };
+	}
+	return { 0, false };
+}
 
-Tuple<s32, bool> get_unary_operator_prec_assoc(UnicodeString op) {
+Tuple<s32, bool> get_prefix_unary_operator_prec_assoc(UnicodeString op) {
 	if (op == "!" || op == "~") {
 		return { 15, false };
 	}
@@ -588,6 +596,10 @@ Tuple<s32, bool> get_unary_operator_prec_assoc(UnicodeString op) {
 }
 
 Tuple<s32, bool> get_binary_operator_prec_assoc(UnicodeString op) { 
+	if (op == ",") {
+		return { 3, true };
+	}
+
 	if (op == "+=" ||
 		op == "-=" ||
 		op == "*=" ||
@@ -630,11 +642,23 @@ Tuple<s32, bool> get_binary_operator_prec_assoc(UnicodeString op) {
 	return { 0, false };
 }
 
-Tuple<AstNode*, Error*> parse_function_call(CLikeParser* p, AstFunction* f) {
+struct AstFunctionCall: AstExpr {
+	AstNode*        f;
+	Array<AstExpr*> args;
+
+	REFLECT(AstFunctionCall) {
+		BASE_TYPE(AstExpr);
+		MEMBER(args);
+	}
+};
+
+Tuple<AstNode*, Error*> parse_function_call(CLikeParser* p, AstNode* node) {
 	auto tok = peek(p);
 	if (tok != "("_b) {
 		return { NULL, parser_error(p, U"Expected ("_b) };
 	}
+	auto call = make_ast_node<AstFunctionCall>();
+	call->f = node;
 	next(p);
 	while (true) {
 		auto tok = peek(p);
@@ -646,7 +670,26 @@ Tuple<AstNode*, Error*> parse_function_call(CLikeParser* p, AstFunction* f) {
 		if (e) {
 			return { NULL, e };
 		}
+		call->args.add((AstExpr*) expr);
+		if (peek(p) == ","_b) {
+			next(p);
+		}
+	}
+	return { call, NULL };
 }
+
+struct AstTernary: AstExpr {
+	AstNode* cond;
+	AstNode* then;
+	AstNode* else_;
+
+	REFLECT(AstTernary) {
+		BASE_TYPE(AstExpr);
+		MEMBER(cond);
+		MEMBER(then);
+		MEMBER(else_);
+	}
+};
 
 Tuple<AstNode*, Error*> parse_primary_expr(CLikeParser* p) {
 	auto tok = peek(p);
@@ -658,7 +701,7 @@ Tuple<AstNode*, Error*> parse_primary_expr(CLikeParser* p) {
 		return { literal, NULL };
 	}
 
-	auto [unary_op_prec, _] = get_unary_operator_prec_assoc(tok);
+	auto [unary_op_prec, _] = get_prefix_unary_operator_prec_assoc(tok);
 	if (unary_op_prec > 0) {
 		next(p);
 		auto [expr, e] = parse_expr(p, unary_op_prec);
@@ -684,27 +727,32 @@ Tuple<AstNode*, Error*> parse_primary_expr(CLikeParser* p) {
 		return { expr, NULL };
 	}
 
-	AstNode* lhs = NULL;
-
-	auto sym = lookup_symbol(p, tok);
-	if (sym) {
-		if (auto var = reflect_cast<AstVar>(sym)) {
-			next(p);
-			lhs = var;
-		}
-		if (auto function = reflect_cast<AstFunction>(sym)) {
-			next(p);
-			// @TODO: parse function call
-			return { NULL, parser_error(p, U"TODO: parse function call"_b) };
-		}
-	}
-
+	AstNode* lhs = lookup_symbol(p, tok);
 	if (!lhs) {
-		return { NULL, parser_error(p, U"Unknown expression"_b) };
+		return { NULL, parser_error(p, U"Unknown identifier"_b) };
 	}
+	next(p);
 
 	while (true) {
 		auto tok = peek(p);
+
+		auto [postfix_op_prec, left_assoc] = get_postfix_unary_operator_prec_assoc(tok);
+		if (postfix_op_prec > 0) {
+			next(p);
+			auto node = make_ast_node<CUnaryExpr>();
+			node->expr = lhs;
+			node->op = tok;
+			lhs = node;
+			continue;
+		}
+		if (tok == "("_b) {
+			auto [call, e] = parse_function_call(p, lhs);
+			if (e) {
+				return { NULL, e };
+			}
+			lhs = call;
+			continue;
+		}
 		if (tok == "."_b) {
 			next(p);
 			auto [ident, e] = parse_ident(p);
@@ -747,6 +795,28 @@ Tuple<AstNode*, Error*> parse_expr(CLikeParser* p, s32 min_prec) {
 
 	while (true) {
 		auto tok = peek(p);
+		if (tok == "?"_b) {
+			next(p);
+			auto [then_expr, e2] = parse_expr(p, 0);
+			if (e2) {
+				return { NULL, e2 };
+			}
+			auto tok = peek(p);
+			if (tok != ":"_b) {
+				return { NULL, parser_error(p, U"Expected a :"_b) };
+			}
+			next(p);
+			auto [else_expr, e3] = parse_expr(p, 0);
+			if (e3) {
+				return { NULL, e3 };
+			}
+			auto node = make_ast_node<AstTernary>();
+			node->cond = lhs;
+			node->then = then_expr;
+			node->else_ = else_expr;
+			lhs = node;
+			continue;
+		}
 		auto [prec, left_assoc] = get_binary_operator_prec_assoc(tok);
 		if (prec == 0) {
 			break;
@@ -761,8 +831,8 @@ Tuple<AstNode*, Error*> parse_expr(CLikeParser* p, s32 min_prec) {
 			return { NULL, e };
 		}
 		auto node = make_ast_node<CBinaryExpr>();
-		node->lhs = reflect_cast<AstExpr>(lhs);
-		node->rhs = reflect_cast<AstExpr>(rhs);
+		node->lhs = lhs;
+		node->rhs = rhs;
 		node->op = tok;
 		lhs = node;
 	}
@@ -781,17 +851,88 @@ Tuple<AstNode*, Error*> parse_if(CLikeParser* p) {
 	return { NULL, parser_error(p, U"TODO: parse if"_b) };
 }
 
+Tuple<AstNode*, Error*> parse_block(CLikeParser* p);
+Tuple<AstNode*, Error*> parse_stmt(CLikeParser* p);
+
+Tuple<AstNode*, Error*> parse_block_or_one_stmt(CLikeParser* p) {
+	auto tok = peek(p);
+	if (tok == "{"_b) {
+		next(p);
+		auto [block, e] = parse_block(p);
+		if (e) {
+			return { NULL, e };
+		}
+		return { block, NULL };
+	} else {
+		return parse_stmt(p);
+	}
+}
+
+struct AstFor: AstNode {
+	AstNode* init_expr = NULL;
+	AstNode* cond_expr = NULL;
+	AstNode* incr_expr = NULL;
+	AstNode* body = NULL;
+
+	REFLECT(AstFor) {
+		BASE_TYPE(AstNode);
+		MEMBER(init_expr);
+		MEMBER(cond_expr);
+		MEMBER(incr_expr);
+		MEMBER(body);
+	}
+};
+
+Tuple<AstNode*, Error*> parse_for(CLikeParser* p) {
+	if (peek(p) != "("_b) {
+		return { NULL, parser_error(p, U"Expected ("_b) };
+	}
+	next(p);
+	auto [init_expr, e] = parse_expr(p, 0);
+	if (e) {
+		return { NULL, e };
+	}
+	if (peek(p) != ";"_b) {
+		return { NULL, parser_error(p, U"Expected ;"_b) };
+	}
+	next(p);
+	auto [cond_expr, e2] = parse_expr(p, 0);
+	if (e2) {
+		return { NULL, e2 };
+	}
+	if (peek(p) != ";"_b) {
+		return { NULL, parser_error(p, U"Expected ;"_b) };
+	}
+	next(p);
+	auto [incr_expr, e3] = parse_expr(p, 0);
+	if (e3) {
+		return { NULL, e3 };
+	}
+	if (peek(p) != ")"_b) {
+		return { NULL, parser_error(p, U"Expected )"_b) };
+	}
+	next(p);
+	auto [body, e4] = parse_block_or_one_stmt(p);
+	if (e4) {
+		return { NULL, e4 };
+	}
+	auto node = make_ast_node<AstFor>();
+	node->init_expr = init_expr;
+	node->cond_expr = cond_expr;
+	node->incr_expr = incr_expr;
+	node->body = body;
+	return { node, NULL };
+}
+
 Tuple<AstNode*, Error*> parse_stmt(CLikeParser* p) {
 	auto tok = peek(p);
 	if (tok == "if"_b) {
 		next(p);
-		auto [_if, e] = parse_if(p);
-		return { _if, e };
+		return parse_if(p);
+	} else if (tok == "for"_b) {
+		next(p);
+		return parse_for(p);
 	}
-	//  else if (tok == "for"_b) {
-	// 	auto [_for, e] = parse_for(p);
-	// 	return { _for, e };
-	// }
 
 	auto type = find_type(p, tok);
 	if (type) {
@@ -916,10 +1057,21 @@ Tuple<AstNode*, Error*> parse_c_like(UnicodeString str) {
 	add_type_alias(&p, reflect_type_of<float>(), U"float"_b);
 	add_type_alias(&p, reflect_type_of<void>(), U"void"_b);
 	add_type_alias(&p, reflect_type_of<Vector3>(), U"vec3"_b);
+	add_type_alias(&p, reflect_type_of<Vector3>(), U"vec4"_b);
 
 	add_shader_intrinsic_var(&p, U"FC"_b); // frag coord
 	add_shader_intrinsic_var(&p, U"r"_b); // resolution
+	add_shader_intrinsic_var(&p, U"PI"_b);
+	add_shader_intrinsic_var(&p, U"o"_b); // out color
+	add_shader_intrinsic_var(&p, U"t"_b); // time?
 	add_shader_intrinsic_func(&p, U"hsv"_b);
+	add_shader_intrinsic_func(&p, U"log"_b);
+	add_shader_intrinsic_func(&p, U"sin"_b);
+	add_shader_intrinsic_func(&p, U"cos"_b);
+	add_shader_intrinsic_func(&p, U"dot"_b);
+	add_shader_intrinsic_func(&p, U"atan"_b);
+	add_shader_intrinsic_func(&p, U"length"_b);
+	add_shader_intrinsic_func(&p, U"abs"_b);
 
 	while (peek(&p) != ""_b) {
 		auto [node, e] = parse_top_level(&p);
