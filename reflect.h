@@ -596,7 +596,15 @@ void reflect_struct_type_add_member(Type* type, StructMember member) {
 	}
 	auto t = (StructType*) type;
 	t->unflattened_members.add(member);
-	reflect_flatten_struct_members(type, member.offset, member);
+}
+
+void reflect_maybe_flatten_struct_type(Type* type) {
+	if (type->kind == StructType::KIND) {
+		auto casted = (StructType*) type;
+		for (auto it: casted->unflattened_members) {
+			reflect_flatten_struct_members(type, it.offset, it);
+		}
+	}
 }
 
 void reflect_enum_type_add_value(Type* type, EnumValue v) {
@@ -645,6 +653,7 @@ template <typename __T = _T> requires(std::is_same_v<_T, __T>)\
 inline static ReflectMacroPickType<__T>* reflect_type(__T* x, ReflectMacroPickType<__T>* type) {\
 	type->name = _name;\
 	reflect_fill_type(x, type);\
+	reflect_maybe_flatten_struct_type(type);\
 	return type;\
 }\
 inline static void reflect_fill_type(_T* x, ReflectMacroPickType<_T>* type)
