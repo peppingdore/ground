@@ -66,6 +66,7 @@ struct AstFunctionArg: AstNode {
 };
 
 struct AstFunction: AstSymbol {
+	Type*                  return_type = NULL;
 	Array<AstFunctionArg*> args;
 	AstBlock*              block = NULL;
 
@@ -99,8 +100,20 @@ void add_shader_intrinsic_var(CLikeParser* p, UnicodeString name) {
 void add_shader_intrinsic_func(CLikeParser* p, UnicodeString name) {
 	auto node = make_ast_node<ShaderIntrinFunc>();
 	node->name = name;
+	node->return_type = reflect_type_of<void>();
 	p->program->globals.add(node);
 }
+
+struct CPostfixExpr: AstExpr {
+	AstNode* lhs;
+	UnicodeString op;
+
+	REFLECT(CPostfixExpr) {
+		BASE_TYPE(AstExpr);
+		MEMBER(lhs);
+		MEMBER(op);
+	}
+};
 
 struct CUnaryExpr: AstExpr {
 	AstNode*      expr;
@@ -600,6 +613,10 @@ Tuple<s32, bool> get_binary_operator_prec_assoc(UnicodeString op) {
 		return { 3, true };
 	}
 
+	if (op == "?") {
+		return { 3, false };
+	}
+
 	if (op == "+=" ||
 		op == "-=" ||
 		op == "*=" ||
@@ -666,7 +683,8 @@ Tuple<AstNode*, Error*> parse_function_call(CLikeParser* p, AstNode* node) {
 			next(p);
 			break;
 		}
-		auto [expr, e] = parse_expr(p, 0);
+		auto [comma_prec, _] = get_binary_operator_prec_assoc(U","_b);
+		auto [expr, e] = parse_expr(p, comma_prec + 1);
 		if (e) {
 			return { NULL, e };
 		}
@@ -739,8 +757,8 @@ Tuple<AstNode*, Error*> parse_primary_expr(CLikeParser* p) {
 		auto [postfix_op_prec, left_assoc] = get_postfix_unary_operator_prec_assoc(tok);
 		if (postfix_op_prec > 0) {
 			next(p);
-			auto node = make_ast_node<CUnaryExpr>();
-			node->expr = lhs;
+			auto node = make_ast_node<CPostfixExpr>();
+			node->lhs = lhs;
 			node->op = tok;
 			lhs = node;
 			continue;
@@ -795,6 +813,13 @@ Tuple<AstNode*, Error*> parse_expr(CLikeParser* p, s32 min_prec) {
 
 	while (true) {
 		auto tok = peek(p);
+		auto [prec, left_assoc] = get_binary_operator_prec_assoc(tok);
+		if (prec == 0) {
+			break;
+		}
+		if (prec < min_prec) {
+			break;
+		}
 		if (tok == "?"_b) {
 			next(p);
 			auto [then_expr, e2] = parse_expr(p, 0);
@@ -806,7 +831,7 @@ Tuple<AstNode*, Error*> parse_expr(CLikeParser* p, s32 min_prec) {
 				return { NULL, parser_error(p, U"Expected a :"_b) };
 			}
 			next(p);
-			auto [else_expr, e3] = parse_expr(p, 0);
+			auto [else_expr, e3] = parse_expr(p, left_assoc ? prec + 1 : prec);
 			if (e3) {
 				return { NULL, e3 };
 			}
@@ -817,16 +842,8 @@ Tuple<AstNode*, Error*> parse_expr(CLikeParser* p, s32 min_prec) {
 			lhs = node;
 			continue;
 		}
-		auto [prec, left_assoc] = get_binary_operator_prec_assoc(tok);
-		if (prec == 0) {
-			break;
-		}
-		if (prec < min_prec) {
-			break;
-		}
 		next(p);
-		s32 next_min_prec = left_assoc ? prec + 1 : prec;
-		auto [rhs, e] = parse_expr(p, next_min_prec);
+		auto [rhs, e] = parse_expr(p, left_assoc ? prec + 1 : prec);
 		if (e) {
 			return { NULL, e };
 		}
@@ -864,7 +881,13 @@ Tuple<AstNode*, Error*> parse_block_or_one_stmt(CLikeParser* p) {
 		}
 		return { block, NULL };
 	} else {
-		return parse_stmt(p);
+		auto [stmt, e] = parse_stmt(p);
+		if (e) {
+			return { NULL, e };
+		}
+		auto block = make_ast_node<AstBlock>();
+		block->statements.add(stmt);
+		return { block, NULL };
 	}
 }
 
@@ -1008,12 +1031,13 @@ Tuple<AstNode*, Error*> parse_function(CLikeParser* p, Type* return_type, Unicod
 	}
 
 	auto f = make_ast_node<AstFunction>();
+	f->return_type = return_type;
+	f->name = name;
+	f->args = args;
 
 	auto tok = peek(p);
 	if (tok == ";") {
 		next(p);
-		f->name = name;
-		f->args = args;
 		return { f, NULL };
 	}
 	if (tok == "{") {
