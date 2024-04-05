@@ -2,6 +2,7 @@
 #include "../log.h"
 #include "../defer.h"
 #include "c_like_parser.h"
+#include "ast_printer.h" 
 
 // https://twitter.com/zozuar/status/1755381710227755046
 //
@@ -33,7 +34,7 @@ int main() {
 		print("Generated at %", e->loc);
 	}
 	else {
-		print("success");
+		print(print_ast_node(program));
 	}
 	return 0;
 }
