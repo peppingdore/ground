@@ -10,66 +10,75 @@
 #include <stdio.h>
 
 enum AllocatorVerb: s32 {
-	ALLOCATOR_VERB_ALLOC   = 0,
-	ALLOCATOR_VERB_REALLOC = 1,
-	ALLOCATOR_VERB_FREE    = 2,
+	ALLOCATOR_VERB_ALLOC     = 0,
+	ALLOCATOR_VERB_REALLOC   = 1,
+	ALLOCATOR_VERB_FREE      = 2,
+	ALLOCATOR_VERB_GET_NAME  = 3,
+	ALLOCATOR_VERB_GET_FLAGS = 4,
 };
 
 using AllocatorProc = void* (AllocatorVerb, void* old_data, u64 old_size, u64 new_size, void* allocator_data, CodeLocation);
 
-constexpr u32 ALLOCATOR_HAS_NO_FREE_AND_REALLOC = 0;
-constexpr u32 ALLOCATOR_HAS_REALLOC             = 1 << 0;
-constexpr u32 ALLOCATOR_HAS_FREE                = 1 << 1;
-constexpr u32 ALLOCATOR_IS_ARENA                = 1 << 3;
+enum AllocatorFlags: u32 {
+	ALLOCATOR_DEFAULT_FLAGS   = 0,
+	ALLOCATOR_FLAG_NO_REALLOC = 1 << 0,
+	ALLOCATOR_FLAG_NO_FREE    = 1 << 1,
+	ALLOCATOR_FLAG_IS_ARENA   = 1 << 3,
+};
 
 struct Allocator {
+	// We could just put |proc| in AllocatorData struct,
+	//   but that wold mean having level of indirection 2,
+	//   which I don't like.
 	AllocatorProc* proc;
 	void*          allocator_data;
-	u32            flags;
-
-#ifdef ALLOCATOR_NAMES
-	const char* name;
-#endif
-
-	void* alloc(u64 size, CodeLocation loc = caller_loc()) {
-		return proc(ALLOCATOR_VERB_ALLOC, NULL, 0, size, allocator_data, loc);
-	}
-
-	void free(void* data, CodeLocation loc = caller_loc()) {
-		if (data == NULL) {
-			return;
-		}
-		proc(ALLOCATOR_VERB_FREE, data, 0, 0, allocator_data, loc);
-	}
-
-	void* realloc(void* data, u64 old_size, u64 new_size, CodeLocation loc = caller_loc()) {
-		if (flags & ALLOCATOR_HAS_REALLOC) {
-			return proc(ALLOCATOR_VERB_REALLOC, data, old_size, new_size, allocator_data, loc);
-		} else {
-			void* new_data = alloc(new_size, loc);			
-			memcpy(new_data, data, min(old_size, new_size));
-			free(data, loc);
-			return new_data;
-		}
-	}
-
-	template <typename T>
-	T* alloc(u64 count, CodeLocation loc = caller_loc()) {
-		return (T*) alloc(sizeof(T) * count, loc);
-	}
-
-	template <typename T>
-	T* realloc(T* old_data, u64 old_count, u64 new_count, CodeLocation loc = caller_loc()) {
-		return (T*) realloc((void*) old_data, old_count * sizeof(T), new_count * sizeof(T), loc);
-	}
 
 	bool operator==(Allocator rhs) {
 		return proc == rhs.proc && allocator_data == rhs.allocator_data;
 	}
 };
 
+u32 get_allocator_flags(Allocator allocator) {
+	return (AllocatorFlags) (u64) allocator.proc(ALLOCATOR_VERB_GET_FLAGS, NULL, 0, 0, allocator.allocator_data, current_loc());
+}
 
-inline void* malloc_crash_on_failure(u64 size) {
+const char* get_allocator_name(Allocator allocator) {
+	return (const char*) allocator.proc(ALLOCATOR_VERB_GET_NAME, NULL, 0, 0, allocator.allocator_data, current_loc());
+}
+
+void* alloc(Allocator allocator, u64 size, CodeLocation loc = caller_loc()) {
+	return allocator.proc(ALLOCATOR_VERB_ALLOC, NULL, 0, size, allocator.allocator_data, loc);
+}
+
+void free(Allocator allocator, void* data, CodeLocation loc = caller_loc()) {
+	if (data == NULL) {
+		return;
+	}
+	allocator.proc(ALLOCATOR_VERB_FREE, data, 0, 0, allocator.allocator_data, loc);
+}
+
+void* realloc(Allocator allocator, void* data, u64 old_size, u64 new_size, CodeLocation loc = caller_loc()) {
+	auto flags = get_allocator_flags(allocator);
+	if (flags & ALLOCATOR_FLAG_NO_REALLOC) {
+		void* new_data = alloc(allocator, new_size, loc);			
+		memcpy(new_data, data, min(old_size, new_size));
+		free(allocator, data, loc);
+		return new_data;
+	}
+	return allocator.proc(ALLOCATOR_VERB_REALLOC, data, old_size, new_size, allocator.allocator_data, loc);
+}
+
+template <typename T>
+T* alloc(Allocator allocator, u64 count, CodeLocation loc = caller_loc()) {
+	return (T*) alloc(allocator, sizeof(T) * count, loc);
+}
+
+template <typename T>
+T* realloc(Allocator allocator, T* old_data, u64 old_count, u64 new_count, CodeLocation loc = caller_loc()) {
+	return (T*) realloc(allocator, (void*) old_data, old_count * sizeof(T), new_count * sizeof(T), loc);
+}
+
+void* malloc_crash_on_failure(u64 size) {
 	void* result = malloc(size);
 	if (result) {
 		return result;
@@ -77,7 +86,7 @@ inline void* malloc_crash_on_failure(u64 size) {
 	fprintf(stderr, "Failed to malloc(%zx)", (size_t) size);
 	exit(-1);
 }
-inline void* realloc_crash_on_failure(void* data, u64 size) {
+void* realloc_crash_on_failure(void* data, u64 size) {
 	void* result = realloc(data, size);
 	if (result) {
 		return result;
@@ -86,7 +95,7 @@ inline void* realloc_crash_on_failure(void* data, u64 size) {
 	exit(-1);
 }
 
-inline void* c_allocator_proc(AllocatorVerb verb, void* old_data, u64 old_size, u64 size, void* allocator_data, CodeLocation loc) {
+void* c_allocator_proc(AllocatorVerb verb, void* old_data, u64 old_size, u64 size, void* allocator_data, CodeLocation loc) {
 	switch (verb) {
 		case ALLOCATOR_VERB_ALLOC:
 			return malloc_crash_on_failure(size);
@@ -95,6 +104,10 @@ inline void* c_allocator_proc(AllocatorVerb verb, void* old_data, u64 old_size, 
 		case ALLOCATOR_VERB_FREE:
 			free(old_data);
 			break;
+		case ALLOCATOR_VERB_GET_FLAGS:
+			return (void*) (u64) ALLOCATOR_DEFAULT_FLAGS;
+		case ALLOCATOR_VERB_GET_NAME:
+			return (void*) "crt_allocator";
 		default:
 			assert(false);
 			return NULL;
@@ -102,45 +115,35 @@ inline void* c_allocator_proc(AllocatorVerb verb, void* old_data, u64 old_size, 
 	return NULL;
 }
 
-constexpr Allocator __crt_allocator = {
+constexpr Allocator crt_allocator = {
 	.proc           = &c_allocator_proc,
 	.allocator_data = NULL,
-	.flags          = ALLOCATOR_HAS_FREE | ALLOCATOR_HAS_REALLOC,
-
-#ifdef ALLOCATOR_NAMES
-	.name = "c_allocator",
-#endif
 };
 
 // Aliasing like this allows us to replace c_allocator
-//   with other allocator at the start of the program.
-Allocator c_allocator = __crt_allocator;
+//   with other allocator in runtime.
+Allocator c_allocator = crt_allocator;
 
 constexpr Allocator null_allocator = { 
 	.proc           = NULL,
 	.allocator_data = NULL,
-	.flags          = 0,
-
-#ifdef ALLOCATOR_NAMES
-	.name = "null_allocator",
-#endif
 };
 
 template <typename T>
-inline T* copy(Allocator allocator, T thing, CodeLocation loc = caller_loc()) {
+T* copy(Allocator allocator, T thing, CodeLocation loc = caller_loc()) {
 	T* mem = allocator.alloc<T>(1, loc);
 	memcpy(mem, &thing, sizeof(T));
 	return mem;
 }
 
 template <typename T>
-inline T* make(Allocator allocator = c_allocator, CodeLocation loc = caller_loc()) {
+T* make(Allocator allocator = c_allocator, CodeLocation loc = caller_loc()) {
 	T* mem = allocator.alloc<T>(1, loc);
 	return new(mem) T();
 }
 
 template <typename T>
-inline T* make(s64 count, Allocator allocator = c_allocator, CodeLocation loc = caller_loc()) {
+T* make(s64 count, Allocator allocator = c_allocator, CodeLocation loc = caller_loc()) {
 	T* mem = (T*) allocator.alloc(sizeof(T) * count, loc);
 	for (auto i: range(count)) {
 		new(mem + i) T();
