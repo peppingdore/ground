@@ -18,8 +18,8 @@ struct AstNode {
 };
 
 template <typename T>
-T* make_ast_node() {
-	auto x = make<T>();
+T* make_ast_node(Allocator allocator) {
+	auto x = make<T>(allocator);
 	x->type = reflect_type_of<T>();
 	return x;
 }
@@ -38,10 +38,6 @@ struct AstBlock: AstNode {
 		MEMBER(statements);
 	}
 };
-
-AstBlock* make_block() {
-	return make_ast_node<AstBlock>();
-}
 
 // struct AstStmt: AstNode {
 

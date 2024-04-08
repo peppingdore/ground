@@ -3,6 +3,7 @@
 #include "mini_ast.h"
 #include "../error.h"
 #include "../math/vector.h"
+#include "../arena_allocator.h"
 
 struct CLikeProgram: AstNode {
 	Array<AstNode*> globals;
@@ -14,6 +15,7 @@ struct CLikeProgram: AstNode {
 };
 
 struct CLikeParser {
+	Allocator       allocator;
 	CLikeProgram*   program;
 	Array<AstNode*> scope;
 	UnicodeString   str;
@@ -85,20 +87,21 @@ struct ShaderIntrinFunc: AstFunction {
 };
 
 void add_type_alias(CLikeParser* p, Type* type, UnicodeString name) {
-	auto node = make_ast_node<CTypeAlias>();
+	auto node = make_ast_node<CTypeAlias>(p->allocator);
 	node->alias_type = type;
 	node->name = name;
 	p->program->globals.add(node);
 }
 
 void add_shader_intrinsic_var(CLikeParser* p, UnicodeString name) {
-	auto node = make_ast_node<ShaderIntrinVar>();
+	auto node = make_ast_node<ShaderIntrinVar>(p->allocator);
 	node->name = name;
 	p->program->globals.add(node);
 }
 
 void add_shader_intrinsic_func(CLikeParser* p, UnicodeString name) {
-	auto node = make_ast_node<ShaderIntrinFunc>();
+	auto node = make_ast_node<ShaderIntrinFunc>(p->allocator);
+	node->args.allocator = p->allocator;
 	node->name = name;
 	node->return_type = reflect_type_of<void>();
 	p->program->globals.add(node);
@@ -508,12 +511,12 @@ Tuple<AstNode*, Error*> parse_primary_expr(CLikeParser* p);
 Tuple<AstNode*, Error*> parse_expr(CLikeParser* p, s32 min_prec);
 
 Tuple<AstNode*, Error*> parse_var_decl(CLikeParser* p, Type* type, UnicodeString first_ident) {
-	Array<AstVarDecl*> var_decls;
+	Array<AstVarDecl*> var_decls = { .allocator = p->allocator };
 	defer { var_decls.free(); };
 
 	auto current_ident = first_ident;
 	while (true) {
-		auto node = make_ast_node<AstVarDecl>();
+		auto node = make_ast_node<AstVarDecl>(p->allocator);
 		node->var_type = type;
 		node->name = current_ident;
 		var_decls.add(node);
@@ -544,7 +547,7 @@ Tuple<AstNode*, Error*> parse_var_decl(CLikeParser* p, Type* type, UnicodeString
 	}
 
 	if (len(var_decls) > 1) {
-		auto node = make_ast_node<AstVarDeclGroup>();
+		auto node = make_ast_node<AstVarDeclGroup>(p->allocator);
 		node->var_decls = var_decls;
 		var_decls = {};
 		return { node, NULL };
@@ -558,7 +561,7 @@ Tuple<AstNode*, Error*> parse_unary_expr(CLikeParser* p, UnicodeString op, s32 m
 	if (e) {
 		return { NULL, e };
 	}
-	auto unary = make_ast_node<CUnaryExpr>();
+	auto unary = make_ast_node<CUnaryExpr>(p->allocator);
 	unary->expr = (AstExpr*) expr;
 	unary->op = op;
 	return { unary, NULL };
@@ -572,7 +575,7 @@ Tuple<AstNode*, Error*> parse_var(CLikeParser* p, AstNode* lhs) {
 		if (e) {
 			return { NULL, e };
 		}
-		auto node = make_ast_node<AstVarMemberAccess>();
+		auto node = make_ast_node<AstVarMemberAccess>(p->allocator);
 		node->lhs = lhs;
 		node->member = ident;
 		return parse_var(p, node);
@@ -674,7 +677,8 @@ Tuple<AstNode*, Error*> parse_function_call(CLikeParser* p, AstNode* node) {
 	if (tok != "("_b) {
 		return { NULL, parser_error(p, U"Expected ("_b) };
 	}
-	auto call = make_ast_node<AstFunctionCall>();
+	auto call = make_ast_node<AstFunctionCall>(p->allocator);
+	call->args.allocator = p->allocator;
 	call->f = node;
 	next(p);
 	while (true) {
@@ -713,7 +717,7 @@ Tuple<AstNode*, Error*> parse_primary_expr(CLikeParser* p) {
 	auto tok = peek(p);
 
 	if (p->is_current_token_number) {
-		auto literal = make_ast_node<CAstLiteral>();
+		auto literal = make_ast_node<CAstLiteral>(p->allocator);
 		literal->value = p->current_token;
 		next(p);
 		return { literal, NULL };
@@ -726,7 +730,7 @@ Tuple<AstNode*, Error*> parse_primary_expr(CLikeParser* p) {
 		if (e) {
 			return { NULL, e };
 		}
-		auto unary = make_ast_node<CUnaryExpr>();
+		auto unary = make_ast_node<CUnaryExpr>(p->allocator);
 		unary->expr = (AstExpr*) expr;
 		unary->op = tok;
 		return { unary, NULL };
@@ -757,7 +761,7 @@ Tuple<AstNode*, Error*> parse_primary_expr(CLikeParser* p) {
 		auto [postfix_op_prec, left_assoc] = get_postfix_unary_operator_prec_assoc(tok);
 		if (postfix_op_prec > 0) {
 			next(p);
-			auto node = make_ast_node<CPostfixExpr>();
+			auto node = make_ast_node<CPostfixExpr>(p->allocator);
 			node->lhs = lhs;
 			node->op = tok;
 			lhs = node;
@@ -777,7 +781,7 @@ Tuple<AstNode*, Error*> parse_primary_expr(CLikeParser* p) {
 			if (e) {
 				return { NULL, e };
 			}
-			auto node = make_ast_node<AstVarMemberAccess>();
+			auto node = make_ast_node<AstVarMemberAccess>(p->allocator);
 			node->lhs = lhs;
 			node->member = ident;
 			lhs = node;
@@ -793,7 +797,7 @@ Tuple<AstNode*, Error*> parse_primary_expr(CLikeParser* p) {
 				return { NULL, parser_error(p, U"Expected a ]"_b) };
 			}
 			next(p);
-			auto node = make_ast_node<AstArrayAccess>();
+			auto node = make_ast_node<AstArrayAccess>(p->allocator);
 			node->lhs = lhs;
 			node->index = (AstExpr*) expr;
 			lhs = node;
@@ -835,7 +839,7 @@ Tuple<AstNode*, Error*> parse_expr(CLikeParser* p, s32 min_prec) {
 			if (e3) {
 				return { NULL, e3 };
 			}
-			auto node = make_ast_node<AstTernary>();
+			auto node = make_ast_node<AstTernary>(p->allocator);
 			node->cond = lhs;
 			node->then = then_expr;
 			node->else_ = else_expr;
@@ -847,7 +851,7 @@ Tuple<AstNode*, Error*> parse_expr(CLikeParser* p, s32 min_prec) {
 		if (e) {
 			return { NULL, e };
 		}
-		auto node = make_ast_node<CBinaryExpr>();
+		auto node = make_ast_node<CBinaryExpr>(p->allocator);
 		node->lhs = lhs;
 		node->rhs = rhs;
 		node->op = tok;
@@ -885,7 +889,7 @@ Tuple<AstNode*, Error*> parse_block_or_one_stmt(CLikeParser* p) {
 		if (e) {
 			return { NULL, e };
 		}
-		auto block = make_ast_node<AstBlock>();
+		auto block = make_ast_node<AstBlock>(p->allocator);
 		block->statements.add(stmt);
 		return { block, NULL };
 	}
@@ -939,7 +943,7 @@ Tuple<AstNode*, Error*> parse_for(CLikeParser* p) {
 	if (e4) {
 		return { NULL, e4 };
 	}
-	auto node = make_ast_node<AstFor>();
+	auto node = make_ast_node<AstFor>(p->allocator);
 	node->init_expr = init_expr;
 	node->cond_expr = cond_expr;
 	node->incr_expr = incr_expr;
@@ -979,7 +983,8 @@ Tuple<AstNode*, Error*> parse_block(CLikeParser* p) {
 		return { NULL, parser_error(p, U"Expected a {"_b) };
 	}
 	next(p);
-	auto block = make_ast_node<AstBlock>();
+	auto block = make_ast_node<AstBlock>(p->allocator);
+	block->statements.allocator = p->allocator;
 	p->scope.add(block);
 	defer { p->scope.pop_last(); };
 	
@@ -1004,7 +1009,7 @@ Tuple<AstNode*, Error*> parse_block(CLikeParser* p) {
 }
 
 Tuple<AstNode*, Error*> parse_function(CLikeParser* p, Type* return_type, UnicodeString name) {
-	Array<AstFunctionArg*> args;
+	Array<AstFunctionArg*> args = { .allocator = p->allocator };
 	defer { args.free(); };
 
 	while (true) {
@@ -1024,13 +1029,14 @@ Tuple<AstNode*, Error*> parse_function(CLikeParser* p, Type* return_type, Unicod
 		if (e2) {
 			return { NULL, e2 };
 		}
-		auto arg_node = make_ast_node<AstFunctionArg>();
+		auto arg_node = make_ast_node<AstFunctionArg>(p->allocator);
 		arg_node->name = arg_name;
 		arg_node->arg_type = type;
 		args.add(arg_node);
 	}
 
-	auto f = make_ast_node<AstFunction>();
+	auto f = make_ast_node<AstFunction>(p->allocator);
+	f->args.allocator = p->allocator;
 	f->return_type = return_type;
 	f->name = name;
 	f->args = args;
@@ -1074,7 +1080,9 @@ Tuple<AstNode*, Error*> parse_top_level(CLikeParser* p) {
 
 Tuple<AstNode*, Error*> parse_c_like(UnicodeString str) {
 	CLikeParser p;
-	p.program = make_ast_node<CLikeProgram>();
+	p.allocator = make_arena_allocator();
+	p.program = make_ast_node<CLikeProgram>(p.allocator);
+	p.program->globals.allocator = p.allocator;
 	p.str = str;
 	p.scope.add(p.program);
 
