@@ -3,6 +3,8 @@
 #include "allocator.h"
 #include "panic.h"
 
+constexpr u64 DEFAULT_ARENA_SIZE = 16 * 1024;
+
 struct Arena {
 	u64       allocated = 0;
 	Arena*    next = NULL;
@@ -76,7 +78,7 @@ void* arena_allocator_proc(AllocatorVerb verb, void* old_data, u64 old_size, u64
 	return NULL;
 }
 
-Allocator make_arena_allocator(Allocator parent_allocator, u64 arena_size) {
+Allocator make_arena_allocator(Allocator parent_allocator, u64 arena_size = DEFAULT_ARENA_SIZE) {
 	if (arena_size == 0) {
 		panic("Arena size must be greater than 0");
 	}
@@ -91,6 +93,10 @@ Allocator make_arena_allocator(Allocator parent_allocator, u64 arena_size) {
 		.allocator_data = arenas,
 	};
 	return allocator;
+}
+
+Allocator make_arena_allocator(u64 arena_size = DEFAULT_ARENA_SIZE) {
+	return make_arena_allocator(c_allocator, arena_size);
 }
 
 struct ArenaAllocatorSnapshot {
