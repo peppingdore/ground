@@ -4,6 +4,7 @@
 #include "range.h"
 #include "code_location.h"
 #include "math/basic_functions.h"
+#include "reflect.h"
 
 #include <cstdlib>
 #include <new>
@@ -13,19 +14,11 @@ enum AllocatorVerb: s32 {
 	ALLOCATOR_VERB_ALLOC          = 0,
 	ALLOCATOR_VERB_REALLOC        = 1,
 	ALLOCATOR_VERB_FREE           = 2,
-	ALLOCATOR_VERB_GET_NAME       = 3,
-	ALLOCATOR_VERB_GET_FLAGS      = 4,
-	ALLOCATOR_VERB_FREE_ALLOCATOR = 5,
+	ALLOCATOR_VERB_GET_TYPE       = 3,
+	ALLOCATOR_VERB_FREE_ALLOCATOR = 4,
 };
 
 using AllocatorProc = void* (AllocatorVerb, void* old_data, u64 old_size, u64 new_size, void* allocator_data, CodeLocation);
-
-enum AllocatorFlags: u32 {
-	ALLOCATOR_DEFAULT_FLAGS   = 0,
-	ALLOCATOR_FLAG_NO_REALLOC = 1 << 0,
-	ALLOCATOR_FLAG_NO_FREE    = 1 << 1,
-	ALLOCATOR_FLAG_IS_ARENA   = 1 << 3,
-};
 
 struct Allocator {
 	// We could just put |proc| in AllocatorData struct,
@@ -39,12 +32,8 @@ struct Allocator {
 	}
 };
 
-u32 get_allocator_flags(Allocator allocator) {
-	return (AllocatorFlags) (u64) allocator.proc(ALLOCATOR_VERB_GET_FLAGS, NULL, 0, 0, allocator.allocator_data, current_loc());
-}
-
-const char* get_allocator_name(Allocator allocator) {
-	return (const char*) allocator.proc(ALLOCATOR_VERB_GET_NAME, NULL, 0, 0, allocator.allocator_data, current_loc());
+Type* get_allocator_type(Allocator allocator) {
+	return (Type*) allocator.proc(ALLOCATOR_VERB_GET_TYPE, NULL, 0, 0, allocator.allocator_data, current_loc());
 }
 
 void free_allocator(Allocator allocator) {
@@ -63,13 +52,6 @@ void free(Allocator allocator, void* data, CodeLocation loc = caller_loc()) {
 }
 
 void* realloc(Allocator allocator, void* data, u64 old_size, u64 new_size, CodeLocation loc = caller_loc()) {
-	auto flags = get_allocator_flags(allocator);
-	if (flags & ALLOCATOR_FLAG_NO_REALLOC) {
-		void* new_data = alloc(allocator, new_size, loc);			
-		memcpy(new_data, data, min(old_size, new_size));
-		free(allocator, data, loc);
-		return new_data;
-	}
 	return allocator.proc(ALLOCATOR_VERB_REALLOC, data, old_size, new_size, allocator.allocator_data, loc);
 }
 
@@ -100,6 +82,10 @@ void* realloc_crash_on_failure(void* data, u64 size) {
 	exit(-1);
 }
 
+struct CRTAllocator {
+	REFLECT(CRTAllocator) {}
+};
+
 void* c_allocator_proc(AllocatorVerb verb, void* old_data, u64 old_size, u64 size, void* allocator_data, CodeLocation loc) {
 	switch (verb) {
 		case ALLOCATOR_VERB_ALLOC:
@@ -109,10 +95,8 @@ void* c_allocator_proc(AllocatorVerb verb, void* old_data, u64 old_size, u64 siz
 		case ALLOCATOR_VERB_FREE:
 			free(old_data);
 			break;
-		case ALLOCATOR_VERB_GET_FLAGS:
-			return (void*) (u64) ALLOCATOR_DEFAULT_FLAGS;
-		case ALLOCATOR_VERB_GET_NAME:
-			return (void*) "crt_allocator";
+		case ALLOCATOR_VERB_GET_TYPE:
+			return reflect_type_of<CRTAllocator>();
 		default:
 			assert(false);
 			return NULL;
@@ -155,5 +139,3 @@ T* make(s64 count, Allocator allocator = c_allocator, CodeLocation loc = caller_
 	}
 	return mem;
 }
-
-

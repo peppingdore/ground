@@ -67,10 +67,13 @@ void* arena_allocator_proc(AllocatorVerb verb, void* old_data, u64 old_size, u64
 			return ptr;
 		}
 		break;
-		case ALLOCATOR_VERB_GET_FLAGS:
-			return (void*) (u64) (ALLOCATOR_FLAG_NO_FREE | ALLOCATOR_FLAG_NO_REALLOC | ALLOCATOR_FLAG_IS_ARENA);
-		case ALLOCATOR_VERB_GET_NAME:
-			return (void*) "arena_allocator";
+		case ALLOCATOR_VERB_REALLOC:
+			void* new_data = arena_allocator_proc(ALLOCATOR_VERB_ALLOC, NULL, 0, size, allocator_data, loc);
+			memcpy(new_data, old_data, min(old_size, size));
+			arena_allocator_proc(ALLOCATOR_VERB_FREE, old_data, 0, 0, allocator_data, loc);
+			return new_data;
+		case ALLOCATOR_VERB_GET_TYPE:
+			return reflect_type_of<LinkedArenas>();
 		case ALLOCATOR_VERB_FREE_ALLOCATOR:
 			free_linked_arenas(arenas);
 			break;
@@ -84,9 +87,9 @@ Allocator make_arena_allocator(Allocator parent_allocator, u64 arena_size = DEFA
 	}
 
 	auto arenas = (LinkedArenas*) alloc(parent_allocator, sizeof(LinkedArenas) + arena_size);
-	*arenas = (LinkedArenas) {
+	*arenas = LinkedArenas {
+		.parent_allocator = parent_allocator,
 		.arena_size = arena_size,
-		.parent_allocator = parent_allocator
 	};
 	Allocator allocator = {
 		.proc = arena_allocator_proc,
@@ -141,16 +144,16 @@ void restore(LinkedArenas* allocator, ArenaAllocatorSnapshot snapshot) {
 }
 
 ArenaAllocatorSnapshot snapshot(Allocator allocator) {
-	auto name = get_allocator_name(allocator);
-	if (strcmp(name, "arena_allocator") != 0) {
+	auto type = get_allocator_type(allocator);
+	if (type != reflect_type_of<LinkedArenas>()) {
 		return {};
 	}
 	return snapshot((LinkedArenas*) allocator.allocator_data);
 }
 
 void restore(Allocator allocator, ArenaAllocatorSnapshot snapshot) {
-	auto name = get_allocator_name(allocator);
-	if (strcmp(name, "arena_allocator") != 0) {
+	auto type = get_allocator_type(allocator);
+	if (type != reflect_type_of<LinkedArenas>()) {
 		return;
 	}
 	restore((LinkedArenas*) allocator.allocator_data, snapshot);
