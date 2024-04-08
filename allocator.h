@@ -10,11 +10,12 @@
 #include <stdio.h>
 
 enum AllocatorVerb: s32 {
-	ALLOCATOR_VERB_ALLOC     = 0,
-	ALLOCATOR_VERB_REALLOC   = 1,
-	ALLOCATOR_VERB_FREE      = 2,
-	ALLOCATOR_VERB_GET_NAME  = 3,
-	ALLOCATOR_VERB_GET_FLAGS = 4,
+	ALLOCATOR_VERB_ALLOC          = 0,
+	ALLOCATOR_VERB_REALLOC        = 1,
+	ALLOCATOR_VERB_FREE           = 2,
+	ALLOCATOR_VERB_GET_NAME       = 3,
+	ALLOCATOR_VERB_GET_FLAGS      = 4,
+	ALLOCATOR_VERB_FREE_ALLOCATOR = 5,
 };
 
 using AllocatorProc = void* (AllocatorVerb, void* old_data, u64 old_size, u64 new_size, void* allocator_data, CodeLocation);
@@ -44,6 +45,10 @@ u32 get_allocator_flags(Allocator allocator) {
 
 const char* get_allocator_name(Allocator allocator) {
 	return (const char*) allocator.proc(ALLOCATOR_VERB_GET_NAME, NULL, 0, 0, allocator.allocator_data, current_loc());
+}
+
+void free_allocator(Allocator allocator) {
+	allocator.proc(ALLOCATOR_VERB_FREE_ALLOCATOR, NULL, 0, 0, allocator.allocator_data, current_loc());
 }
 
 void* alloc(Allocator allocator, u64 size, CodeLocation loc = caller_loc()) {
@@ -150,3 +155,5 @@ T* make(s64 count, Allocator allocator = c_allocator, CodeLocation loc = caller_
 	}
 	return mem;
 }
+
+
