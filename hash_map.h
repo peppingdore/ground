@@ -29,6 +29,10 @@ struct HashMap {
 	f32          load_factor = 0.75;
 	CodeLocation loc = caller_loc();
 
+	void set_allocator(Allocator allocator) {
+		entries.allocator = allocator;
+	}
+
 	void make_sure_initted() {
 		if (entries.data) {
 			return;
