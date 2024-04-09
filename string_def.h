@@ -63,7 +63,7 @@ struct BaseString {
 	BaseString<char32_t> copy_unicode_string(Allocator allocator = c_allocator) 
 		requires (std::is_same_v<Char, char>)
 	{
-		auto mem = allocator.alloc<char32_t>(length);
+		auto mem = Alloc<char32_t>(allocator, length);
 		for (auto i: range(length)) {
 			mem[i] = data[i];
 		}
@@ -75,13 +75,13 @@ struct BaseString {
 
 	BaseString copy(Allocator allocator = c_allocator, CodeLocation loc = caller_loc()) {
 		auto cp = *this;
-		cp.data = allocator.alloc<Char>(length, loc);
+		cp.data = Alloc<Char>(allocator, length, loc);
 		memcpy(cp.data, data, length * sizeof(Char));
 		return cp;
 	}
 
 	void free(Allocator allocator = c_allocator) {
-		allocator.free(data);
+		Free(allocator, data);
 	}
 };
 

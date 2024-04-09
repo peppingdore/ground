@@ -8,38 +8,38 @@
 #include <utility>
 
 template <typename... T>
-struct Decomposed_Function_Type;
+struct DecomposedFunctionType;
 
-template <typename __Return_Type, typename... Args>
-struct Decomposed_Function_Type<__Return_Type(Args...)> {
-	using Return_Type = __Return_Type;
-	using Args_Tuple_Type = Tuple<Args...>;
+template <typename __ReturnType, typename... Args>
+struct DecomposedFunctionType<__ReturnType(Args...)> {
+	using ReturnType = __ReturnType;
+	using ArgsTupleType = Tuple<Args...>;
 };
 
-template <typename Class, typename __Return_Type, typename... Args>
-struct Decomposed_Member_Function_Type {
-	using Raw_Function_Type = Decomposed_Function_Type<__Return_Type(Args...)>;
-	// using Return_Type = __Return_Type;
+template <typename Class, typename __ReturnType, typename... Args>
+struct DecomposedMemberFunctionType {
+	using RawFunctionType = DecomposedFunctionType<__ReturnType(Args...)>;
+	// using ReturnType = __ReturnType;
 };
 
-template <typename Return_Type, typename... Args>
-Decomposed_Function_Type<Return_Type(Args...)> decompose_function_type( Return_Type (*) (Args...)) {
+template <typename ReturnType, typename... Args>
+DecomposedFunctionType<ReturnType(Args...)> decompose_function_type( ReturnType (*) (Args...)) {
 	return {};
 }
 
-template <typename Class, typename Return_Type, typename... Args>
-Decomposed_Member_Function_Type<Class, Return_Type, Args...> decompose_member_function_type(Return_Type(Class::*)(Args...)) {
+template <typename Class, typename ReturnType, typename... Args>
+DecomposedMemberFunctionType<Class, ReturnType, Args...> decompose_member_function_type(ReturnType(Class::*)(Args...)) {
 	return {};
 }
 
-template <typename Class, typename Return_Type, typename... Args>
-Decomposed_Member_Function_Type<Class, Return_Type, Args...> decompose_member_function_type(Return_Type(Class::*)(Args...) const) {
+template <typename Class, typename ReturnType, typename... Args>
+DecomposedMemberFunctionType<Class, ReturnType, Args...> decompose_member_function_type(ReturnType(Class::*)(Args...) const) {
 	return {};
 }
 
 auto decompose_function_type(auto lambda) -> decltype(auto) {
 	using Decomposed = decltype(decompose_member_function_type(&lambda.operator())());
-	return typename Decomposed::Raw_Function_Type();
+	return typename Decomposed::RawFunctionType();
 }
 
 // Question of syntax taste.
@@ -47,7 +47,7 @@ auto decompose_function_type(auto lambda) -> decltype(auto) {
 template <typename T>
 using Proc = T;
 
-enum class Function_Kind: u8 {
+enum class FunctionKind: u8 {
 	None = 0,             // Function is empty
 	Small_Lambda = 1,     // Lambda that can fit inside a small optimization container.
 	Big_Lambda = 2,       // Lambda that has to be allocated separately.
@@ -62,11 +62,11 @@ struct Function {
 constexpr u64 SMALL_LAMBDA_STORAGE_SIZE = 24; // 24 + lambda flattened_proc ptr (8) = 32 bytes.
 
 // We tradeoff readibility for struct size.
-template <typename Return_Type, typename... Args_Types>
-struct Function<Return_Type(Args_Types...)> {
+template <typename ReturnType, typename... ArgsTypes>
+struct Function<ReturnType(ArgsTypes...)> {
 	union {
 		struct {
-			Return_Type (*ptr)(Args_Types...);
+			ReturnType (*ptr)(ArgsTypes...);
 		} function_ptr;
 
 		struct {
@@ -81,33 +81,33 @@ struct Function<Return_Type(Args_Types...)> {
 				} big_lambda;
 			};
 
-			Return_Type (*flattened_proc)(Function*, Args_Types...);
+			ReturnType (*flattened_proc)(Function*, ArgsTypes...);
 		} lambda;
 	};
 
-	Function_Kind kind                     : 4 = Function_Kind::None;
-	bool          is_using_custom_allocator: 4 = false;
+	FunctionKind kind                     : 4 = FunctionKind::None;
+	bool         is_using_custom_allocator: 4 = false;
 
 	bool is_empty() {
-		return kind == Function_Kind::None;
+		return kind == FunctionKind::None;
 	}
 
-	Return_Type operator()(Args_Types... args) {
+	ReturnType operator()(ArgsTypes... args) {
 		switch (kind) {
-			case Function_Kind::Function_Pointer: {
+			case FunctionKind::Function_Pointer: {
 				return function_ptr.ptr(args...);
 			}
 			break;
 
-			case Function_Kind::Big_Lambda:
-			case Function_Kind::Small_Lambda: {
+			case FunctionKind::Big_Lambda:
+			case FunctionKind::Small_Lambda: {
 				return lambda.flattened_proc(this, args...);
 			}
 			break;
 
 			default:
 				assert(false);
-				return Return_Type();
+				return ReturnType();
 		}
 	}
 
@@ -122,8 +122,8 @@ struct Function<Return_Type(Args_Types...)> {
 
 	Function copy(CodeLocation loc = caller_loc()) const {
 		Function copied = *this;
-		if (kind == Function_Kind::Big_Lambda) {
-			void* new_mem = c_allocator.alloc(lambda.big_lambda.size, loc);
+		if (kind == FunctionKind::Big_Lambda) {
+			void* new_mem = Malloc(lambda.big_lambda.size, loc);
 			memcpy(new_mem, lambda.big_lambda.mem, lambda.big_lambda.size);
 			copied.lambda.big_lambda.mem = new_mem;
 		}
@@ -132,27 +132,27 @@ struct Function<Return_Type(Args_Types...)> {
 
 	void free(CodeLocation loc = caller_loc()) {
 		assert(!is_using_custom_allocator);
-		if (kind == Function_Kind::Big_Lambda){
-			c_allocator.free(lambda.big_lambda.mem, loc);
+		if (kind == FunctionKind::Big_Lambda){
+			Free(lambda.big_lambda.mem, loc);
 		}
-		kind = Function_Kind::None;
+		kind = FunctionKind::None;
 	}
 
 	void free(Allocator allocator, CodeLocation loc = caller_loc()) {
 		assert(is_using_custom_allocator);
-		if (kind == Function_Kind::Big_Lambda) {
-			allocator.free(lambda.big_lambda.mem, loc);
+		if (kind == FunctionKind::Big_Lambda) {
+			Free(allocator, lambda.big_lambda.mem, loc);
 		}
-		kind = Function_Kind::None;
+		kind = FunctionKind::None;
 		is_using_custom_allocator = false;
 	}
 };
 
 
-template <typename Return_Type, typename... Args_Types>
-auto make_function(Return_Type (*function_ptr)(Args_Types...)) {
-	Function<Return_Type(Args_Types...)> result;
-	result.kind = Function_Kind::Function_Pointer;
+template <typename ReturnType, typename... ArgsTypes>
+auto make_function(ReturnType (*function_ptr)(ArgsTypes...)) {
+	Function<ReturnType(ArgsTypes...)> result;
+	result.kind = FunctionKind::Function_Pointer;
 	result.function_ptr.ptr = function_ptr;
 	return result;
 }
@@ -166,23 +166,23 @@ auto make_no_heap_function(auto lambda, CodeLocation loc = caller_loc()) {
 auto make_function(auto lambda, CodeLocation loc = caller_loc()) {
 	using Lambda_Type = decltype(lambda);
 
-	// static_assert(std::is_same_v<std::invoke_result_t<Lambda_Type, Args_Types...>, Return_Type>, "Lambda return type is incorrect");
-	// using Decomposed = Decompose_Member_Function_Type<decltype(&Lambda_Type::operator())>;
+	// static_assert(std::is_same_v<std::invoke_result_t<Lambda_Type, ArgsTypes...>, ReturnType>, "Lambda return type is incorrect");
+	// using Decomposed = Decompose_Member_FunctionType<decltype(&Lambda_Type::operator())>;
 
 	auto do_stuff = [&]
-		<typename Return_Type, typename... Args_Types>
-		( const Decomposed_Member_Function_Type<Lambda_Type, Return_Type, Args_Types...>) {
+		<typename ReturnType, typename... ArgsTypes>
+		( const DecomposedMemberFunctionType<Lambda_Type, ReturnType, ArgsTypes...>) {
 		
-		using Flattened_Type = Function<Return_Type(Args_Types...)>;
+		using FlattenedType = Function<ReturnType(ArgsTypes...)>;
 
-		Flattened_Type result;
+		FlattenedType result;
 
 		if constexpr (SMALL_LAMBDA_STORAGE_SIZE < sizeof(lambda)) {
-		
-			void* mem = c_allocator.alloc(sizeof(lambda), loc);
+			
+			void* mem = Malloc(sizeof(lambda), loc);
 			memcpy(mem, &lambda, sizeof(lambda));
 
-			auto flattened_proc = +[](Flattened_Type* flattened, Args_Types... args) -> Return_Type {
+			auto flattened_proc = +[](FlattenedType* flattened, ArgsTypes... args) -> ReturnType {
 				auto lambda = (Lambda_Type*) flattened->lambda.big_lambda.mem;
 				return lambda->operator()(args...);
 			};
@@ -190,18 +190,18 @@ auto make_function(auto lambda, CodeLocation loc = caller_loc()) {
 			result.lambda.flattened_proc = flattened_proc;
 			result.lambda.big_lambda.mem = mem;
 			result.lambda.big_lambda.size = sizeof(lambda);
-			result.kind = Function_Kind::Big_Lambda;
+			result.kind = FunctionKind::Big_Lambda;
 		
 		} else {
 			memcpy(&result.lambda.small_lambda.storage, &lambda, sizeof(lambda));
-			auto flattened_proc = +[](Flattened_Type* flattened, Args_Types... args) -> Return_Type {
+			auto flattened_proc = +[](FlattenedType* flattened, ArgsTypes... args) -> ReturnType {
 				auto lambda = (Lambda_Type*) &flattened->lambda.small_lambda;
 
 				return lambda->operator()(args...);
 			};
 
 			result.lambda.flattened_proc = flattened_proc;
-			result.kind = Function_Kind::Small_Lambda;
+			result.kind = FunctionKind::Small_Lambda;
 		}
 
 		return result;
@@ -210,7 +210,7 @@ auto make_function(auto lambda, CodeLocation loc = caller_loc()) {
 	using Decomposed = decltype(decompose_member_function_type(&Lambda_Type::operator()));
 
 	auto result = do_stuff(Decomposed());
-	assert(result.kind != Function_Kind::None);
+	assert(result.kind != FunctionKind::None);
 	return result;
 }
 
@@ -255,9 +255,9 @@ struct __cast2noheapfunction {
 #define $6 tuple_get<6>(lambda_args_tuple)
 
 
-template <typename Candidate, typename Function_Type, typename D = Decomposed_Function_Type<Function_Type>>
-concept Callable = requires(Candidate f, Function_Type signature_type) {
-	{ call_with_tuple(f, std::declval<typename D::Args_Tuple_Type>()) } -> std::same_as<typename D::Return_Type>;
+template <typename Candidate, typename FunctionType, typename D = DecomposedFunctionType<FunctionType>>
+concept Callable = requires(Candidate f, FunctionType signature_type) {
+	{ call_with_tuple(f, std::declval<typename D::ArgsTupleType>()) } -> std::same_as<typename D::ReturnType>;
 };
 
 auto call_with_tuple(auto f, auto tuple) {

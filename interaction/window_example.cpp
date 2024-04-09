@@ -2,7 +2,7 @@
 #include "../log.h"
 
 int main() {
-	auto [window, e] = create_window({ .title = U"A window"_b });
+	auto [window, e] = create_window({ .title = U"Window"_b });
 	if (e) {
 		Log(e);
 		return -1;
@@ -14,7 +14,6 @@ int main() {
 			if (auto e = as<WindowCloseEvent>(event)) {
 				return 0;
 			}
-			Log(event->type->name);
 		}
 	}
 

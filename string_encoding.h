@@ -55,7 +55,7 @@ void encode_utf8(UnicodeString str, char* buf) {
 String encode_utf8(Allocator allocator, UnicodeString str, CodeLocation loc = caller_loc()) {
 	s64 length = utf8_length(str);
 	String result = {
-		.data   = allocator.alloc<char>(length + 1, loc),
+		.data   = Alloc<char>(allocator, length + 1, loc),
 		.length = length
 	};
 	encode_utf8(str, result.data);
@@ -79,7 +79,7 @@ Tuple<char16_t*, s64> encode_utf16(Allocator allocator, UnicodeString str, CodeL
 		length += utf16_char_size(str[i]);
 	}
 
-	char16_t* data = allocator.alloc<char16_t>(length + 1, loc);
+	char16_t* data = Alloc<char16_t>(allocator, length + 1, loc);
 	data[length] = '\0';
 
 	auto ptr = data;
@@ -112,7 +112,7 @@ UnicodeString decode_utf8(Allocator allocator, String utf8, CodeLocation loc = c
 		result.length += 1;
 	}
 
-	result.data = allocator.alloc<char32_t>(result.length + 1, loc),
+	result.data = Alloc<char32_t>(allocator, result.length + 1, loc);
 	result.data[result.length] = '\0';
 
 	auto dst = result.data;
@@ -200,7 +200,7 @@ UnicodeString decode_utf16(Allocator allocator, const char16_t* str, s64 length 
 		result.length += 1;
 	}
 
-	result.data = allocator.alloc<char32_t>(result.length + 1, loc);
+	result.data = Alloc<char32_t>(allocator, result.length + 1, loc);
 
 	auto dst = result.data;
 	auto src = str;

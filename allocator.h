@@ -40,30 +40,6 @@ void free_allocator(Allocator allocator) {
 	allocator.proc(ALLOCATOR_VERB_FREE_ALLOCATOR, NULL, 0, 0, allocator.allocator_data, current_loc());
 }
 
-void* alloc(Allocator allocator, u64 size, CodeLocation loc = caller_loc()) {
-	return allocator.proc(ALLOCATOR_VERB_ALLOC, NULL, 0, size, allocator.allocator_data, loc);
-}
-
-void free(Allocator allocator, void* data, CodeLocation loc = caller_loc()) {
-	if (data == NULL) {
-		return;
-	}
-	allocator.proc(ALLOCATOR_VERB_FREE, data, 0, 0, allocator.allocator_data, loc);
-}
-
-void* realloc(Allocator allocator, void* data, u64 old_size, u64 new_size, CodeLocation loc = caller_loc()) {
-	return allocator.proc(ALLOCATOR_VERB_REALLOC, data, old_size, new_size, allocator.allocator_data, loc);
-}
-
-template <typename T>
-T* alloc(Allocator allocator, u64 count, CodeLocation loc = caller_loc()) {
-	return (T*) alloc(allocator, sizeof(T) * count, loc);
-}
-
-template <typename T>
-T* realloc(Allocator allocator, T* old_data, u64 old_count, u64 new_count, CodeLocation loc = caller_loc()) {
-	return (T*) realloc(allocator, (void*) old_data, old_count * sizeof(T), new_count * sizeof(T), loc);
-}
 
 void* malloc_crash_on_failure(u64 size) {
 	void* result = malloc(size);
@@ -118,6 +94,43 @@ constexpr Allocator null_allocator = {
 	.allocator_data = NULL,
 };
 
+void* Malloc(Allocator allocator, u64 size, CodeLocation loc = caller_loc()) {
+	return allocator.proc(ALLOCATOR_VERB_ALLOC, NULL, 0, size, allocator.allocator_data, loc);
+}
+
+void* Malloc(u64 size, CodeLocation loc = caller_loc()) {
+	return Malloc(c_allocator, size, loc);
+}
+
+void Free(Allocator allocator, void* data, CodeLocation loc = caller_loc()) {
+	if (data == NULL) {
+		return;
+	}
+	allocator.proc(ALLOCATOR_VERB_FREE, data, 0, 0, allocator.allocator_data, loc);
+}
+
+void Free(void* data, CodeLocation loc = caller_loc()) {
+	Free(c_allocator, data, loc);
+}
+
+void* Realloc(Allocator allocator, void* data, u64 old_size, u64 new_size, CodeLocation loc = caller_loc()) {
+	return allocator.proc(ALLOCATOR_VERB_REALLOC, data, old_size, new_size, allocator.allocator_data, loc);
+}
+
+void* Realloc(void* data, u64 old_size, u64 new_size, CodeLocation loc = caller_loc()) {
+	return Realloc(c_allocator, data, old_size, new_size, loc);
+}
+
+template <typename T>
+T* Alloc(Allocator allocator, u64 count, CodeLocation loc = caller_loc()) {
+	return (T*) Malloc(allocator, sizeof(T) * count, loc);
+}
+
+template <typename T>
+T* Alloc(u64 count, CodeLocation loc = caller_loc()) {
+	return Alloc(c_allocator, count, loc);
+}
+
 template <typename T>
 T* copy(Allocator allocator, T thing, CodeLocation loc = caller_loc()) {
 	T* mem = allocator.alloc<T>(1, loc);
@@ -127,13 +140,13 @@ T* copy(Allocator allocator, T thing, CodeLocation loc = caller_loc()) {
 
 template <typename T>
 T* make(Allocator allocator = c_allocator, CodeLocation loc = caller_loc()) {
-	T* mem = allocator.alloc<T>(1, loc);
+	T* mem = Alloc<T>(allocator,1, loc);
 	return new(mem) T();
 }
 
 template <typename T>
 T* make(s64 count, Allocator allocator = c_allocator, CodeLocation loc = caller_loc()) {
-	T* mem = (T*) allocator.alloc(sizeof(T) * count, loc);
+	T* mem = (T*) Alloc<T>(allocator, count, loc); 
 	for (auto i: range(count)) {
 		new(mem + i) T();
 	}

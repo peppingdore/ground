@@ -46,7 +46,7 @@ Tuple<File, Error*> open_file(UnicodeString path, OpenFileFlag flags = FILE_READ
 	int creation_disposition = (flags & FILE_CREATE_NEW) ? CREATE_ALWAYS : OPEN_EXISTING;
 
 	auto [wide_str, wide_length] = encode_utf16(path);
-	defer { c_allocator.free(wide_str); };
+	defer { Free(wide_str); };
 
 	HANDLE handle = CreateFileW((wchar_t*) wide_str, windows_flags, FILE_SHARE_READ, NULL, creation_disposition, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (handle == INVALID_HANDLE_VALUE) {

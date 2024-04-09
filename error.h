@@ -17,7 +17,7 @@ struct Error {
 			prev->free();
 		}
 		text.free();
-		c_allocator.free(this);
+		Free(this);
 	}
 
 	Error* because(Error* error) {

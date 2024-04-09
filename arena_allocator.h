@@ -29,12 +29,12 @@ void free_linked_arenas(LinkedArenas* arenas) {
 	while (arena) {
 		auto block = get_arena_mem_block(arenas, arena);
 		arena = arena->next;
-		free(parent_allocator, block);
+		Free(parent_allocator, block);
 	}
 }
 
 Arena* make_arena(Allocator parent_allocator, u64 size) {
-	Arena* arena = (Arena*) alloc(parent_allocator, sizeof(Arena) + size);
+	Arena* arena = (Arena*) Malloc(parent_allocator, sizeof(Arena) + size);
 	*arena = Arena{};
 	return arena;
 }
@@ -67,11 +67,14 @@ void* arena_allocator_proc(AllocatorVerb verb, void* old_data, u64 old_size, u64
 			return ptr;
 		}
 		break;
-		case ALLOCATOR_VERB_REALLOC:
+		case ALLOCATOR_VERB_REALLOC: {
 			void* new_data = arena_allocator_proc(ALLOCATOR_VERB_ALLOC, NULL, 0, size, allocator_data, loc);
 			memcpy(new_data, old_data, min(old_size, size));
 			arena_allocator_proc(ALLOCATOR_VERB_FREE, old_data, 0, 0, allocator_data, loc);
 			return new_data;
+		}
+		case ALLOCATOR_VERB_FREE:
+			return NULL;
 		case ALLOCATOR_VERB_GET_TYPE:
 			return reflect_type_of<LinkedArenas>();
 		case ALLOCATOR_VERB_FREE_ALLOCATOR:
@@ -86,7 +89,7 @@ Allocator make_arena_allocator(Allocator parent_allocator, u64 arena_size = DEFA
 		panic("Arena size must be greater than 0");
 	}
 
-	auto arenas = (LinkedArenas*) alloc(parent_allocator, sizeof(LinkedArenas) + arena_size);
+	auto arenas = (LinkedArenas*) Malloc(parent_allocator, sizeof(LinkedArenas) + arena_size);
 	*arenas = LinkedArenas {
 		.parent_allocator = parent_allocator,
 		.arena_size = arena_size,
@@ -113,7 +116,7 @@ ArenaAllocatorSnapshot snapshot(LinkedArenas* allocator) {
 
 	auto arena = &allocator->first;
 	while (arena) {
-		current_arena_allocated == arena->allocated;
+		current_arena_allocated = arena->allocated;
 		if (arena->allocated < allocator->arena_size) {
 			break;
 		}

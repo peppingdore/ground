@@ -79,8 +79,8 @@ Tuple<WindowsWindow*, Error*> os_create_window(WindowParams params) {
 	);
 
 	if (window->hwnd == NULL) {
-		c_allocator.free(window->utf16_title);
-		c_allocator.free(window);
+		Free(window->utf16_title);
+		Free(window);
 		return { NULL, windows_error() };
 	}
 

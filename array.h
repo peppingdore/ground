@@ -35,7 +35,7 @@ struct Array: public ArrayView<T> {
 		if (capacity <= 0) {
 			capacity = DEFAULT_DYNAMIC_ARRAY_CAPACITY;
 		}
-		data = allocator.alloc<T>(capacity, loc);
+		data = Alloc<T>(allocator, capacity, loc);
 	}
 
 	T* reserve_at_index(s64 index, s64 length, CodeLocation loc = caller_loc()) {
@@ -146,7 +146,7 @@ struct Array: public ArrayView<T> {
 
 	void free(CodeLocation loc = caller_loc()) {
 		if (data) {
-			allocator.free(data, loc);
+			Free(allocator, data, loc);
 			data  = NULL;
 			count = 0;
 		}
@@ -170,7 +170,7 @@ struct Array: public ArrayView<T> {
 			s64 old_capacity = capacity;
 			assert(old_capacity > 0);
 			capacity = max(old_capacity * 2, target_capacity);
-			data     = allocator.realloc<T>(data, old_capacity, capacity, loc);
+			data     = (T*) Realloc(allocator, data, old_capacity * sizeof(T), capacity * sizeof(T), loc);
 		}
 	}
 	

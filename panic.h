@@ -22,8 +22,10 @@ inline void* panic_allocator_proc(AllocatorVerb verb, void* old_data, u64 old_si
 			return result;
 		}
 		break;
-		case ALLOCATOR_VERB_FREE: break;
-		case ALLOCATOR_VERB_REALLOC: break;
+		case ALLOCATOR_VERB_FREE: return NULL;
+		case ALLOCATOR_VERB_REALLOC: return NULL;
+		case ALLOCATOR_VERB_GET_TYPE: return NULL;
+		case ALLOCATOR_VERB_FREE_ALLOCATOR: return NULL;
 	}
 	return NULL;
 }
@@ -40,7 +42,7 @@ Spinlock PANIC_LOCK;
 
 inline void panic(const char* file_name, int line_number, auto... args) {
 	PANIC_LOCK.lock();
-	auto message = sprint(panic_allocator, args...);
+	auto message = sprint_unicode(panic_allocator, args...);
 	String utf8 = encode_utf8(panic_allocator, message);
 	fwrite(utf8.data, utf8.length, 1, stderr);
 	fwrite("\n", 1, 1, stderr);
