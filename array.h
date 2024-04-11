@@ -184,7 +184,7 @@ struct Array: public ArrayView<T> {
 			return;
 		}
 		assert(new_capacity >= count);
-		data = allocator.realloc<T>(data, capacity, new_capacity, loc);
+		data = Realloc<T>(allocator,data, capacity, new_capacity, loc);
 		capacity = new_capacity;
 	}
 

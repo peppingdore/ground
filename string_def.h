@@ -54,7 +54,7 @@ struct BaseString {
 	}
 
 	Char* copy_c_str(Allocator allocator = c_allocator) {
-		auto cp = allocator.alloc<Char>(length + 1);
+		auto cp = Alloc<Char>(allocator,length + 1);
 		memcpy(cp, data, length * sizeof(Char));
 		cp[length] = '\0';
 		return cp;
