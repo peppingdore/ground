@@ -128,12 +128,12 @@ T* Alloc(Allocator allocator, u64 count, CodeLocation loc = caller_loc()) {
 
 template <typename T>
 T* Alloc(u64 count, CodeLocation loc = caller_loc()) {
-	return Alloc(c_allocator, count, loc);
+	return Alloc<T>(c_allocator, count, loc);
 }
 
 template <typename T>
 T* copy(Allocator allocator, T thing, CodeLocation loc = caller_loc()) {
-	T* mem = allocator.alloc<T>(1, loc);
+	T* mem = Alloc<T>(1, loc);
 	memcpy(mem, &thing, sizeof(T));
 	return mem;
 }
