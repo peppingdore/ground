@@ -16,13 +16,15 @@
 //         e -= abs(cos(dot(m = cos(p * s), q / q))) / s, z -= m.y;
 
 UnicodeString PROGRAM = UR"TAG(
+float PI = 3.14;
+
 void main() {
 float i,e,R,s,z;
 vec3 m,q,p,d=FC.rgb/r.y-.5;
 q=hsv(t/6./PI,2.,.4);
 for(q.z--;i++<1e2;q-=d*e*R*.4,o+=log(++R+sin(vec4(1,2,3,0)+z*z/2e4))/2e2,p=vec3(log(R=length(q))-t/2.,e=-q.z/R,atan(q.x,q.y)),z=s,i>60.?d/=d,e+=1e-4:e)
 	for(s=2.;s<1e3;s/=-.5)
-		e-=abs(cos(dot(m=cos(p*s),q/q)))/s,z-=m.y;
+		e-=abs(cos(dot_vec3(m=cos(p*s),q/q)))/s,z-=m.y;
 }
 )TAG"_b;
 

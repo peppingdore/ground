@@ -36,8 +36,8 @@ void print_expr(UnicodeStringBuilder* sb, AstNode* expr) {
 		sb->append(member_access->member);
 	} else if (auto var_decl = reflect_cast<AstVar>(expr)) {
 		sb->append(var_decl->name);
-	} else if (auto literal = reflect_cast<CAstLiteral>(expr)) {
-		sb->append(literal->value);
+	} else if (auto literal = reflect_cast<LiteralExpr>(expr)) {
+		sb->append(literal->token);
 	} else if (auto ternary = reflect_cast<AstTernary>(expr)) {
 		sb->append("(");
 		print_expr(sb, ternary->cond);
