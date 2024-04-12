@@ -77,13 +77,17 @@ bool ends_with(auto str, auto end) {
 	return slice(str, str.length - end.length) == end;
 }
 
-bool compare_ignore_case(auto a, auto b) {
+bool ascii_to_lower(char32_t c) {
+	return (c >= 'A' && c <= 'Z') ? c + ('a' - 'A') : c;
+}
+
+bool compare_ignore_case_ascii(auto a, auto b) {
 	if (a.length != b.length) {
 		return false;
 	}
 
 	for (auto i: range(a.length)) {
-		if (u_tolower(a[i]) != u_tolower(b[i])) {
+		if (ascii_to_lower(a[i]) != ascii_to_lower(b[i])) {
 			return false;
 		}
 	}

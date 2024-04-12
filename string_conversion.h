@@ -528,16 +528,16 @@ inline bool parse_float(BaseString<Char> str, f64* result, Float_Parsing_Params 
 		return false;
 	}
 
-	if (compare_ignore_case(str, "-nan"_b)) {
+	if (compare_ignore_case_ascii(str, "-nan"_b)) {
 		*result = -NAN;
 		return true;
-	} else if (compare_ignore_case(str, "nan"_b)) {
+	} else if (compare_ignore_case_ascii(str, "nan"_b)) {
 		*result =  NAN;
 		return true;
-	} else if (compare_ignore_case(str, "-inf"_b)) {
+	} else if (compare_ignore_case_ascii(str, "-inf"_b)) {
 		*result = -INFINITY;
 		return true;
-	} else if (compare_ignore_case(str, "inf"_b)) {
+	} else if (compare_ignore_case_ascii(str, "inf"_b)) {
 		*result =  INFINITY;
 		return true;
 	}
