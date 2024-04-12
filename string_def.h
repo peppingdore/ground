@@ -102,7 +102,7 @@ BaseString<T> make_string(const T* c_str) {
 		}
 		ptr += 1;
 	}
-	return { .data = (T*) c_str, .length = ptr_diff(ptr, c_str) };
+	return { .data = (T*) c_str, .length = ptr - c_str };
 }
 
 constexpr String operator""_b(const char* c_str, size_t length) {
