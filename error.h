@@ -10,11 +10,15 @@ struct Error {
 	String        text;
 	Type*         type;
 	CodeLocation  loc;
+	void         (*on_free)(Error*) = NULL;
 	Error*        prev = NULL;
 
 	void free() {
 		if (prev) {
 			prev->free();
+		}
+		if (on_free) {
+			on_free(this);
 		}
 		text.free();
 		Free(this);
