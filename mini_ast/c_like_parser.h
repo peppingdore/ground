@@ -66,6 +66,9 @@ constexpr bool AST_EXPR_RVALUE = false;
 template <typename T>
 T* make_ast_expr(Allocator allocator, AstType* expr_type, bool is_lvalue) {
 	auto x = make_ast_node<T>(allocator);
+	if (!expr_type) {
+		panic("expr_type must be non-null");
+	}
 	x->expr_type = expr_type;
 	x->is_lvalue = is_lvalue;
 	return x;
@@ -224,12 +227,10 @@ struct CBinaryExpr: AstExpr {
 };
 
 struct AstVarDecl: AstVar { 
-	AstType*      var_type;
 	AstExpr*      init = NULL;
 
 	REFLECT(AstVarDecl) {
 		BASE_TYPE(AstVar);
-		MEMBER(var_type);
 		MEMBER(init);
 	}
 };
@@ -963,7 +964,7 @@ bool parse_swizzle_ident(CLikeParser* p, UnicodeString ident, int* swizzle, int 
 	return true;
 }
 
-Tuple<AstSwizzleExpr*, Error*> try_parse_swizzle_expr(CLikeParser* p, AstExpr* lhs, UnicodeString ident) {
+Tuple<AstExpr*, Error*> try_parse_swizzle_expr(CLikeParser* p, AstExpr* lhs, UnicodeString ident) {
 	if (auto c_type_alias = reflect_cast<CTypeAlias>(lhs->expr_type)) {
 		int swizzle_idx[4] = { -1, -1, -1, -1 };
 		if (c_type_alias->c_type == reflect_type_of<Vector2_f32>()) {
@@ -1004,6 +1005,16 @@ Tuple<AstSwizzleExpr*, Error*> try_parse_swizzle_expr(CLikeParser* p, AstExpr* l
 			swizzle_type = find_type(p, U"vec4"_b);
 		} else {
 			panic(p, U"Unexpected swizzle_len = %"_b, swizzle_len);
+		}
+
+		if (swizzle_len == 1) {
+			auto expr = make_ast_expr<AstArrayAccess>(p->allocator, swizzle_type, AST_EXPR_LVALUE);
+			expr->lhs = lhs;
+			auto idx = make_ast_expr<LiteralExpr>(p->allocator, find_type(p, U"int"_b), AST_EXPR_RVALUE);
+			idx->u64_value = swizzle_idx[0];
+			expr->index = idx;
+			lhs = expr;
+			return { lhs, NULL };
 		}
 
 		auto expr = make_ast_expr<AstSwizzleExpr>(p->allocator, lhs->expr_type, AST_EXPR_RVALUE);
@@ -1111,7 +1122,14 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 		auto expr = make_ast_expr<AstVariableAccess>(p->allocator, var->var_type, AST_EXPR_LVALUE);
 		expr->var = var;
 		lhs = expr;
-	} else {		
+	} else if (auto func = reflect_cast<AstFunction>(sym)) {
+		next(p);
+		auto [call, e] = parse_function_call(p, func);
+		if (e) {
+			return { NULL, e };
+		}
+		lhs = call;
+	} else {
 		return { NULL, parser_error(p, U"Expected type or variable"_b) };
 	}
 
@@ -1122,7 +1140,7 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 		if (postfix_op_prec > 0) {
 			if (tok == "++"_b || tok == "--"_b) {
 				if (!is_numeric(lhs->expr_type)) {
-					return { NULL, parser_error(p, U"Operator '%' can only be applied to numeric types.", tok) };
+					return { NULL, parser_error(p, U"Operator '%' can only be applied to numeric types. Got '%'.", tok, lhs->expr_type->name) };
 				}
 				if (!lhs->is_lvalue) {
 					return { NULL, parser_error(p, U"Operator '%' can only be applied to lvalues.", tok) };
@@ -1136,6 +1154,7 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 			continue;
 		}
 		if (tok == "("_b) {
+			// @TODO: support calling on function pointers.
 			auto func = reflect_cast<AstFunction>(lhs);
 			if (!func) {
 				return { NULL, parser_error(p, U"Expected a function, got %"_b, lhs->type->name) };
@@ -1162,7 +1181,8 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 				return { NULL, ee };
 			}
 			if (swizzle) {
-				return { swizzle, NULL };
+				lhs = swizzle;
+				continue;
 			}
 
 			auto [member, ok] = get_struct_member(p, lhs->expr_type, ident);
