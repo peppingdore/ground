@@ -911,6 +911,113 @@ Optional<AstStructMember> get_struct_member(CLikeParser* p, AstType* type, Unico
 	return {};
 }
 
+struct AstSwizzleExpr: AstExpr {
+	AstExpr* lhs;
+	int      swizzle[4];
+	int      swizzle_len = 0;
+
+	REFLECT(AstSwizzleExpr) {
+		BASE_TYPE(AstExpr);
+		MEMBER(lhs);
+		MEMBER(swizzle);
+		MEMBER(swizzle_len);
+	}
+};
+
+bool parse_swizzle_ident(CLikeParser* p, UnicodeString ident, int* swizzle, int src_len) {
+	s64 ident_len = len(ident);
+	if (ident_len > 4) {
+		return false;
+	}
+	bool did_fail = false;
+	for (auto i: range(ident_len)) {
+		if (ident[i] == 'x') {
+			swizzle[i] = 0;
+		} else if (src_len >= 2 && ident[i] == 'y') {
+			swizzle[i] = 1;
+		} else if (src_len >= 3 && ident[i] == 'z') {
+			swizzle[i] = 2;
+		} else if (src_len >= 4 && ident[i] == 'w') {
+			swizzle[i] = 3;
+		} else {
+			did_fail = true;
+			break;
+		}
+	}
+	if (!did_fail) {
+		return true;
+	}
+	for (auto i: range(ident_len)) {
+		if (ident[i] == 'r') {
+			swizzle[i] = 0;
+		} else if (src_len >= 2 && ident[i] == 'g') {
+			swizzle[i] = 1;
+		} else if (src_len >= 3 && ident[i] == 'b') {
+			swizzle[i] = 2;
+		} else if (src_len >= 4 && ident[i] == 'a') {
+			swizzle[i] = 3;
+		} else {
+			return false;
+		}
+	}
+	return true;
+}
+
+Tuple<AstSwizzleExpr*, Error*> try_parse_swizzle_expr(CLikeParser* p, AstExpr* lhs, UnicodeString ident) {
+	if (auto c_type_alias = reflect_cast<CTypeAlias>(lhs->expr_type)) {
+		int swizzle_idx[4] = { -1, -1, -1, -1 };
+		if (c_type_alias->c_type == reflect_type_of<Vector2_f32>()) {
+			bool ok = parse_swizzle_ident(p, ident, swizzle_idx, 2);
+			if (!ok) {
+				return { NULL, NULL };
+			}
+		} else if (c_type_alias->c_type == reflect_type_of<Vector3_f32>()) {
+			bool ok = parse_swizzle_ident(p, ident, swizzle_idx, 3);
+			if (!ok) {
+				return { NULL, NULL };
+			}
+		} else if (c_type_alias->c_type == reflect_type_of<Vector4_f32>()) {
+			bool ok = parse_swizzle_ident(p, ident, swizzle_idx, 4);
+			if (!ok) {
+				return { NULL, NULL };
+			}
+		} else {
+			return { NULL, NULL };
+		}
+
+		int swizzle_len = 0;
+		for (auto i: range(4)) {
+			if (swizzle_idx[i] == -1) {
+				break;
+			}
+			swizzle_len += 1;
+		}
+
+		AstType* swizzle_type = NULL;
+		if (swizzle_len == 1) {
+			swizzle_type = find_type(p, U"float"_b);
+		} else if (swizzle_len == 2) {
+			swizzle_type = find_type(p, U"vec2"_b);
+		} else if (swizzle_len == 3) {
+			swizzle_type = find_type(p, U"vec3"_b);
+		} else if (swizzle_len == 4) {
+			swizzle_type = find_type(p, U"vec4"_b);
+		} else {
+			panic(p, U"Unexpected swizzle_len = %"_b, swizzle_len);
+		}
+
+		auto expr = make_ast_expr<AstSwizzleExpr>(p->allocator, lhs->expr_type, AST_EXPR_RVALUE);
+		expr->lhs = lhs;
+		expr->swizzle[0] = swizzle_idx[0];
+		expr->swizzle[1] = swizzle_idx[1];
+		expr->swizzle[2] = swizzle_idx[2];
+		expr->swizzle[3] = swizzle_idx[3];
+		expr->swizzle_len = swizzle_len;
+		return { expr, NULL };
+	}
+	return { NULL, NULL };
+}
+
 Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 	auto tok = peek(p);
 
@@ -1049,6 +1156,15 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 			if (e) {
 				return { NULL, e };
 			}
+			
+			auto [swizzle, ee] = try_parse_swizzle_expr(p, lhs, ident);
+			if (ee) {
+				return { NULL, ee };
+			}
+			if (swizzle) {
+				return { swizzle, NULL };
+			}
+
 			auto [member, ok] = get_struct_member(p, lhs->expr_type, ident);
 			if (!ok) {
 				return { NULL, parser_error_tok(p, ident, U"Member '%' not found in struct '%'.", ident, lhs->expr_type->name) };
