@@ -32,7 +32,11 @@ for(q.z--;i++<1e2;q-=d*e*R*.4,o+=log(++R+sin(vec4(1,2,3,0)+z*z/2e4))/2e2,p=vec3(
 int main() {
 	auto [program, e] = parse_c_like(PROGRAM);
 	if (e) {
-		print(e->text);
+		if (auto error = reflect_cast<CLikeParserError>(e)) {
+			print_parser_error(error);
+		} else {
+			print(e->text);
+		}
 		print("Generated at %", e->loc);
 	}
 	else {

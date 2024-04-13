@@ -281,29 +281,54 @@ struct LiteralExpr: AstExpr {
 	}
 };
 
+struct CParserErrorPiece {
+	UnicodeString text;
+	s64           start = 0;
+	s64           end = 0;
+	s64           highlight_start = 0;
+	s64           highlight_end = 0;
+};
 
 struct CLikeParserError: Error {
-	s64 start;
-	s64 end;
+	UnicodeString            program_text;
+	Array<CParserErrorPiece> pieces;
 
 	REFLECT(CLikeParserError) {
 		BASE_TYPE(Error);
-		MEMBER(start);
-		MEMBER(end);
+		MEMBER(program_text);
+		MEMBER(pieces);
 	}
 };
 
-CLikeParserError* parser_error_impl(CLikeParser* p, CodeLocation loc, UnicodeString str) {
-	if (p->current_token.data == NULL) {
-		return format_error_t(CLikeParserError, "current_token is not set!");
+CLikeParserError* make_parser_error(CLikeParser* p, CodeLocation loc, UnicodeString str) {
+	auto error = format_error<CLikeParserError>(loc, str);
+	error->program_text = p->str.copy();
+	error->on_free = [](Error* uncasted) {
+		auto e = (CLikeParserError*) uncasted;
+		e->program_text.free();
+		for (auto it: e->pieces) {
+			it.text.free();
+		}
+		e->pieces.free();
+	};
+	return error;
+}
+
+void add_site(CLikeParser* p, CLikeParserError* error, UnicodeString tok) {
+	s64 tok_start = tok.data - p->str.data;
+	s64 tok_end = tok_start + len(tok);
+	if (tok_start < 0) {
+		return;
 	}
-	s64 idx = p->current_token.data - p->str.data;
-	
+	if (tok_end > len(p->str)) {
+		return;
+	}
+
 	s64 bottom_lines_count = 0;
 	s64 top_lines_count = 0;
 	s64 end = len(p->str);
 	s64 start = 0;
-	for (auto i: range_from_to(idx, len(p->str))) {
+	for (auto i: range_from_to(tok_start, len(p->str))) {
 		if (is_line_break(p->str[i])) {
 			bottom_lines_count += 1;
 			if (bottom_lines_count >= 3) {
@@ -312,7 +337,7 @@ CLikeParserError* parser_error_impl(CLikeParser* p, CodeLocation loc, UnicodeStr
 			}
 		}
 	}
-	for (auto i: range(idx).reverse()) {
+	for (auto i: range(tok_start).reverse()) {
 		if (is_line_break(p->str[i])) {
 			top_lines_count += 1;
 			if (top_lines_count >= 3) {
@@ -322,31 +347,47 @@ CLikeParserError* parser_error_impl(CLikeParser* p, CodeLocation loc, UnicodeStr
 		}
 	}
 
-	auto sb = build_unicode_string();
-	defer { sb.free(); };
-	auto local_text = slice(p->str, start, end - start);
-	auto pre_text = slice(local_text, 0, idx - start);
-	auto highlight_text = slice(local_text, idx - start, len(p->current_token));
-	auto post_text = slice(local_text, idx - start + len(p->current_token));
-	sb.append('\n');
-	sb.append(str);
-	sb.append('\n');
-	sb.append("\x1b[0;97m");
-	sb.append(pre_text);
-	sb.append("\x1b[0m");
-	sb.append("\x1b[4;31m");
-	sb.append(highlight_text);
-	sb.append("\x1b[0m");
-	sb.append("\x1b[0;97m");
-	sb.append(post_text);
-	sb.append("\x1b[0m");
-	auto error = format_error<CLikeParserError>(loc, sb.get_string());
-	error->start = idx;
-	error->end = idx + len(p->current_token);
+	CParserErrorPiece piece = {
+		.start = start,
+		.end = end,
+		.highlight_start = tok_start,
+		.highlight_end = tok_end,
+	};
+	error->pieces.add(piece);
+}
+
+void add_text(CLikeParser* p, CLikeParserError* error, auto... args) {
+	CParserErrorPiece piece = {
+		.text = sprint_unicode(args...),
+	};
+	error->pieces.add(piece);
+}
+
+void print_parser_error(CLikeParserError* e) {
+	print(e->text);
+	for (auto it: e->pieces) {
+		if (len(it.text) > 0) {
+			print(it.text);
+		}
+		if (it.end > it.start) {
+			auto pre_text = slice(e->program_text, it.start, it.highlight_start - it.start);
+			auto highlight_text = slice(e->program_text, it.highlight_start, it.highlight_end - it.highlight_start);
+			auto post_text = slice(e->program_text, it.highlight_end, it.end - it.highlight_end);
+			print("\x1b[0;97m%\x1b[0m\x1b[4;31m%\x1b[0m\x1b[0;97m%\x1b[0m", pre_text, highlight_text, post_text);
+		}
+	}
+}
+
+CLikeParserError* simple_parser_error(CLikeParser* p, CodeLocation loc, UnicodeString tok, UnicodeString str) {
+	auto error = make_parser_error(p, loc, str);
+	if (tok.data) {
+		add_site(p, error, tok);
+	}
 	return error;
 }
 
-#define parser_error(p, ...) parser_error_impl(p, caller_loc(), sprint_unicode(p->allocator, __VA_ARGS__))
+#define parser_error(p, ...) simple_parser_error(p, caller_loc(), p->current_token, sprint_unicode(p->allocator, __VA_ARGS__))
+#define parser_error_tok(p, tok, ...) simple_parser_error(p, caller_loc(), tok, sprint_unicode(p->allocator, __VA_ARGS__))
 
 UnicodeString set_current_token(CLikeParser* p, s64 end, u32 flags = 0) {
 	defer { p->cursor = end; };
@@ -1010,7 +1051,7 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 			}
 			auto [member, ok] = get_struct_member(p, lhs->expr_type, ident);
 			if (!ok) {
-				return { NULL, parser_error(p, U"Member '%' not found in struct '%'.", ident, lhs->expr_type->name) };
+				return { NULL, parser_error_tok(p, ident, U"Member '%' not found in struct '%'.", ident, lhs->expr_type->name) };
 			}
 			auto node = make_ast_expr<AstVarMemberAccess>(p->allocator, member.type, lhs->is_lvalue);
 			node->lhs = lhs;
