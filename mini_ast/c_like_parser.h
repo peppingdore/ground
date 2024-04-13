@@ -1376,11 +1376,11 @@ Tuple<AstNode*, Error*> parse_c_like(UnicodeString str) {
 	add_c_type_alias(&p, reflect_type_of<void>(), U"void"_b);
 	add_c_type_alias(&p, reflect_type_of<Vector2_f32>(), U"vec2"_b);
 	add_c_type_alias(&p, reflect_type_of<Vector3_f32>(), U"vec3"_b);
-	add_c_type_alias(&p, reflect_type_of<Vector4_f64>(), U"vec4"_b);
+	add_c_type_alias(&p, reflect_type_of<Vector4_f32>(), U"vec4"_b);
 
 	auto float_type = find_type(&p, U"float"_b);
 
-	add_shader_intrinsic_var(&p, U"FC"_b, find_type(&p, U"vec2"_b)); // frag coord
+	add_shader_intrinsic_var(&p, U"FC"_b, find_type(&p, U"vec4"_b)); // frag coord
 	add_shader_intrinsic_var(&p, U"r"_b, find_type(&p, U"vec2"_b)); // resolution
 	add_shader_intrinsic_var(&p, U"o"_b, find_type(&p, U"vec4"_b)); // out color
 	add_shader_intrinsic_var(&p, U"t"_b, find_type(&p, U"float"_b)); // time?
