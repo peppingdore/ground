@@ -269,6 +269,7 @@ struct AstArrayAccess: AstExpr {
 
 struct LiteralExpr: AstExpr {
 	UnicodeString token;
+	f32           f32_value = 0;
 	f64           f64_value = 0;
 	u64           u64_value = 0;
 	s64           s64_value = 0;
@@ -276,6 +277,7 @@ struct LiteralExpr: AstExpr {
 	REFLECT(LiteralExpr) {
 		BASE_TYPE(AstNode);
 		MEMBER(token);
+		MEMBER(f32_value);
 		MEMBER(f64_value);
 		MEMBER(u64_value);
 		MEMBER(s64_value);
@@ -427,8 +429,10 @@ s64 maybe_eat_floating_point_literal(CLikeParser* p) {
 	if (c == start) {
 		return 0;
 	}
+	bool have_exp = false;
 	if (c < len(p->str)) {
 		if (p->str[c] == 'e' || p->str[c] == 'E') {
+			have_exp = true;
 			c += 1;
 			if (c >= len(p->str)) {
 				return 0;
@@ -446,10 +450,15 @@ s64 maybe_eat_floating_point_literal(CLikeParser* p) {
 			}
 		}
 	}
+	bool have_suffix = false;
 	if (c < len(p->str)) {
 		if (p->str[c] == 'f' || p->str[c] == 'F' || p->str[c] == 'd' || p->str[c] == 'D') {
+			have_suffix = true;
 			c += 1;
 		}
+	}
+	if ((!have_dot && !have_exp) && !have_suffix) {
+		return 0;
 	}
 	return c;
 }
@@ -893,6 +902,54 @@ AstStructMember make_ast_struct_member(AstType* type, UnicodeString name, s64 of
 	return member;
 }
 
+s64 get_members_count(AstType* type) {
+	if (auto c_alias = reflect_cast<CTypeAlias>(type)) {
+		auto c_type = c_alias->c_type;
+		if (auto casted = c_type->as<StructType>()) {
+			if (casted == reflect_type_of<Vector2_f32>()) {
+				return 2;
+			} else if (casted == reflect_type_of<Vector3_f32>()) {
+				return 3;
+			} else if (casted == reflect_type_of<Vector4_f32>()) {
+				return 4;
+			}
+			return casted->members.count;
+		}
+	}
+	return -1;
+}
+
+Optional<AstStructMember> get_struct_member(CLikeParser* p, AstType* type, s64 index) {
+	if (auto c_alias = reflect_cast<CTypeAlias>(type)) {
+		auto c_type = c_alias->c_type;
+		if (auto casted = c_type->as<StructType>()) {
+			if (casted == reflect_type_of<Vector2_f32>()) {
+				if (index == 0)      return make_ast_struct_member(find_type(p, U"float"_b), U"x"_b, 0);
+				else if (index == 1) return make_ast_struct_member(find_type(p, U"float"_b), U"y"_b, 4);
+			} else if (casted == reflect_type_of<Vector3_f32>()) {
+				if (index == 0)      return make_ast_struct_member(find_type(p, U"float"_b), U"x"_b, 0);
+				else if (index == 1) return make_ast_struct_member(find_type(p, U"float"_b), U"y"_b, 4);
+				else if (index == 2) return make_ast_struct_member(find_type(p, U"float"_b), U"z"_b, 8);
+			} else if (casted == reflect_type_of<Vector4_f32>()) {
+				if (index == 0)      return make_ast_struct_member(find_type(p, U"float"_b), U"x"_b, 0);
+				else if (index == 1) return make_ast_struct_member(find_type(p, U"float"_b), U"y"_b, 4);
+				else if (index == 2) return make_ast_struct_member(find_type(p, U"float"_b), U"z"_b, 8);
+				else if (index == 3) return make_ast_struct_member(find_type(p, U"float"_b), U"w"_b, 12);
+			}
+
+			if (index < casted->members.count) {
+				auto unicode_str = make_string(casted->members[index]->name).copy_unicode_string(p->allocator);
+				auto found = find_type(p, unicode_str);
+				if (!found) {
+					panic("Type '%' not found", unicode_str);
+				}
+				return make_ast_struct_member(found, unicode_str, casted->members[index]->offset);
+			}
+		}
+	}
+	return {};
+}
+
 Optional<AstStructMember> get_struct_member(CLikeParser* p, AstType* type, UnicodeString name) {
 	if (auto c_alias = reflect_cast<CTypeAlias>(type)) {
 		auto c_type = c_alias->c_type;
@@ -1029,18 +1086,48 @@ Tuple<AstExpr*, Error*> try_parse_swizzle_expr(CLikeParser* p, AstExpr* lhs, Uni
 	return { NULL, NULL };
 }
 
+struct AstStructInitializer: AstExpr {
+	AstType*        struct_type = NULL;
+	Array<AstExpr*> members;
+
+	REFLECT(AstStructInitializer) {
+		BASE_TYPE(AstExpr);
+		MEMBER(struct_type);
+		MEMBER(members);
+	}
+};
+
 Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 	auto tok = peek(p);
 
 	if (p->current_token_flags & CTOKEN_FLAG_FLOATING_POINT) {
-		f64 f;
-		bool ok = parse_float(p->current_token, &f);
+		auto lit = tok;
+		bool parse_as_float = false;
+		if (len(lit) > 0) {
+			if (lit[len(lit) - 1] == 'f' || lit[len(lit) - 1] == 'F') {
+				lit.length -= 1;
+				parse_as_float = true;
+			}
+			if (lit[len(lit) - 1] == 'd' || lit[len(lit) - 1] == 'D') {
+				lit.length -= 1;
+			}
+		}
+
+		f64 float_val;
+		f64 double_val;
+		bool ok = false;
+		if (parse_as_float) {
+			ok = parse_float(lit, &float_val);
+		} else {
+			ok = parse_float(lit, &double_val);
+		}
 		if (!ok) {
 			return { NULL, parser_error(p, U"Could not parse floating point literal."_b) };
 		}
-		auto literal = make_ast_expr<LiteralExpr>(p->allocator, find_type(p, U"double"_b), AST_EXPR_RVALUE);
-		literal->token = p->current_token;
-		literal->f64_value = f;
+		auto literal = make_ast_expr<LiteralExpr>(p->allocator, find_type(p, parse_as_float ? U"float"_b : U"double"_b), AST_EXPR_RVALUE);
+		literal->token = tok;
+		literal->f32_value = float_val;
+		literal->f64_value = double_val;
 		next(p);
 		return { literal, NULL };
 	}
@@ -1115,8 +1202,44 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 	AstExpr* lhs = NULL;
 	if (auto type = reflect_cast<AstType>(sym)) {
 		next(p);
-		// @TODO: parse initializer.
-		return { NULL, parser_error(p, U"TODO: type initializer"_b) };
+		if (peek(p) == "("_b) {
+			next(p);
+			s64 member_index = 0;
+			Array<AstExpr*> args = { .allocator = p->allocator };
+			defer { args.free(); };
+			while (true) {
+				auto tok = peek(p);
+				if (tok == ")"_b) {
+					if (args.count != get_members_count(type)) {
+						return { NULL, parser_error(p, U"Expected % arguments in initializer but got '%'", get_members_count(type), args.count) };
+					}
+					auto node = make_ast_expr<AstStructInitializer>(p->allocator, type, AST_EXPR_RVALUE);
+					node->struct_type = type;
+					node->members = args;
+					args = {};
+					next(p);
+					lhs = node;
+					break;
+				}
+				auto [comma_prec, _] = get_binary_operator_prec_assoc(U","_b);
+				auto [expr, e] = parse_expr(p, comma_prec + 1);
+				if (e) {
+					return { NULL, e };
+				}
+				auto [member, found] = get_struct_member(p, type, member_index);
+				if (!found) {
+					return { NULL, parser_error(p, U"Exceeded arguments count in initializer, struct '%' has % members", type->name, get_members_count(type)) };
+				}
+				if (member.type != expr->expr_type) {
+					return { NULL, parser_error(p, U"Initializer type mismatch, expected '%' but got '%'", member.type->name, expr->expr_type->name) };
+				}
+				args.add(expr);
+				member_index += 1;
+				if (peek(p) == ","_b) {
+					next(p);
+				}
+			}
+		}
 	} else if (auto var = reflect_cast<AstVar>(sym)) {
 		next(p);
 		auto expr = make_ast_expr<AstVariableAccess>(p->allocator, var->var_type, AST_EXPR_LVALUE);
@@ -1258,7 +1381,10 @@ Tuple<AstExpr*, Error*> parse_expr(CLikeParser* p, s32 min_prec) {
 			if (e3) {
 				return { NULL, e3 };
 			}
-			auto node = make_ast_node<AstTernary>(p->allocator);
+			if (lhs->expr_type != else_expr->expr_type) {
+				return { NULL, parser_error(p, U"Ternary expression type mismatch, expected '%' but got '%'", lhs->expr_type->name, else_expr->expr_type->name) };
+			}
+			auto node = make_ast_expr<AstTernary>(p->allocator, lhs->expr_type, AST_EXPR_RVALUE);
 			node->cond = lhs;
 			node->then = then_expr;
 			node->else_ = else_expr;
@@ -1270,7 +1396,10 @@ Tuple<AstExpr*, Error*> parse_expr(CLikeParser* p, s32 min_prec) {
 		if (e) {
 			return { NULL, e };
 		}
-		auto node = make_ast_node<CBinaryExpr>(p->allocator);
+		if (lhs->expr_type != rhs->expr_type) {
+			return { NULL, parser_error(p, U"Binary expression type mismatch, expected '%' but got '%'", lhs->expr_type->name, rhs->expr_type->name) };
+		}
+		auto node = make_ast_expr<CBinaryExpr>(p->allocator, lhs->expr_type, AST_EXPR_RVALUE);
 		node->lhs = lhs;
 		node->rhs = rhs;
 		node->op = tok;
