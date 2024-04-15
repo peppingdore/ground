@@ -89,6 +89,11 @@ struct Array: public ArrayView<T> {
 		add(other.data, other.count, loc);
 	}
 
+	template <size_t N>
+	void add(const T (&array)[N], CodeLocation loc = caller_loc()) {
+		add((T*) array, N, loc);
+	}
+
 	void add(std::initializer_list<T> other, CodeLocation loc = caller_loc()) {
 		// (T*) cast is to remove const from other.begin(), so the compiler doesn't bitch.
 		add((T*) other.begin(), other.size(), loc);
