@@ -89,7 +89,7 @@ using String        = BaseString<char>;
 using UnicodeString = BaseString<char32_t>;
 
 template <StringChar T>
-BaseString<T> make_string(const T* data, s64 length) {
+constexpr BaseString<T> make_string(const T* data, s64 length) {
 	return { .data = (T*) data, .length = length };
 }
 
