@@ -190,7 +190,7 @@ void format_parser(
 	
 	constexpr char escapable[] = { '%', '[', '(' };
 
-	sort(&format_flags, sort_key(&format_flags, lambda($0.text.length)));
+	sort(format_flags, lambda(len(format_flags[$0]->text) < len(format_flags[$1]->text)));    
 	reverse(format_flags);
 
 	u32 arg_index = 0;
