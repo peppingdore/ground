@@ -4,33 +4,33 @@
 #include "array_view.h"
 #include "range.h"
 
-void quick_sort(s64 start, s64 end, auto less, auto swap) {
+void quick_sort(auto arr, s64 start, s64 end, auto less, auto swap) {
 	if ((end - start) < 2) {
 		return;
 	}
 	s64 left = start;
 	s64 right = end - 1;
 	s64 pivot_index = (left) + (end - left) / 2;
-	swap(right, pivot_index);
+	swap(arr, right, pivot_index);
 	
 	for (auto i: range_from_to(start, end)) {
-		if (less(i, right)) { 
-			swap(i, left);
+		if (less(arr, i, right)) { 
+			swap(arr, i, left);
 			left += 1;
 		}
 	}
-	swap(left, right);
+	swap(arr, left, right);
 
-	quick_sort(start, left, less, swap);
-	quick_sort(left + 1, end, less, swap);
+	quick_sort(arr, start, left, less, swap);
+	quick_sort(arr, left + 1, end, less, swap);
 }
 
 void sort(auto arr, auto less, auto swap) {
-	quick_sort(0, len(arr), less, swap);
+	quick_sort(arr, 0, len(arr), less, swap);
 }
 
 void sort(auto arr, auto less) {
-	auto swap = [&](s64 a, s64 b) {
+	auto swap = [&](auto _, s64 a, s64 b) {
 		auto temp = *arr[a];
 		*arr[a] = *arr[b];
 		*arr[b] = temp;
@@ -39,7 +39,7 @@ void sort(auto arr, auto less) {
 }
 
 void sort(auto arr) {
-	auto less = [&] (s64 a, s64 b) {
+	auto less = [&] (auto _, s64 a, s64 b) {
 		return *arr[a] < *arr[b];
 	};
 	sort(arr, less);
@@ -59,7 +59,7 @@ bool is_sorted(auto arr, auto less) {
 }
 
 bool is_sorted(auto arr) {
-	auto less = [&] (s64 a, s64 b) {
+	auto less = [&] (auto _, s64 a, s64 b) {
 		return *arr[a] < *arr[b];
 	};
 	return is_sorted(arr, less);
