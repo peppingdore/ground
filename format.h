@@ -190,7 +190,7 @@ void format_parser(
 	
 	constexpr char escapable[] = { '%', '[', '(' };
 
-	sort(format_flags, lambda(len(format_flags[$0]->text) < len(format_flags[$1]->text)));    
+	sort(format_flags, lambda(len(format_flags[$1]->text) < len(format_flags[$2]->text)));
 	reverse(format_flags);
 
 	u32 arg_index = 0;
@@ -955,17 +955,6 @@ void format_item(Formatter* formatter, Type* type, void* thing, String spec) {
 	}
 }
 
-void print(String text) {
-	fwrite(text.data, text.length, 1, stdout);
-	fwrite("\n", 1, 1, stdout);
-}
-
-void print(UnicodeString text) {
-	auto utf8 = encode_utf8(text);
-	print(utf8);
-	utf8.free();
-}
-
 template <StringChar T>
 void format(StringBuilder<T>* builder, Allocator allocator, auto... args) {
 	auto formatter = make_formatter(builder, allocator);
@@ -994,11 +983,26 @@ void formatln(StringBuilder<T>* builder, auto... args) {
 	formatln(builder, c_allocator, args...);
 }
 
+void print_to_stdout(String text) {
+	fwrite(text.data, text.length, 1, stdout);
+}
+
+void print_to_stdout(UnicodeString text) {
+	auto utf8 = encode_utf8(text);
+	print_to_stdout(utf8);
+	utf8.free();
+}
+
 void print(auto... args) {
 	auto builder = build_unicode_string();
 	format(&builder, c_allocator, args...);
 	auto text = builder.get_string();
-	print(text);
+	print_to_stdout(text);
+}
+
+void println(auto... args) {
+	print(args...);
+	print(U"\n"_b);
 }
 
 template <StringChar T = char>
