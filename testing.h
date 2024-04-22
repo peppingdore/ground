@@ -109,7 +109,6 @@ void test_expect(bool cond, const char* cond_str, const char* message, CodeLocat
 	tester_write_result_line("TESTER_EXPECT");
 	if (cond) {
 		tester.current_test->expect_succeeded += 1;
-		printf("  %s - ok\n", cond_str);
 		tester_write_result_int(1);
 	} else {
 		tester.current_test->expect_failed += 1;
@@ -133,10 +132,14 @@ void test_expect(bool cond, const char* cond_str, const char* message, CodeLocat
 	ptr = tester.scope;
 	while (ptr) {
 		tester_write_result_loc(ptr->loc);
-		printf("   %s: %d\n", ptr->loc.file, ptr->loc.line);
+		if (!cond) {
+			printf("   %s: %d\n", ptr->loc.file, ptr->loc.line);
+		}
 		ptr = ptr->next;
 	}
-	printf("   %s: %d\n", loc.file, loc.line);
+	if (!cond) {
+		printf("   %s: %d\n", loc.file, loc.line);
+	}
 }
 
 // void test_expect(bool cond, const char* cond_str, Unicode_String message, CodeLocation loc = caller_loc()) {
