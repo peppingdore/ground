@@ -45,9 +45,9 @@ void sort(auto arr) {
 	sort(arr, less);
 }
 
-bool is_sorted(s64 start, s64 length, auto less) {
+bool is_sorted(auto arr, s64 start, s64 length, auto less) {
 	for (auto i: range(length - 1)) {
-		if (less(i + 1, i)) {
+		if (less(arr, i + 1, i)) {
 			return false;
 		}
 	}
@@ -55,7 +55,7 @@ bool is_sorted(s64 start, s64 length, auto less) {
 }
 
 bool is_sorted(auto arr, auto less) {
-	return is_sorted(0, len(arr), less);
+	return is_sorted(arr, 0, len(arr), less);
 }
 
 bool is_sorted(auto arr) {
