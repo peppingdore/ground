@@ -1,152 +1,21 @@
 #pragma once
 
+#include "span.h"
 #include "allocator.h"
-#include "array_view.h"
-#include "reflect.h"
-#include "coroutine.h"
-
-#include <string.h>
-#include <initializer_list>
-
-constexpr s64 DEFAULT_DYNAMIC_ARRAY_CAPACITY = 8;
 
 template <typename T>
-struct Array: public ArrayView<T> {
-	using ArrayView<T>::data;
-	using ArrayView<T>::count;
-	using ArrayView<T>::index_of;
-	using ArrayView<T>::index_of_fast;
+struct Array: Span<T> {
+	using Span<T>::data;
+	using Span<T>::count;
 
 	s64          capacity  = 0;
 	Allocator    allocator = c_allocator;
 	CodeLocation loc       = caller_loc();
 
-
-	Array& operator=(Array const& other) = default;
-
-	s64 get_allocated_capacity() {
-		return data ? capacity : 0;
-	}
-
-	void make_sure_initted() {
-		if (data) {
-			return;
-		}
-		if (capacity <= 0) {
-			capacity = DEFAULT_DYNAMIC_ARRAY_CAPACITY;
-		}
-		data = Alloc<T>(allocator, capacity, loc);
-	}
-
-	T* reserve_at_index(s64 index, s64 length, CodeLocation loc = caller_loc()) {
-		assert(index >= 0 && index <= count);
-		
-		ensure_capacity(count + length, loc);
-		memmove(data + index + length, data + index, (count - index) * sizeof(T));
-		T* ptr = data + index;
-		count += length;
-		return ptr;
-	}
-
-	T* reserve(CodeLocation loc = caller_loc()) {
-		return reserve_at_index(count, 1, loc);
-	}
-
-	T* add(T item, CodeLocation loc = caller_loc()) {
-		auto item_location = reserve(loc);
-		memcpy(item_location, &item, sizeof(T));
-		return item_location;
-	}
-
-	T* add_at_index(s64 index, T item, CodeLocation loc = caller_loc()) {
-		auto item_location = reserve_at_index(index, 1, loc);
-		memcpy(item_location, &item, sizeof(T));
-		return item_location;
-	}
-
-	bool add_or_replace_at_index(s64 index, T item, CodeLocation loc = caller_loc()) {
-		if (index < count) {
-			data[index] = item;
-			return false;
-		} else {
-			add_at_index(index, item, loc);
-			return true;
-		}
-	}
-
-	void add_at_index(s64 index, T* src, s64 length, CodeLocation loc = caller_loc()) {
-
-		assert(index <= count);
-		T* dst = reserve_at_index(index, length, loc);
-		memcpy(dst, src, length * sizeof(T));
-	}
-
-	void add(T* item, s64 length, CodeLocation loc = caller_loc()) {
-		add_at_index(count, item, length, loc);
-	}
-
-	void add(ArrayView<T> other, CodeLocation loc = caller_loc()) {
-		add(other.data, other.count, loc);
-	}
-
-	template <size_t N>
-	void add(const T (&array)[N], CodeLocation loc = caller_loc()) {
-		add((T*) array, N, loc);
-	}
-
-	void add(std::initializer_list<T> other, CodeLocation loc = caller_loc()) {
-		// (T*) cast is to remove const from other.begin(), so the compiler doesn't bitch.
-		add((T*) other.begin(), other.size(), loc);
-	}
-
-	void add_at_index(s64 index, ArrayView<T> other, CodeLocation loc = caller_loc()) {
-		add_at_index(index, other.data, other.count, loc);
-	}
-
-	void add_sorted(T item, auto key_proc) {
-		auto index = bisect_rightmost(this, item, key_proc);
-		add_at_index(index, item);
-	}
-
-	void add_sorted(T item) {
-		add_sorted(item, [](auto i) { return i; });
-	}
-
-	void remove_fast(T* ptr) {
-		remove_at_index(index_of_fast(ptr));
-	}
-
-	void remove_at_index(s64 index, s64 remove_count) {
-		assert(remove_count <= (count - index));
-		count -= remove_count;
-		memmove(data + index, data + index + remove_count, (count - index) * sizeof(T));
-	}
-
-	void remove_at_index(s64 index) {
-		remove_at_index(index, 1);
-	}
-
-	bool remove(T item) {
-		auto index = index_of(item);
-		if (index != -1) {
-			remove_at_index(index);
-			return true;
-		} else {
-			return false;
-		}
-	}
-
-	bool remove_last() {
-		if (count > 0) {
-			count -= 1;
-			return true;
-		} else {
-			return false;
-		}
-	}
-
-	void clear(CodeLocation loc = caller_loc()) {
-		count = 0;
+	Array copy(Allocator cp_allocator = c_allocator, CodeLocation loc = caller_loc()) {
+		Array result = { .allocator = cp_allocator };
+		add(&result, *this, loc);
+		return result;
 	}
 
 	void free(CodeLocation loc = caller_loc()) {
@@ -156,106 +25,122 @@ struct Array: public ArrayView<T> {
 			count = 0;
 		}
 	}
-
-	T pop_last(CodeLocation loc = caller_loc()) {
-		assert(count > 0);
-		count -= 1;
-		T result = data[count];
-		return result;
-	}
-
-	void ensure_capacity(s64 target_capacity, CodeLocation loc = caller_loc()) {
-		if (data == NULL && target_capacity > capacity) {
-			capacity = target_capacity;
-		}
-
-		make_sure_initted();
-
-		if (target_capacity > capacity) {
-			s64 old_capacity = capacity;
-			assert(old_capacity > 0);
-			capacity = max(old_capacity * 2, target_capacity);
-			data     = (T*) Realloc(allocator, data, old_capacity * sizeof(T), capacity * sizeof(T), loc);
-		}
-	}
-	
-	void shrink_to_capacity(s64 new_capacity, CodeLocation loc = caller_loc()) {
-		if (!data) {
-			return;
-		}
-
-		assert(new_capacity > 0);
-		if (capacity <= new_capacity) {
-			return;
-		}
-		assert(new_capacity >= count);
-		data = Realloc<T>(allocator,data, capacity, new_capacity, loc);
-		capacity = new_capacity;
-	}
-
-	Array<T> copy(Allocator allocator = c_allocator, CodeLocation loc = caller_loc()) {
-		Array<T> copied;
-		copied.allocator = allocator;
-		copied.allocator.capacity = capacity;
-		copied.add(this);
-		copied.loc = loc;
-		return copied;
-	}
 };
 
 template <typename T>
-inline Array<T> make_array(Allocator allocator = c_allocator, s64 capacity = DEFAULT_DYNAMIC_ARRAY_CAPACITY, CodeLocation loc = caller_loc()) {
-	Array<T> result;
-	result.allocator = allocator;
-	result.capacity = capacity;
+T* reserve(Array<T>* arr, s64 length, s64 index = -1, CodeLocation loc = caller_loc()) {
+	if (index < 0) {
+		index += len(*arr) + 1;
+	}
+
+	assert(length >= 0);
+	assert(index >= 0);
+	assert(index <= len(*arr));
+
+	if (length == 0) {
+		// Be canonical about returning address, even though
+		//   we can't actually write to it.
+		return arr->data + index;
+	}
+
+	s64 target_capacity = len(*arr) + length;
+
+	if (!arr->data) {
+		if (target_capacity > arr->capacity) {
+			arr->capacity = target_capacity;
+		}
+		if (arr->capacity <= 0) {
+			arr->capacity = 8;
+		}
+		arr->data = Alloc<T>(arr->allocator, arr->capacity, loc);
+	}
+
+	if (target_capacity > arr->capacity) {
+		s64 old_capacity = arr->capacity;
+		assert(old_capacity > 0);
+		arr->capacity = max_s64(old_capacity * 2, target_capacity);
+		arr->data     = (T*) Realloc(arr->allocator, arr->data, old_capacity * sizeof(T), arr->capacity * sizeof(T), loc);
+	}
+
+	memmove(arr->data + index + length, arr->data + index, (len(*arr) - index) * sizeof(T));
+	arr->count += length;
+	return arr->data + index;
+}
+
+template <typename T>
+T* add(Array<T>* arr, std::type_identity_t<T> item, s64 index = -1, CodeLocation loc = caller_loc()) {
+	T* ptr = reserve(arr, 1, index, loc);
+	*ptr = item;
+	return ptr;
+}
+
+template <typename T>
+T* add(Array<T>* arr, T* src, s64 length, s64 index = -1, CodeLocation loc = caller_loc()) {
+	T* ptr = reserve(arr, length, index, loc);
+	for (auto i: range(length)) {
+		ptr[i] = src[i];
+	}
+	return ptr;
+}
+
+template <typename T>
+T* add(Array<T>* arr, Span<T> src, s64 index = -1, CodeLocation loc = caller_loc()) {
+	return add(arr, src.data, src.count, index, loc);
+}
+
+// add initializer list
+template <typename T>
+T* add(Array<T>* arr, std::initializer_list<T> list, s64 index = -1, CodeLocation loc = caller_loc()) {
+	return add(arr, (T*) list.begin(), list.size(), index, loc);
+}
+
+template <typename T, s64 N>
+T* add(Array<T>* arr, const T (&src)[N], s64 index = -1, CodeLocation loc = caller_loc()) {
+	return add(arr, (T*) src, N, index, loc);	
+}
+
+template <typename T>
+void remove_at_index(Array<T>* arr, s64 index, s64 remove_count = 1) {
+	assert(remove_count <= (len(*arr) - index));
+	arr->count -= remove_count;
+	memmove(arr->data + index, arr->data + index + remove_count, (len(*arr) - index) * sizeof(T));
+}
+
+template <typename T>
+bool remove(Array<T>* arr, T item) {
+	s64 index = index_of(*arr, item);
+	if (index == -1) {
+		return false;
+	}
+	remove_at_index(arr, index);
+	return true;
+}
+
+template <typename T>
+bool remove(Array<T>* arr, Span<T> item) {
+	s64 index = index_of(arr, item);
+	if (index == -1) {
+		return false;
+	}
+	remove_at_index(arr, index, len(item));
+	return true;
+}
+
+template <typename T>
+void clear(Array<T>* arr, CodeLocation loc = caller_loc()) {
+	arr->count = 0;
+}
+
+template <typename T>
+Array<T> copy(Allocator allocator, Span<T> src, CodeLocation loc = caller_loc()) {
+	Array<T> result = { .allocator = allocator };
+	add(&result, src, -1, loc);
 	return result;
 }
 
 template <typename T>
-inline Array<T> make_array(Allocator allocator, ArrayView<T> view, CodeLocation loc = caller_loc()) {
-	auto arr = make_array<T>(allocator, view.count, loc);
-	arr.add(view);
-	return arr;
-}
-
-template <typename T>
-inline Array<T> make_array(ArrayView<T> view, CodeLocation loc = caller_loc()) {
-	return make_array(c_allocator, view, loc);
-}
-
-template <typename T>
-inline Array<T> make_array(Allocator allocator, std::initializer_list<T> list, CodeLocation loc = caller_loc()) {
-	return make_array(allocator, make_array_view(list), loc);
-}
-
-template <typename T>
-inline Array<T> make_array(std::initializer_list<T> list, CodeLocation loc = caller_loc()) {
-	return make_array(c_allocator, list, loc);
-}
-
-template <typename T>
-inline void make_array(Array<T>* array, Allocator allocator = c_allocator, s64 capacity = DEFAULT_DYNAMIC_ARRAY_CAPACITY, CodeLocation loc = caller_loc()) {
-	*array = make_array<T>(allocator, capacity, loc); 
-}
-
-template <typename T>
-ArrayType* reflect_type(Array<T>* x, ArrayType* type) {
-	type->inner = reflect_type_of<T>();
-	type->name = heap_sprintf("Array<%s>", type->inner->name);
-	type->get_count = [](void* arr) {
-		auto casted = (Array<int>*) arr;
-		return casted->count;
-	};
-	type->get_capacity = [](void* arr) {
-		auto casted = (Array<int>*) arr;
-		return casted->capacity;
-	};
-	type->get_item = [](void* arr, s64 index) {
-		auto casted = (Array<int>*) arr;
-		void* item = ptr_add(casted->data, sizeof(T) * index);
-		return item;
-	};
-	return type;
+Array<T> copy(Span<T> src, CodeLocation loc = caller_loc()) {
+	return copy(c_allocator, src, loc);
 }
 
 template <typename T>
@@ -270,4 +155,30 @@ Array<T> to_array(Allocator allocator, Generator<T>&& generator) {
 template <typename T>
 Array<T> to_array(Generator<T>&& generator) {
 	return to_array(c_allocator, std::move(generator));
+}
+
+
+struct ArrayType: SpanType {
+	s64 (*get_capacity)(void* arr);
+};
+
+template <typename T>
+ArrayType* reflect_type(Array<T>* x, ArrayType* type) {
+	type->inner = reflect_type_of<T>();
+	type->name = heap_sprintf("Array<%s>", type->inner->name);
+	type->subkind = "array";
+	type->get_count = [](void* arr) {
+		auto casted = (Array<int>*) arr;
+		return casted->count;
+	};
+	type->get_capacity = [](void* arr) {
+		auto casted = (Array<int>*) arr;
+		return casted->capacity;
+	};
+	type->get_item = [](void* arr, s64 index) {
+		auto casted = (Array<int>*) arr;
+		void* item = ptr_add(casted->data, sizeof(T) * index);
+		return item;
+	};
+	return type;
 }

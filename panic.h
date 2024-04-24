@@ -44,7 +44,7 @@ inline void panic(const char* file_name, int line_number, auto... args) {
 	PANIC_LOCK.lock();
 	auto message = sprint_unicode(panic_allocator, args...);
 	String utf8 = encode_utf8(panic_allocator, message);
-	fwrite(utf8.data, utf8.length, 1, stderr);
+	fwrite(utf8.data, len(utf8), 1, stderr);
 	fwrite("\n", 1, 1, stderr);
 	Debug_Break();
 	exit(-1);

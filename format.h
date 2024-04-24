@@ -1,6 +1,6 @@
 #pragma once
 
-#include "string_conversion.h"
+#include "number_string_conversion.h"
 #include "reflect.h"
 #include "hash_map.h"
 #include "sort.h"
@@ -37,7 +37,7 @@ REFLECTION_REFLECT_HOOK(T) {
 		if (!type_format_procs) {
 			type_format_procs = make<HashMap<Type*, Type_Format_Type_Erased*>>();
 		}
-		type_format_procs->put(reflect_type_of<T>(), proc);
+		put(type_format_procs, reflect_type_of<T>(), proc);
 	}
 }
 
@@ -61,7 +61,7 @@ enum FormatFlags: s64 {
 //  characters out of ASCII range are encoded as utf-8 into the builder.
 struct Formatter {
 	void*                  builder;
-	bool                   is_unicode_builder = false;
+	bool                   is_unicode_formatter = false;
 	FormatFlags            flags = FORMAT_DEFAULT;
 	String                 indent_text = "\t"_b;
 	s64                    indentation = 0;
@@ -76,30 +76,30 @@ struct Formatter {
 	}
 
 	void append(UnicodeString str) {
-		if (is_unicode_builder) {
-			((UnicodeStringBuilder*) builder)->append(str);
+		if (is_unicode_formatter) {
+			add((Array<char32_t>*) builder, str);
 		} else {
 			s64 length = utf8_length(str);
-			auto b = (StringBuilder<>*) builder;
-			auto ptr = b->reserve(length);
+			auto b = (Array<char>*) builder;
+			auto ptr = reserve(b, length);
 			encode_utf8(str, ptr);
 		}
 	}
 
 	void append(String str) {
-		if (is_unicode_builder) {
-			((UnicodeStringBuilder*) builder)->append(str);
+		if (is_unicode_formatter) {
+			add((Array<char32_t>*) builder, str);
 		} else {
-			((StringBuilder<>*) builder)->append(str);
+			add((Array<char>*) builder, str);
 		}
 	}
 
 	s64 builder_cursor() {
 		s64 length;
-		if (is_unicode_builder) {
-			length = len(*(UnicodeStringBuilder*) builder);
+		if (is_unicode_formatter) {
+			length = len(*(Array<char32_t>*) builder);
 		} else {
-			length = len(*(StringBuilder<>*) builder);
+			length = len(*(Array<char>*) builder);
 		}
 		return length - builder_start;
 	}
@@ -110,10 +110,10 @@ struct Formatter {
 };
 
 template <StringChar T>
-Formatter make_formatter(StringBuilder<T>* b, Allocator allocator) {
+Formatter make_formatter(Array<T>* b, Allocator allocator) {
 	Formatter result;
 	result.builder = b;
-	result.is_unicode_builder = std::is_same_v<T, char32_t>;
+	result.is_unicode_formatter = std::is_same_v<T, char32_t>;
 	result.cyclic_pointer_tracker.allocator = allocator;
 	result.builder_start = len(*b);
 	return result;
@@ -125,14 +125,14 @@ void formatter_indent(Formatter* formatter) {
 	}
 }
 
-template <typename T>
-void formatter_append_indented(Formatter* formatter, BaseString<T> str) {
+template <StringChar T>
+void formatter_append_indented(Formatter* formatter, Span<T> str) {
 	s64 index = 0;
 	for (auto line: iterate_lines(str)) {
 		if (index > 0) {
 			formatter->line_start = formatter->builder_cursor();
 		}
-		if (line.length > 0 && formatter->builder_cursor() == formatter->line_start) {
+		if (len(line) > 0 && formatter->builder_cursor() == formatter->line_start) {
 			formatter_indent(formatter);
 		}
 		formatter->append(line);
@@ -178,11 +178,11 @@ struct FormatFlag {
 	bool   unset = false;
 };
 
-template <typename Char>
+template <StringChar Char>
 void format_parser(
-	BaseString<Char> fmt,
-	ArrayView<String> short_specs,
-	ArrayView<FormatFlag> format_flags,
+	Span<Char> fmt,
+	Span<String> short_specs,
+	Span<FormatFlag> format_flags,
 	auto* flags,
 	auto insert_char,
 	auto insert_arg
@@ -190,15 +190,15 @@ void format_parser(
 	
 	constexpr char escapable[] = { '%', '[', '(' };
 
-	sort(format_flags, lambda(len(format_flags[$1]->text) < len(format_flags[$2]->text)));
+	sort(format_flags, lambda(len(format_flags[$1].text) < len(format_flags[$2].text))); 
 	reverse(format_flags);
 
 	u32 arg_index = 0;
-	for (s64 i = 0; i < fmt.length; i++) {
+	for (s64 i = 0; i < len(fmt); i++) {
 		auto c = fmt[i];
 		if (c == '\\') {
 			for (auto e: range(static_array_count(escapable))) {
-				if (fmt.length > i + 1 && fmt[i + 1] == escapable[e]) {
+				if (len(fmt) > i + 1 && fmt[i + 1] == escapable[e]) {
 					insert_char(escapable[e]);
 					i += 1;
 					continue;
@@ -208,26 +208,26 @@ void format_parser(
 			decltype(fmt) format_spec;
 
 			for (auto it: short_specs) {
-				if (starts_with(slice(fmt, i + 1), it)) {
-					format_spec = slice(fmt, i + 1, it.length);
-					i += it.length;
+				if (starts_with(fmt[i + 1, len(fmt)], it)) {
+					format_spec = fmt[i + 1, i + 1 + len(it)];
+					i += len(it);
 					break;
 				}
 			}
 
-			if (starts_with(slice(fmt, i + 1), "["_b)) {
-				auto [idx_str, found] = take_until(slice(fmt, i + 2), lambda($0 == ']'));
+			if (starts_with(fmt[i + 1, len(fmt)], "["_b)) {
+				auto [idx_str, found] = take_until(fmt[i + 2, len(fmt)], lambda($0 == ']'));
 				if (found) {
 					s64 new_idx;
 					if (parse_integer(idx_str, &new_idx)) {
 						arg_index = new_idx;
-						i += idx_str.length + 2;
+						i += len(idx_str) + 2; 
 					}
 				}
 			}
 
 			while (true) {
-				auto start = slice(fmt, i + 1);
+				auto start = fmt[i + 1, len(fmt)];
 				for (auto it: format_flags) {
 					if (starts_with(start, it.text)) {
 						if (it.unset) {
@@ -235,7 +235,7 @@ void format_parser(
 						} else {
 							*flags |= it.flag;
 						}
-						i += it.text.length;
+						i += len(it.text);
 						goto next;
 					}
 				}
@@ -244,10 +244,10 @@ void format_parser(
 				continue;
 			}
 
-			if (format_spec.length == 0 && starts_with(slice(fmt, i + 1), "("_b)) {
+			if (len(format_spec) == 0 && starts_with(fmt[i + 1, {}], "("_b)) {
 				s64 open_counter = 1;
 				s64 closing_index = -1;
-				for (auto j: range_from_to(i + 2, fmt.length)) {
+				for (auto j: range_from_to(i + 2, len(fmt))) {
 					if (fmt[j] == '(') {
 						open_counter += 1;
 					}
@@ -261,7 +261,7 @@ void format_parser(
 				}
 
 				if (closing_index != -1) {
-					auto str = slice(fmt, i + 2, closing_index - i - 2);
+					auto str = fmt[i + 2, closing_index - 1]; 
 					format_spec = str;
 					i = closing_index;
 				}
@@ -285,7 +285,7 @@ Tuple<String, bool> formatter_resolve_spec(Formatter* formatter, String spec) {
 }
 
 template <StringChar T, typename... Args>
-void format(Formatter* formatter, BaseString<T> format_str, Args... args) {
+void format(Formatter* formatter, Span<T> format_str, Args... args) {
 
 	Any things[] = { make_any(&args)... };
 
@@ -312,8 +312,8 @@ void format(Formatter* formatter, BaseString<T> format_str, Args... args) {
 		},
 	};
 
-	auto specs_view = make_array_view(short_specs);
-	auto flags_view = make_array_view(flags);
+	auto specs_view = make_span(short_specs);
+	auto flags_view = make_span(flags);
 
 	auto insert_char = [&] (auto c) {
 		formatter_append_indented(formatter, make_string(&c, 1));
@@ -324,7 +324,7 @@ void format(Formatter* formatter, BaseString<T> format_str, Args... args) {
 			auto [resolved_spec, have_to_free] = formatter_resolve_spec(formatter, spec);
 			format_item(formatter, things[idx], resolved_spec);
 			if (have_to_free) {
-				resolved_spec.free();
+				Free(resolved_spec.data);
 			}
 		}
 	};
@@ -559,7 +559,68 @@ void format_struct(Formatter* formatter, StructType* type, void* thing) {
 	printer.tail();
 }
 
-void format_array(Formatter* formatter, ArrayType* type, void* thing) {
+template <typename T>
+void format_c_string(Formatter* formatter, T* c_str, String spec) {
+	if (c_str == NULL) {
+		format(formatter, "NULL");
+		return;
+	}
+
+	bool quote = contains(spec, "quote"_b) || formatter->quote_inner_string;
+	formatter->quote_inner_string = false;
+	if (quote) {
+		format(formatter, "\"");
+	}
+
+	char32_t buf[128];
+
+	s64 length = 0;
+	s64 start  = 0;
+	while (true) {
+		if ((length - start) == static_array_count(buf)) {
+			format(formatter, make_string(buf, length - start));
+			start = length;
+		}
+		if (length >= 4096 || c_str[length] == '\0') {
+			format(formatter, make_string(buf, length - start));
+			break;
+		}
+		buf[length - start] = c_str[length];
+		length += 1;
+	}
+
+	if (quote) {
+		format(formatter, "\"");
+	}
+}
+
+void format_string(Formatter* formatter, SpanType* type, void* thing, String spec) {
+	bool quote = contains(spec, "quote"_b) || formatter->quote_inner_string;
+	formatter->quote_inner_string = false;
+	if (quote) {
+		format(formatter, "\"");
+	}
+
+	if (type->inner == reflect_type_of<char>()) {
+		format(formatter, *(String*) thing);
+	} else if (type->inner == reflect_type_of<char32_t>()) {
+		format(formatter, *(UnicodeString*) thing);
+	} else {
+		assert(false);
+	}
+
+	if (quote) {
+		format(formatter, "\"");
+	}
+}
+
+void format_span(Formatter* formatter, SpanType* type, void* thing, String spec) {
+	if (type->inner == reflect_type_of<char>() ||
+		type->inner == reflect_type_of<char32_t>()) {
+		format_string(formatter, type, thing, spec);
+		return;
+	}
+
 	auto printer = make_array_printer(formatter);
 	printer.head(make_string(type->name));
 	for (auto i: range(type->get_count(thing))) {
@@ -685,26 +746,6 @@ void format_primitive(Formatter* formatter, PrimitiveType* type, void* thing, St
 	}
 }
 
-void format_string(Formatter* formatter, StringType* type, void* thing, String spec) {
-	bool quote = contains(spec, "quote"_b) || formatter->quote_inner_string;
-	formatter->quote_inner_string = false;
-	if (quote) {
-		format(formatter, "\"");
-	}
-
-	if (type->string_kind == StringKind::Ascii) {
-		format(formatter, *(String*) thing);
-	} else if (type->string_kind == StringKind::Utf32) {
-		format(formatter, *(UnicodeString*) thing);
-	} else {
-		assert(false);
-	}
-
-	if (quote) {
-		format(formatter, "\"");
-	}
-}
-
 bool is_flag_set(void* dst, void* src, u64 size) {
 	for (auto i: range(size)) {
 		u8 dst_v = *(u8*) dst;
@@ -746,42 +787,6 @@ void format_enum(Formatter* formatter, EnumType* type, void* thing) {
 	format(formatter, "%(%)", type->name, make_any(type->base_type, thing));
 }
 
-template <typename T>
-void format_c_string(Formatter* formatter, T* c_str, String spec) {
-	if (c_str == NULL) {
-		format(formatter, "NULL");
-		return;
-	}
-
-	bool quote = contains(spec, "quote"_b) || formatter->quote_inner_string;
-	formatter->quote_inner_string = false;
-	if (quote) {
-		format(formatter, "\"");
-	}
-
-	char32_t buf[128];
-
-	s64 length = 0;
-	s64 start  = 0;
-	while (true) {
-		if ((length - start) == static_array_count(buf)) {
-			format(formatter, make_string(buf, length - start));
-			start = length;
-		}
-		if (length >= 4096 || c_str[length] == '\0') {
-			format(formatter, make_string(buf, length - start));
-			break;
-		}
-		buf[length - start] = c_str[length];
-		length += 1;
-	}
-
-	if (quote) {
-		format(formatter, "\"");
-	}
-}
-
-
 void format_pointer(Formatter* formatter, PointerType* type, void* thing, String spec) {
 	s32  indir_level;
 	auto inner_type = reflect_get_pointer_inner_type_with_indirection_level(type, &indir_level);
@@ -799,15 +804,15 @@ void format_pointer(Formatter* formatter, PointerType* type, void* thing, String
 	void* ptr_value = *(void**) thing;
 
 	if (formatter->flags & FORMAT_DEREFERENCE) {
-		did_deref_before = formatter->cyclic_pointer_tracker.contains(ptr_value);
+		did_deref_before = contains(formatter->cyclic_pointer_tracker, ptr_value);
 		if (!did_deref_before) {
-			formatter->cyclic_pointer_tracker.add(ptr_value);
+			add(&formatter->cyclic_pointer_tracker, ptr_value);
 			did_add_to_cycle_tracker = true;
 		}
 	}
 	defer { 
 		if (did_add_to_cycle_tracker) {
-			formatter->cyclic_pointer_tracker.remove(ptr_value);
+			remove(&formatter->cyclic_pointer_tracker, ptr_value); 
 		}
 	};
 
@@ -875,7 +880,7 @@ void format_function(Formatter* formatter, FunctionType* type, void* thing, Stri
 void format_item(Formatter* formatter, Type* type, void* thing, String spec) {
 
 	if (type_format_procs) {
-		if (auto* fmt_proc = type_format_procs->get(type)) {
+		if (auto* fmt_proc = get(type_format_procs, type)) {
 			(*fmt_proc)(formatter, thing, spec);
 			return;
 		}
@@ -905,22 +910,15 @@ void format_item(Formatter* formatter, Type* type, void* thing, String spec) {
 		}
 		break;
 
-		case StringType::KIND: {
-			auto casted = (StringType*) real_type;
-			formatter->quote_inner_string = saved_quote_string;
-			format_string(formatter, casted, thing, spec);
-		}
-		break;
-
 		case EnumType::KIND: {
 			auto casted = (EnumType*) real_type;
 			format_enum(formatter, casted, thing);
 		}
 		break;
 
-		case ArrayType::KIND: {
+		case SpanType::KIND: {
 			auto casted = (ArrayType*) real_type;
-			format_array(formatter, casted, thing);
+			format_span(formatter, casted, thing, spec);
 		}
 		break;
 
@@ -956,14 +954,14 @@ void format_item(Formatter* formatter, Type* type, void* thing, String spec) {
 }
 
 template <StringChar T>
-void format(StringBuilder<T>* builder, Allocator allocator, auto... args) {
+void format(Array<T>* builder, Allocator allocator, auto... args) {
 	auto formatter = make_formatter(builder, allocator);
 	format(&formatter, args...);
 	formatter.free();
 }
 
 template <StringChar T>
-void format(StringBuilder<T>* builder, auto... args) {
+void format(Array<T>* builder, auto... args) {
 	format(builder, c_allocator, args...);
 }
 
@@ -973,31 +971,31 @@ void formatln(Formatter* formatter, auto... args) {
 }
 
 template <StringChar T>
-void formatln(StringBuilder<T>* builder, Allocator allocator, auto... args) {
+void formatln(Array<T>* builder, Allocator allocator, auto... args) {
 	format(builder, allocator, args...);
 	format(builder, allocator, "\n");
 }
 
 template <StringChar T>
-void formatln(StringBuilder<T>* builder, auto... args) {
+void formatln(Array<T>* builder, auto... args) {
 	formatln(builder, c_allocator, args...);
 }
 
 void print_to_stdout(String text) {
-	fwrite(text.data, text.length, 1, stdout);
+	fwrite(text.data, len(text), 1, stdout);
 }
 
 void print_to_stdout(UnicodeString text) {
 	auto utf8 = encode_utf8(text);
 	print_to_stdout(utf8);
-	utf8.free();
+	Free(utf8.data);
 }
 
 void print(auto... args) {
-	auto builder = build_unicode_string();
+	Array<char32_t> builder;
+	defer { builder.free(); };
 	format(&builder, c_allocator, args...);
-	auto text = builder.get_string();
-	print_to_stdout(text);
+	print_to_stdout(builder);
 }
 
 void println(auto... args) {
@@ -1006,14 +1004,14 @@ void println(auto... args) {
 }
 
 template <StringChar T = char>
-BaseString<T> sprint(Allocator allocator, auto... args) {
-	auto builder = build_string<T>();
+Array<T> sprint(Allocator allocator, auto... args) {
+	Array<T> builder = { .allocator = allocator };
 	format(&builder, allocator, args...);
-	return builder.get_string();
+	return builder;
 }
 
 template <StringChar T = char>
-BaseString<T> sprint(auto... args) {
+Array<T> sprint(auto... args) {
 	return sprint(c_allocator, args...);
 }
 

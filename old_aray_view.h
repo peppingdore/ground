@@ -37,6 +37,7 @@ struct ArrayView {
 	void slice(s64 slice_start) {
 		slice(slice_start, count - slice_start);
 	}
+	
 	decltype(auto) sliced(s64 start) {
 		auto copy = *this;
 		copy.slice(start);
@@ -47,13 +48,6 @@ struct ArrayView {
 		assert(index >= 0 && index < count);
 		return data + index;
 	}
-
-
-	T* first() const {
-		assert(count > 0);
-		return data;
-	} 
-
 
 	T* last() const {
 		assert(count > 0);

@@ -29,7 +29,7 @@ struct Logger {
 };
 
 void default_logger_proc(Logger* logger, LogInfo info, UnicodeString text) {
-	auto unicode_path = make_string(info.loc.file).copy_unicode_string();
+	auto unicode_path = copy_unicode_string(make_string(info.loc.file));
 	auto base = path_basename(unicode_path);
 	auto formatted = sprint("%:% %", base, info.loc.line, text);
 	print(formatted);

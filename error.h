@@ -2,16 +2,16 @@
 
 #include "string.h"
 #include "code_location.h"
-#include "string_conversion.h"
+#include "number_string_conversion.h"
 #include "code_location.h"
 #include "format.h"
 
 struct Error {
-	String        text;
-	Type*         type;
-	CodeLocation  loc;
-	void         (*on_free)(Error*) = NULL;
-	Error*        prev = NULL;
+	AllocatedString text;
+	Type*           type;
+	CodeLocation    loc;
+	void          (*on_free)(Error*) = NULL;
+	Error*          prev = NULL;
 
 	void free() {
 		if (prev) {
@@ -59,7 +59,7 @@ REFLECT(Error) {
 }
 
 template <typename T = Error>
-T* make_error(String text, CodeLocation loc = caller_loc()) {
+T* make_error(AllocatedString text, CodeLocation loc = caller_loc()) {
 	auto e = make<T>();
 	e->text = text;
 	e->type = reflect_type_of<T>();
@@ -69,12 +69,12 @@ T* make_error(String text, CodeLocation loc = caller_loc()) {
 
 template <typename T = Error>
 T* make_error(const char* str, CodeLocation loc = caller_loc()) {
-	return make_error<T>(make_string(str).copy(), loc);
+	return make_error<T>(copy(make_string(str)), loc); 
 }
 
 template <typename T = Error>
 T* format_error(CodeLocation loc, auto... args) {
-	String str = sprint<char>(c_allocator, args...);
+	AllocatedString str = sprint<char>(c_allocator, args...);
 	return make_error<T>(str, loc);
 }
 

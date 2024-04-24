@@ -1,7 +1,7 @@
 #pragma once
 
 #include "base.h"
-#include "array_view.h"
+#include "span.h"
 #include "range.h"
 
 void quick_sort(auto arr, s64 start, s64 end, auto less, auto swap) {
@@ -31,9 +31,9 @@ void sort(auto arr, auto less, auto swap) {
 
 void sort(auto arr, auto less) {
 	auto swap = [&](auto _, s64 a, s64 b) {
-		auto temp = *arr[a];
-		*arr[a] = *arr[b];
-		*arr[b] = temp;
+		auto temp = arr[a];
+		arr[a] = arr[b];
+		arr[b] = temp;
 	};
 	sort(arr, less, swap);
 }

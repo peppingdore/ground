@@ -178,14 +178,13 @@ struct StructType: Type {
 	const char*                subkind = "";
 };
 
-struct ArrayType: Type {
-	constexpr static auto KIND = make_type_kind("array");
+struct SpanType: Type {
+	constexpr static auto KIND = make_type_kind("span");
 
 	Type*       inner = NULL;
 	const char* subkind = "";
 
 	s64   (*get_count)   (void* arr) = NULL;
-	s64   (*get_capacity)(void* arr) = NULL;
 	void* (*get_item)    (void* arr, s64 index) = NULL;
 };
 
@@ -202,11 +201,12 @@ struct MapType: Type {
 	};
 
 	s64              (*get_count)    (void* map) = NULL;
+	// @TODO: move get_capacity to more specific type.?
 	s64              (*get_capacity) (void* map) = NULL;
 	Generator<Item*> (*iterate)      (void* map) = NULL;
 };
 
-struct FixedArrayType: ArrayType {
+struct FixedArrayType: SpanType {
 	s64 array_size = 0;
 };
 
@@ -471,9 +471,6 @@ FixedArrayType* reflect_type(T (*arr)[N], FixedArrayType* type) {
 	type->get_count = +[](void* arr) {
 		return N;
 	};
-	type->get_capacity = +[](void* arr) {
-		return N;
-	};
 	type->get_item = +[](void* arr, s64 index) -> void* {
 		return ptr_add(arr, sizeof(T) * index);
 	};
@@ -713,8 +710,12 @@ REFLECT(Type) {
 	MEMBER(id);
 }
 
+struct ReflectArrayType: SpanType {
+	s64 (*get_capacity)(void* arr);
+};
+
 template <typename T>
-ArrayType* reflect_type(ReflectArray<T>* x, ArrayType* type) {
+ReflectArrayType* reflect_type(ReflectArray<T>* x, ReflectArrayType* type) {
 	type->inner = reflect_type_of<T>();
 	type->subkind = "reflect_array";
 	type->name = heap_sprintf("ReflectArray<%s>", type->inner->name);

@@ -1,8 +1,8 @@
 #pragma once
 
 #include "coroutine.h"
-#include "string_builder.h"
 #include "function.h"
+#include "string.h"
 
 bool is_path_sep(char32_t c) {
 	#if OS_WINDOWS
@@ -28,7 +28,7 @@ UnicodeString path_stem(UnicodeString path) {
 		prev = last;
 		last = it;
 	}
-	return last.length > 0 ? prev : last;
+	return len(last) > 0 ? prev : last;
 }
 
 UnicodeString path_ext(UnicodeString path) {
@@ -42,8 +42,8 @@ UnicodeString path_ext(UnicodeString path) {
 	return index >= 2 ? last : UnicodeString{};
 }
 
-UnicodeString path_join(Allocator allocator, auto... args) {
-	auto result = build_unicode_string(allocator);
+AllocatedUnicodeString path_join(Allocator allocator, auto... args) {
+	Array<char32_t> result = { .allocator = allocator };
 	auto pieces = { make_string(args)... };
 	for (auto idx: range(pieces.size())) {
 		auto it = *pieces[idx];
@@ -54,11 +54,11 @@ UnicodeString path_join(Allocator allocator, auto... args) {
 			if (it.length > 0 && is_path_sep(it[it.length - 1])) {
 				it = slice(it, 0, it.length - 1);
 			}
-			result.append('/');
+			add(&result, '/');
 		}
-		result.append(it);
+		add(&result, it);
 	}
-	return result.get_string();
+	return result;
 }
 
 Generator<UnicodeString> path_segments(UnicodeString path) {
@@ -70,5 +70,5 @@ UnicodeString path_parent(UnicodeString path) {
 	for (auto it: path_segments(path)) {
 		last = it;
 	}
-	return slice(path, 0, path.length - last.length);
+	return path[0, len(path) - len(last)];
 }
