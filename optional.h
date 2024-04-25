@@ -1,7 +1,6 @@
 #pragma once
 
 #include "reflect.h"
-#include "string_def.h"
 
 template <typename T>
 struct Optional {
@@ -60,7 +59,7 @@ struct OptionalType: Type {
 
 template <typename T>
 OptionalType* reflect_type(Optional<T>* x, OptionalType* type) {
-	type->name = heap_sprintf("Optional<%s>", type->inner->name);
 	type->inner = reflect_type_of<T>();
+	type->name = heap_sprintf("Optional<%s>", type->inner->name);
 	return type;
 }
