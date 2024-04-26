@@ -7,6 +7,7 @@ struct OneDimRegion {
 	s64 length;
 };
 
+// Regions must not have spaces between them!
 void one_dim_patch(s64 regions_count, auto get_region, auto resize, auto insert, auto remove, s64 insert_start, s64 insert_length) {
 	if (insert_length < 0) {
 		return;
