@@ -1,100 +1,99 @@
 #pragma once
 
 #include "c_like_parser.h"
-#include "../string_builder.h"
 
-void print_ast_node(UnicodeStringBuilder* sb, AstNode* ast_node);
+void print_ast_node(AllocatedUnicodeString* sb, AstNode* ast_node);
 
-void print_c_program(UnicodeStringBuilder* sb, CLikeProgram* program) {
+void print_c_program(AllocatedUnicodeString* sb, CLikeProgram* program) {
 	for (auto it: program->globals) {
 		print_ast_node(sb, it);
 	}
 }
 
-void print_expr(UnicodeStringBuilder* sb, AstNode* expr) {
+void print_expr(AllocatedUnicodeString* sb, AstNode* expr) {
 	if (auto binary_op = reflect_cast<CBinaryExpr>(expr)) {
-		sb->append("(");
+		add(sb, "(");
 		print_expr(sb, binary_op->lhs);
-		sb->append(" ");
-		sb->append(binary_op->op);
-		sb->append(" ");
+		add(sb, " ");
+		add(sb, binary_op->op);
+		add(sb, " ");
 		print_expr(sb, binary_op->rhs);
-		sb->append(")");
+		add(sb, ")");
 	} else if (auto unary_op = reflect_cast<CUnaryExpr>(expr)) {
-		sb->append("(");
-		sb->append(unary_op->op);
+		add(sb, "(");
+		add(sb, unary_op->op);
 		print_expr(sb, unary_op->expr);
-		sb->append(")");
+		add(sb, ")");
 	} else if (auto postfix_op = reflect_cast<CPostfixExpr>(expr)) {
-		sb->append("(");
+		add(sb, "(");
 		print_expr(sb, postfix_op->lhs);
-		sb->append(postfix_op->op);
-		sb->append(")");
+		add(sb, postfix_op->op);
+		add(sb, ")");
 	} else if (auto member_access = reflect_cast<AstVarMemberAccess>(expr)) {
 		print_expr(sb, member_access->lhs);
-		sb->append(".");
-		sb->append(member_access->member);
+		add(sb, ".");
+		add(sb, member_access->member);
 	} else if (auto var_decl = reflect_cast<AstVar>(expr)) {
-		sb->append(var_decl->name);
+		add(sb, var_decl->name);
 	} else if (auto literal = reflect_cast<LiteralExpr>(expr)) {
-		sb->append(literal->token);
+		add(sb, literal->tok.str);
 	} else if (auto ternary = reflect_cast<AstTernary>(expr)) {
-		sb->append("(");
+		add(sb, "(");
 		print_expr(sb, ternary->cond);
-		sb->append(" ? ");
+		add(sb, " ? ");
 		print_expr(sb, ternary->then);
-		sb->append(" : ");
+		add(sb, " : ");
 		print_expr(sb, ternary->else_);
-		sb->append(")");
+		add(sb, ")");
 	} else if (auto call = reflect_cast<AstFunctionCall>(expr)) {
-		sb->append(reflect_cast<AstSymbol>(call->f)->name);
-		sb->append("(");
+		add(sb, reflect_cast<AstSymbol>(call->f)->name);
+		add(sb, "(");
 		for (auto it: call->args) {
 			print_expr(sb, it);
-			if (it != *call->args.last()) {
-				sb->append(", ");
+			if (it != call->args[-1]) {
+				add(sb, ", ");
 			}
 		}
-		sb->append(")");
+		add(sb, ")");
 	} else {
-		sb->append("Unknown expr: ");
-		sb->append(expr->type->name);
+		add(sb, "Unknown expr: ");
+		add(sb, expr->type->name);
 	}
 }
 
-void print_block(UnicodeStringBuilder* sb, AstBlock* block);
+void print_block(AllocatedUnicodeString* sb, AstBlock* block);
 
-void print_for(UnicodeStringBuilder* sb, AstFor* for_stmt) {
-	sb->append("for (");
+void print_for(AllocatedUnicodeString* sb, AstFor* for_stmt) {
+	add(sb, "for (");
 	print_expr(sb, for_stmt->init_expr);
-	sb->append(";");
+	add(sb, ";");
 	print_expr(sb, for_stmt->cond_expr);
-	sb->append(";");
+	add(sb, ";");
 	print_expr(sb, for_stmt->incr_expr);
-	sb->append(")");
+	add(sb, ")");
 	print_block(sb, reflect_cast<AstBlock>(for_stmt->body));
 }
 
-void print_var_decl_group(UnicodeStringBuilder* sb, AstVarDeclGroup* group) {
+void print_var_decl_group(AllocatedUnicodeString* sb, AstVarDeclGroup* group) {
 	assert(len(group->var_decls) > 0); 
-	auto first = *group->var_decls[0];
-	sb->append(first->var_type->name);
-	sb->append(" ");
+	auto first = group->var_decls[0];
+	add(sb, first->var_type->name);
+	add(sb, " ");
 	for (auto i: range(len(group->var_decls))) {
-		auto var_decl = *group->var_decls[i];
-		sb->append(var_decl->name);
+		auto var_decl = group->var_decls[i];
+		add(sb, var_decl->name);
 		if (i < len(group->var_decls) - 1) {
-			sb->append(", ");
+			add(sb, ", ");
 		}
 	}
 	if (first->init) {
-		sb->append(" = ");
+		add(sb, " = ");
 		print_expr(sb, first->init);
 	}
-	sb->append(";\n");
+	add(sb, ";\n");
 }
 
-void print_stmt(UnicodeStringBuilder* sb, AstNode* stmt) {
+void print_stmt(AllocatedUnicodeString* sb, AstNode* stmt) {
 	if (auto _for = reflect_cast<AstFor>(stmt)) {
 		return print_for(sb, _for);
 	} else if (auto var_decl_group = reflect_cast<AstVarDeclGroup>(stmt)) {
@@ -102,43 +101,43 @@ void print_stmt(UnicodeStringBuilder* sb, AstNode* stmt) {
 	} else if (auto expr = reflect_cast<AstExpr>(stmt)) {
 		return print_expr(sb, expr);
 	} else {
-		sb->append("Unknown stmt type: ");
-		sb->append(stmt->type->name);
+		add(sb, "Unknown stmt type: ");
+		add(sb, stmt->type->name);
 	}
 }
 
-void print_block(UnicodeStringBuilder* sb, AstBlock* block) {
-	sb->append("{\n");
+void print_block(AllocatedUnicodeString* sb, AstBlock* block) {
+	add(sb, "{\n");
 	for (auto it: block->statements) {
 		print_stmt(sb, it);
-		sb->append("\n");
+		add(sb, "\n");
 	}
-	sb->append("}");
+	add(sb, "}");
 }
 
-void print_function(UnicodeStringBuilder* sb, AstFunction* function) {
-	sb->append(function->return_type->name);
-	sb->append(" ");
-	sb->append(function->name);
-	sb->append("(");
+void print_function(AllocatedUnicodeString* sb, AstFunction* function) {
+	add(sb, function->return_type->name);
+	add(sb, " ");
+	add(sb, function->name);
+	add(sb, "(");
 	for (auto i: range(len(function->args))) {
-		auto arg = *function->args[i];
-		sb->append(arg->arg_type->name);
-		sb->append(" ");
-		sb->append(arg->name);
+		auto arg = function->args[i];
+		add(sb, arg->arg_type->name);
+		add(sb, " ");
+		add(sb, arg->name);
 		if (i < len(function->args) - 1) {
-			sb->append(", ");
+			add(sb, ", ");
 		}
 	}
-	sb->append(")");
+	add(sb, ")");
 	if (function->block) {
 		print_block(sb, function->block);
 	} else {
-		sb->append(";\n");
+		add(sb, ";\n");
 	}
 }
 
-void print_ast_node(UnicodeStringBuilder* sb, AstNode* ast_node) {
+void print_ast_node(AllocatedUnicodeString* sb, AstNode* ast_node) {
 	if (auto program = reflect_cast<CLikeProgram>(ast_node)) {
 		return print_c_program(sb, program);
 	} else if (auto decl = reflect_cast<AstVarDeclGroup>(ast_node)) {
@@ -146,14 +145,14 @@ void print_ast_node(UnicodeStringBuilder* sb, AstNode* ast_node) {
 	} else if (auto function = reflect_cast<AstFunction>(ast_node)) {
 		return print_function(sb, function);
 	} else {
-		sb->append("Unknown node type: ");
-		sb->append(ast_node->type->name);
-		sb->append("\n");
+		add(sb, "Unknown node type: ");
+		add(sb, ast_node->type->name);
+		add(sb, "\n");
 	}
 }
 
-UnicodeString print_ast_node(AstNode* ast_node) {
-	auto sb = build_unicode_string();
+AllocatedUnicodeString print_ast_node(AstNode* ast_node) {
+	AllocatedUnicodeString sb;
 	print_ast_node(&sb, ast_node);
-	return sb.get_string();
+	return sb;
 }
