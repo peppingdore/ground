@@ -1220,6 +1220,9 @@ Tuple<AstExpr*, Error*> try_parse_swizzle_expr(CLikeParser* p, AstExpr* lhs, Tok
 		}
 
 		ProgramTextRegion text_region = { ident.reg.start, peek(p).reg.start };
+		if (lhs->text_region.has_value) {
+			text_region.start = lhs->text_region.value.start;
+		}
 
 		if (swizzle_len == 1) {
 			auto expr = make_ast_expr<AstArrayAccess>(p->allocator, swizzle_type, AST_EXPR_LVALUE, text_region);
@@ -1634,7 +1637,7 @@ Tuple<AstExpr*, Error*> parse_expr(CLikeParser* p, s32 min_prec) {
 				if (rhs->text_region.has_value) {
 					add(&tokens, CParserErrorToken{
 						.reg = rhs->text_region.value,
-						.color = CPARSER_ERROR_TOKEN_COLOR_REGULAR_RED,
+						.color = CPARSER_ERROR_TOKEN_COLOR_REGULAR_BLUE,
 					});
 				}
 				add_site(p, e, tokens);
