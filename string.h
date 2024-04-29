@@ -159,7 +159,7 @@ bool ends_with(Span<T> str, Span<U> end) {
 	return str[-len(end), len(end)] == end;
 }
 
-bool ascii_to_lower(char32_t c) {
+char32_t ascii_to_lower(char32_t c) {
 	return (c >= 'A' && c <= 'Z') ? c + ('a' - 'A') : c;
 }
 
