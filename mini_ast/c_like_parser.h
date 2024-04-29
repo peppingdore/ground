@@ -117,7 +117,7 @@ struct AstOperator {
 	s32           flags = 0;
 };
 
-constexpr AstOperator AST_BINARY_OPERATORS_UNSORTED[] = { 
+AstOperator AST_BINARY_OPERATORS_UNSORTED[] = { 
 	{ U","_b, 10, AST_OP_FLAG_LEFT_ASSOC },
 	{ U"="_b, 11, 0 },
 	{ U"|="_b, 11, AST_OP_FLAG_MOD_ASSIGN },
@@ -151,7 +151,7 @@ constexpr AstOperator AST_BINARY_OPERATORS_UNSORTED[] = {
 	{ U"%"_b, 22, AST_OP_FLAG_LEFT_ASSOC | AST_OP_FLAG_INT },
 };
 
-constexpr AstOperator AST_PREFIX_UNARY_OPERATORS_UNSORTED[] = {
+AstOperator AST_PREFIX_UNARY_OPERATORS_UNSORTED[] = {
 	{ U"!"_b, 30 },
 	{ U"~"_b, 30 },
 	{ U"+"_b, 30 },
@@ -162,7 +162,7 @@ constexpr AstOperator AST_PREFIX_UNARY_OPERATORS_UNSORTED[] = {
 	{ U"&"_b, 30 },
 };
 
-constexpr AstOperator AST_POSTFIX_UNARY_OPERATORS_UNSORTED[] = {
+AstOperator AST_POSTFIX_UNARY_OPERATORS_UNSORTED[] = {
 	{ U"++"_b, 40 },
 	{ U"--"_b, 40 },
 };
@@ -179,15 +179,13 @@ struct Token {
 };
 
 struct CLikeParser {
-	Allocator          allocator;
-	CLikeProgram*      program;
-	Array<AstNode*>    scope;
-	UnicodeString      str;
-	s64                cursor = 0;
-	Token              current_token;
-	Array<AstOperator> binary_operators;
-	Array<AstOperator> prefix_unary_operators;
-	Array<AstOperator> postfix_unary_operators;
+	Allocator            allocator;
+	CLikeProgram*        program;
+	Array<AstNode*>      scope;
+	UnicodeString        str;
+	s64                  cursor = 0;
+	Token                current_token;
+	Array<UnicodeString> op_tokens_sorted;
 };
 
 
@@ -421,33 +419,45 @@ CLikeParserError* make_parser_error(CLikeParser* p, CodeLocation loc, auto... ar
 }
 
 struct CParserErrorToken {
-	ProgramTextRegion reg;
-	u64               color = 0;
+	Optional<ProgramTextRegion> reg;
+	u64                         color = 0;
 };
 
 bool sort_parser_error_toks(Span<CParserErrorToken> toks, s64 a, s64 b) {
-	if (toks[a].reg.start < toks[b].reg.start) {
+	assert(toks[a].reg.has_value);
+	assert(toks[b].reg.has_value);
+	if (toks[a].reg.value.start < toks[b].reg.value.start) {
 		return true;
 	}
-	if (toks[a].reg.start == toks[b].reg.start) {
+	if (toks[a].reg.value.start == toks[b].reg.value.start) {
 		// It's actually '>', to make larger token go first in the sorted array,
 		//   which lowers it's priority for highlighting.
-		return toks[a].reg.end > toks[b].reg.end;  
+		return toks[a].reg.value.end > toks[b].reg.value.end;  
 	}
 	return false;
 }
 
 #include "../one_dim_intersect.h"
 
-void add_site(CLikeParser* p, CLikeParserError* error, Span<CParserErrorToken> toks) {
+void add_site(CLikeParser* p, CLikeParserError* error, auto... tok_arglist) {
+	CParserErrorToken toks_list[] = { tok_arglist... }; 
+
+	Array<CParserErrorToken> toks = { .allocator = p->allocator };
+	defer { toks.free(); };
+	for (auto it: toks_list) {
+		if (it.reg.has_value) {
+			add(&toks, it);
+		}
+	}
+
 	if (len(toks) == 0) {
 		return;
 	}
 
 	sort(toks, sort_parser_error_toks);
 
-	s64 toks_start = toks[0].reg.start;
-	s64 toks_end = toks[-1].reg.end;
+	s64 toks_start = toks[0].reg.value.start;
+	s64 toks_end = toks[-1].reg.value.end;
 
 	assert(toks_start >= 0);
 	assert(toks_end <= len(p->str));
@@ -510,7 +520,7 @@ void add_site(CLikeParser* p, CLikeParserError* error, Span<CParserErrorToken> t
 			remove_at_index(&result_highlights, i);
 		};
 
-		one_dim_patch(len(result_highlights), get_region, resize, insert, remove, tok.reg.start, tok.reg.end - tok.reg.start);
+		one_dim_patch(len(result_highlights), get_region, resize, insert, remove, tok.reg.value.start, tok.reg.value.end - tok.reg.value.start);
 	}
 
 	CParserErrorPiece piece = {
@@ -547,12 +557,10 @@ void print_parser_error(CLikeParserError* e) {
 CLikeParserError* simple_parser_error(CLikeParser* p, CodeLocation loc, ProgramTextRegion reg, auto... args) {
 	auto error = make_parser_error(p, loc, args...);
 	if (reg.end > reg.start) {
-		CParserErrorToken token = {
+		add_site(p, error, CParserErrorToken {
 			.reg = reg,
 			.color = CPARSER_ERROR_TOKEN_COLOR_REGULAR_RED,
-		};
-		Span<CParserErrorToken> span = { &token, 1 };  
-		add_site(p, error, span);
+		}); 
 	}
 	return error;
 }
@@ -696,19 +704,9 @@ Token next(CLikeParser* p) {
 				} else {
 					// parse multichar operators.
 					auto txt = p->str[i, {}];
-					for (auto it: p->binary_operators) {
-						if (starts_with(txt, it.op)) {
-							return set_current_token(p, i + len(it.op));
-						}
-					}
-					for (auto it: p->prefix_unary_operators) {
-						if (starts_with(txt, it.op)) {
-							return set_current_token(p, i + len(it.op));
-						}
-					}
-					for (auto it: p->postfix_unary_operators) {
-						if (starts_with(txt, it.op)) {
-							return set_current_token(p, i + len(it.op));
+					for (auto it: p->op_tokens_sorted) {
+						if (starts_with(txt, it)) {
+							return set_current_token(p, i + len(it));
 						}
 					}
 					return set_current_token(p, i + 1);
@@ -875,7 +873,7 @@ struct AstFunctionCall: AstExpr {
 };
 
 AstOperator* find_binary_operator(CLikeParser* p, UnicodeString op) {
-	for (auto& it: p->binary_operators) {
+	for (auto& it: AST_BINARY_OPERATORS_UNSORTED) {
 		if (op == it.op) {
 			return &it;
 		}
@@ -884,7 +882,7 @@ AstOperator* find_binary_operator(CLikeParser* p, UnicodeString op) {
 }
 
 AstOperator* find_prefix_unary_operator(CLikeParser* p, UnicodeString op) {
-	for (auto& it: p->prefix_unary_operators) {
+	for (auto& it: AST_PREFIX_UNARY_OPERATORS_UNSORTED) {
 		if (op == it.op) {
 			return &it;
 		}
@@ -893,7 +891,7 @@ AstOperator* find_prefix_unary_operator(CLikeParser* p, UnicodeString op) {
 }
 
 AstOperator* find_postfix_unary_operator(CLikeParser* p, UnicodeString op) {
-	for (auto& it: p->postfix_unary_operators) {
+	for (auto& it: AST_POSTFIX_UNARY_OPERATORS_UNSORTED) {
 		if (op == it.op) {
 			return &it;
 		}
@@ -914,7 +912,7 @@ Tuple<AstExpr*, Error*> parse_function_call(CLikeParser* p, Token func_token, As
 	while (true) {
 		auto tok = peek(p);
 		if (tok.str == ")"_b) {
-			call->text_region = ProgramTextRegion { func_token.reg.start, peek(p).reg.start };
+			call->text_region = ProgramTextRegion { func_token.reg.start, tok.reg.end };
 			next(p);
 			break;
 		}
@@ -1228,7 +1226,7 @@ Tuple<AstExpr*, Error*> try_parse_swizzle_expr(CLikeParser* p, AstExpr* lhs, Tok
 			auto expr = make_ast_expr<AstArrayAccess>(p->allocator, swizzle_type, AST_EXPR_LVALUE, text_region);
 			expr->lhs = lhs;
 			auto idx = make_ast_expr<LiteralExpr>(p->allocator, find_type(p, U"int"_b), AST_EXPR_RVALUE, {});
-			idx->u64_value = swizzle_idx[0];
+			idx->s64_value = swizzle_idx[0];
 			expr->index = idx;
 			lhs = expr;
 			return { lhs, NULL };
@@ -1256,6 +1254,152 @@ struct AstStructInitializer: AstExpr {
 		MEMBER(members);
 	}
 };
+
+bool is_vector_type(AstType* type) {
+	type = resolve_ast_type_alias(type);
+	if (auto c_alias = reflect_cast<CTypeAlias>(type)) {
+		auto c_type = c_alias->c_type;
+		if (c_type == reflect_type_of<Vector2_f32>() ||
+			c_type == reflect_type_of<Vector3_f32>() ||
+			c_type == reflect_type_of<Vector4_f32>())
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+bool is_integral(AstType* type) {
+	return is_integer(type) || is_bool(type);
+}
+
+bool is_primitive(AstType* type) {
+	return is_bool(type) || is_integer(type) || is_floating_point(type);
+}
+
+Tuple<AstExpr*, Error*> typecheck_binary_expr(CLikeParser* p, AstExpr* lhs, AstExpr* rhs, Token op_tok, AstOperator* op) {
+
+	ProgramTextRegion text_region = { op_tok.reg.start, peek(p).reg.end };
+	if (lhs->text_region.has_value) {
+		text_region.start = lhs->text_region.value.start;
+	}
+	if (rhs->text_region.has_value) {
+		text_region.end = rhs->text_region.value.end;
+	}
+
+	if (op->op == ",") {
+		auto node = make_ast_expr<CBinaryExpr>(p->allocator, rhs->expr_type, AST_EXPR_RVALUE, text_region);
+		node->lhs = lhs;
+		node->rhs = rhs;
+		node->op = op_tok.str;
+		return { node, NULL };
+	}
+
+	auto pure_op = op;
+	AstType* expr_result_type = NULL;
+	if ((op->flags & AST_OP_FLAG_MOD_ASSIGN) || op->op == "=") {
+		if (op->flags & AST_OP_FLAG_MOD_ASSIGN) {
+			pure_op = find_binary_operator(p, op->op[0, len(op->op) - 1]);
+		}
+		if (!lhs->is_lvalue) {
+			return { NULL, simple_parser_error(p, current_loc(), op_tok.reg, U"Operator '%' can only be applied to lvalues.", op->op) };
+		}
+	}
+	if (lhs->expr_type == find_type(p, U"void"_b)) {
+		return { NULL, simple_parser_error(p, current_loc(), op_tok.reg, U"Cannot apply operator '%' to void", op->op) };
+	}
+	if (is_vector_type(lhs->expr_type)) {
+		if (pure_op->op == "*" ||
+			pure_op->op == "/" ||
+			pure_op->op == "+" ||
+			pure_op->op == "-" ||
+			pure_op->op == "="
+		) {
+			if (rhs->expr_type != find_type(p, U"float"_b) && 
+				rhs->expr_type != find_type(p, U"double"_b) &&
+				lhs->expr_type != rhs->expr_type) {
+				return { NULL, simple_parser_error(p, current_loc(), op_tok.reg, U"Operator '%' for vector requires rhs to be float or double or vector, got '%'.", op->op, rhs->expr_type->name) };
+			}
+			expr_result_type = lhs->expr_type;
+		} else {
+			auto e = make_parser_error(p, current_loc(), "Operator '%' cannot be applied to '%'.", op->op, lhs->expr_type->name);
+
+			add_site(p, e,
+				CParserErrorToken{
+					.reg = lhs->text_region,
+					.color = CPARSER_ERROR_TOKEN_COLOR_REGULAR_GREEN,
+				},
+				CParserErrorToken{
+					.reg = op_tok.reg,
+					.color = CPARSER_ERROR_TOKEN_COLOR_REGULAR_RED,
+				},
+				CParserErrorToken{
+					.reg = rhs->text_region,
+					.color = CPARSER_ERROR_TOKEN_COLOR_REGULAR_CYAN,
+				}
+			);
+
+			return { NULL, e };
+		}
+	} else {
+		if (lhs->expr_type != rhs->expr_type) {
+			auto e = make_parser_error(p, current_loc(), "Binary expression type mismatch, expected '%' but got '%'", lhs->expr_type->name, rhs->expr_type->name);
+
+			add_site(p, e,
+				CParserErrorToken{
+					.reg = lhs->text_region,
+					.color = CPARSER_ERROR_TOKEN_COLOR_REGULAR_GREEN,
+				},
+				CParserErrorToken{
+					.reg = op_tok.reg,
+					.color = CPARSER_ERROR_TOKEN_COLOR_REGULAR_RED,
+				},
+				CParserErrorToken{
+					.reg = rhs->text_region,
+					.color = CPARSER_ERROR_TOKEN_COLOR_REGULAR_CYAN,
+				}
+			);
+			return { NULL, e };
+		}
+		if (pure_op->flags & AST_OP_FLAG_BOOL) {
+			if (!is_bool(lhs->expr_type)) {
+				return { NULL, simple_parser_error(p, current_loc(), op_tok.reg, U"Operator '%' can only be applied to bool types, got '%'.", op->op, lhs->expr_type->name) };
+			}
+		}
+		if (pure_op->flags & AST_OP_FLAG_INT) {
+			if (!is_integer(lhs->expr_type)) {
+				return { NULL, simple_parser_error(p, current_loc(), op_tok.reg, U"Operator '%' can only be applied to integer types, got '%'.", op->op, lhs->expr_type->name) };
+			}
+		}
+		if (pure_op->flags & AST_OP_FLAG_PRIMITIVE) {
+			if (!is_primitive(lhs->expr_type)) {
+				return { NULL, simple_parser_error(p, current_loc(), op_tok.reg, U"Operator '%' can only be applied to primitive types, got '%'.", op->op, lhs->expr_type->name) };
+			}
+		}
+		if (pure_op->flags & AST_OP_FLAG_NUMERIC) {
+			if (!is_numeric(lhs->expr_type)) {
+				return { NULL, simple_parser_error(p, current_loc(), op_tok.reg, U"Operator '%' can only be applied to numeric types, got '%'.", op->op, lhs->expr_type->name) };
+			}
+		}
+		if (op->op == "==" ||
+			op->op == "!=" ||
+			op->op == "<=" ||
+			op->op == ">="
+		) {
+			expr_result_type = find_type(p, U"bool"_b);
+		} else {
+			expr_result_type = lhs->expr_type;
+		}
+	}
+	if (!expr_result_type) {
+		return { NULL, simple_parser_error(p, current_loc(), op_tok.reg, U"Unexpected error: could not determine result type of binary expression '%'.", op->op) };
+	}
+	auto node = make_ast_expr<CBinaryExpr>(p->allocator, expr_result_type, AST_EXPR_RVALUE, text_region);
+	node->lhs = lhs;
+	node->rhs = rhs;
+	node->op = op_tok.str;
+	return { node, NULL };
+}
 
 Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 	auto tok = peek(p);
@@ -1288,6 +1432,7 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 		literal->tok = tok;
 		literal->f32_value = float_val;
 		literal->f64_value = double_val;
+		println("Parsed fp literal value: %, % from str: %", literal->f32_value, literal->f64_value, lit);
 		next(p);
 		return { literal, NULL };
 	}
@@ -1362,6 +1507,7 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 	}
 	AstExpr* lhs = NULL;
 	if (auto type = reflect_cast<AstType>(sym)) {
+		auto initializer_reg_start = tok.reg.start;
 		next(p);
 		if (peek(p).str == "("_b) {
 			next(p);
@@ -1374,7 +1520,7 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 					if (args.count != get_members_count(type)) {
 						return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Expected % arguments in initializer but got '%'.", get_members_count(type), args.count) };
 					}
-					ProgramTextRegion text_region = { tok.reg.start, peek(p).reg.start };
+					ProgramTextRegion text_region = { initializer_reg_start, tok.reg.end };
 					auto node = make_ast_expr<AstStructInitializer>(p->allocator, type, AST_EXPR_RVALUE, text_region);
 					node->struct_type = type;
 					node->members = args;
@@ -1437,7 +1583,7 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 			if (lhs->text_region.has_value) {
 				text_region.start = lhs->text_region.value.start;
 			}
-			auto node = make_ast_node<CPostfixExpr>(p->allocator, text_region);
+			auto node = make_ast_expr<CPostfixExpr>(p->allocator, lhs->expr_type, false, text_region);
 			node->lhs = lhs;
 			node->op = tok.str;
 			lhs = node;
@@ -1526,28 +1672,6 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 	return { lhs, NULL };
 }
 
-bool is_vector_type(AstType* type) {
-	type = resolve_ast_type_alias(type);
-	if (auto c_alias = reflect_cast<CTypeAlias>(type)) {
-		auto c_type = c_alias->c_type;
-		if (c_type == reflect_type_of<Vector2_f32>() ||
-			c_type == reflect_type_of<Vector3_f32>() ||
-			c_type == reflect_type_of<Vector4_f32>())
-		{
-			return true;
-		}
-	}
-	return false;
-}
-
-bool is_integral(AstType* type) {
-	return is_integer(type) || is_bool(type);
-}
-
-bool is_primitive(AstType* type) {
-	return is_bool(type) || is_integer(type) || is_floating_point(type);
-}
-
 Tuple<AstExpr*, Error*> parse_expr(CLikeParser* p, s32 min_prec) {
 	auto [lhs, e] = parse_primary_expr(p);
 	if (e) {
@@ -1603,99 +1727,12 @@ Tuple<AstExpr*, Error*> parse_expr(CLikeParser* p, s32 min_prec) {
 		if (e) {
 			return { NULL, e };
 		}
-		auto pure_op = op;
-		AstType* expr_result_type = NULL;
-		if (op->flags & AST_OP_FLAG_MOD_ASSIGN) {
-			pure_op = find_binary_operator(p, op->op[0, len(op->op) - 1]);
-			if (!lhs->is_lvalue) {
-				return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Operator '%' can only be applied to lvalues.", op->op) };
-			}
-		}
-		if (lhs->expr_type == find_type(p, U"void"_b)) {
-			return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Cannot apply operator '%' to void", op->op) };
-		}
-		if (is_vector_type(lhs->expr_type)) {
-			if (pure_op->op != "*" &&
-				pure_op->op != "/" 
-				// pure_op->op != "+" &&
-				// pure_op->op != "-"
-			) {
-				auto e = make_parser_error(p, current_loc(), "Operator '%' cannot be applied to '%'.", op->op, lhs->expr_type->name);
 
-				Array<CParserErrorToken> tokens = {};
-				defer { tokens.free(); };
-				if (lhs->text_region.has_value) {
-					add(&tokens, CParserErrorToken{
-						.reg = lhs->text_region.value,
-						.color = CPARSER_ERROR_TOKEN_COLOR_REGULAR_GREEN,
-					});
-				}
-				add(&tokens, CParserErrorToken{
-					.reg = tok.reg,
-					.color = CPARSER_ERROR_TOKEN_COLOR_REGULAR_RED,
-				});
-				if (rhs->text_region.has_value) {
-					add(&tokens, CParserErrorToken{
-						.reg = rhs->text_region.value,
-						.color = CPARSER_ERROR_TOKEN_COLOR_REGULAR_BLUE,
-					});
-				}
-				add_site(p, e, tokens);
-
-				return { NULL, e };
-			}
-			if (rhs->expr_type != find_type(p, U"float"_b) && 
-				rhs->expr_type != find_type(p, U"double"_b)) {
-				return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Operator '%' for vector requires rhs to be float or double, got '%'.", op->op, rhs->expr_type->name) };
-			}
-			expr_result_type = lhs->expr_type;
-		} else {
-			if (lhs->expr_type != rhs->expr_type) {
-				return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Binary expression type mismatch, expected '%' but got '%'", lhs->expr_type->name, rhs->expr_type->name) };
-			}
-			if (pure_op->flags & AST_OP_FLAG_BOOL) {
-				if (!is_bool(lhs->expr_type)) {
-					return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Operator '%' can only be applied to bool types, got '%'.", op->op, lhs->expr_type->name) };
-				}
-			}
-			if (pure_op->flags & AST_OP_FLAG_INT) {
-				if (!is_integer(lhs->expr_type)) {
-					return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Operator '%' can only be applied to integer types, got '%'.", op->op, lhs->expr_type->name) };
-				}
-			}
-			if (pure_op->flags & AST_OP_FLAG_PRIMITIVE) {
-				if (!is_primitive(lhs->expr_type)) {
-					return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Operator '%' can only be applied to primitive types, got '%'.", op->op, lhs->expr_type->name) };
-				}
-			}
-			if (pure_op->flags & AST_OP_FLAG_NUMERIC) {
-				if (!is_numeric(lhs->expr_type)) {
-					return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Operator '%' can only be applied to numeric types, got '%'.", op->op, lhs->expr_type->name) };
-				}
-			}
-			if (op->op == "==" ||
-				op->op == "!=" ||
-				op->op == "<=" ||
-				op->op == ">="
-			) {
-				expr_result_type = find_type(p, U"bool"_b);
-			}
+		auto [expr, e2] = typecheck_binary_expr(p, lhs, rhs, tok, op);
+		if (e2) {
+			return { NULL, e2 };
 		}
-		if (!expr_result_type) {
-			return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Unexpected error: could not determine result type of binary expression '%'.", op->op) };
-		}
-		ProgramTextRegion text_region = { tok.reg.start, peek(p).reg.end };
-		if (lhs->text_region.has_value) {
-			text_region.start = lhs->text_region.value.start;
-		}
-		if (rhs->text_region.has_value) {
-			text_region.end = rhs->text_region.value.end;
-		}
-		auto node = make_ast_expr<CBinaryExpr>(p->allocator, expr_result_type, AST_EXPR_RVALUE, text_region);
-		node->lhs = lhs;
-		node->rhs = rhs;
-		node->op = tok.str;
-		lhs = node;
+		lhs = expr;
 	}
 	return { lhs, NULL };
 }
@@ -1906,10 +1943,10 @@ Tuple<AstNode*, Error*> parse_function(CLikeParser* p, AstType* return_type, Tok
 		if (e) {
 			return { NULL, e };
 		}
+		f->block = (AstBlock*) block;
 		if (f->block->text_region.has_value) {
 			f->text_region.value.end = f->block->text_region.value.end;
 		}
-		f->block = (AstBlock*) block;
 		return { f, NULL };
 	}
 
@@ -1943,15 +1980,16 @@ Tuple<AstNode*, Error*> parse_c_like(UnicodeString str) {
 	p.program->globals.allocator = p.allocator;
 	p.str = str;
 	add(&p.scope, p.program);
-	p.binary_operators.allocator = p.allocator;
-	add(&p.binary_operators, AST_BINARY_OPERATORS_UNSORTED);
-	p.prefix_unary_operators.allocator = p.allocator;
-	add(&p.prefix_unary_operators, AST_PREFIX_UNARY_OPERATORS_UNSORTED);
-	p.postfix_unary_operators.allocator = p.allocator;
-	add(&p.postfix_unary_operators, AST_POSTFIX_UNARY_OPERATORS_UNSORTED);
-	sort(p.binary_operators, lambda(len($0[$1].op) < len($0[$2].op)));
-	sort(p.prefix_unary_operators, lambda(len($0[$1].op) < len($0[$2].op)));
-	sort(p.postfix_unary_operators, lambda(len($0[$1].op) < len($0[$2].op)));
+	for (auto it: AST_BINARY_OPERATORS_UNSORTED) {
+		add(&p.op_tokens_sorted, it.op);
+	}
+	for (auto it: AST_PREFIX_UNARY_OPERATORS_UNSORTED) {
+		add(&p.op_tokens_sorted, it.op);
+	}
+	for (auto it: AST_POSTFIX_UNARY_OPERATORS_UNSORTED) {
+		add(&p.op_tokens_sorted, it.op);
+	}
+	sort(p.op_tokens_sorted, lambda(len($0[$1]) > len($0[$2]))); 
 
 	add_c_type_alias(&p, reflect_type_of<s64>(), U"int"_b);
 	add_c_type_alias(&p, reflect_type_of<double>(), U"double"_b);

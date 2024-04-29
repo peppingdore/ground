@@ -88,9 +88,9 @@ struct Formatter {
 
 	void append(String str) {
 		if (is_unicode_formatter) {
-			add((Array<char32_t>*) builder, str);
+			::append((Array<char32_t>*) builder, str);
 		} else {
-			add((Array<char>*) builder, str);
+			::append((Array<char>*) builder, str);
 		}
 	}
 

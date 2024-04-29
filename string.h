@@ -41,7 +41,15 @@ constexpr UnicodeString operator""_b(const char32_t* c_str, size_t length) {
 	return { (char32_t*) c_str, (s64) length };
 }
 
-void add(Array<char32_t>* arr, String str, s64 index = -1, CodeLocation loc = caller_loc()) {
+template <StringChar T>
+void append(Array<T>* arr, Span<T> str, s64 index = -1, CodeLocation loc = caller_loc()) { 
+	auto ptr = reserve(arr, len(str), index, loc);
+	for (auto i: range(len(str))) {
+		ptr[i] = str[i];
+	}
+}
+
+void append(Array<char32_t>* arr, String str, s64 index = -1, CodeLocation loc = caller_loc()) {
 	auto ptr = reserve(arr, len(str), index, loc);
 	for (auto i: range(len(str))) {
 		ptr[i] = str[i];
@@ -49,12 +57,12 @@ void add(Array<char32_t>* arr, String str, s64 index = -1, CodeLocation loc = ca
 }
 
 template <s64 N>
-void add(Array<char32_t>* arr, const char32_t (&str)[N], s64 index = -1, CodeLocation loc = caller_loc()) {
+void append(Array<char32_t>* arr, const char32_t (&str)[N], s64 index = -1, CodeLocation loc = caller_loc()) {
 	add(arr, Span<char32_t>{ str, N - 1 }, index, loc);
 }
 
 template <s64 N>
-void add(Array<char32_t>* arr, const char (&str)[N], s64 index = -1, CodeLocation loc = caller_loc()) {
+void append(Array<char32_t>* arr, const char (&str)[N], s64 index = -1, CodeLocation loc = caller_loc()) {
 	auto* ptr = reserve(arr, N - 1, index, loc);
 	for (auto i: range(N - 1)) {
 		ptr[i] = str[i];
@@ -62,21 +70,21 @@ void add(Array<char32_t>* arr, const char (&str)[N], s64 index = -1, CodeLocatio
 }
 
 template <s64 N>
-void add(Array<char>* arr, const char (&str)[N], s64 index = -1, CodeLocation loc = caller_loc()) {
+void append(Array<char>* arr, const char (&str)[N], s64 index = -1, CodeLocation loc = caller_loc()) {
 	add(arr, Span<char>{ str, N - 1 }, index, loc);
 }
 
-void add(Array<char32_t>* arr, const char32_t* str, s64 index = -1, CodeLocation loc = caller_loc()) {
+void append(Array<char32_t>* arr, const char32_t* str, s64 index = -1, CodeLocation loc = caller_loc()) {
 	auto s = make_string(str);
 	add(arr, s, index, loc);
 }
 
-void add(Array<char32_t>* arr, const char* str, s64 index = -1, CodeLocation loc = caller_loc()) {
+void append(Array<char32_t>* arr, const char* str, s64 index = -1, CodeLocation loc = caller_loc()) {
 	auto s = make_string(str);
-	add(arr, s, index, loc);
+	append(arr, s, index, loc);
 }
 
-void add(Array<char>* arr, const char* str, s64 index = -1, CodeLocation loc = caller_loc()) {
+void append(Array<char>* arr, const char* str, s64 index = -1, CodeLocation loc = caller_loc()) {
 	auto s = make_string(str);
 	add(arr, s, index, loc);
 }
@@ -98,7 +106,7 @@ Array<T> copy_string(Span<T> str, Allocator allocator = c_allocator, CodeLocatio
 
 AllocatedUnicodeString copy_unicode_string(Allocator allocator, String str) {
 	Array<char32_t> result = { .allocator = allocator };
-	add(&result, str);
+	append(&result, str);
 	return result;
 }
 
