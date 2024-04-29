@@ -109,6 +109,33 @@ s64 index_of_fast(Span<T> span, T* ptr) {
 }
 
 template <typename T>
+void remove_at_index(Span<T>* arr, s64 index, s64 remove_count = 1) {
+	assert(remove_count <= (len(*arr) - index));
+	arr->count -= remove_count;
+	memmove(arr->data + index, arr->data + index + remove_count, (len(*arr) - index) * sizeof(T));
+}
+
+template <typename T>
+bool remove(Span<T>* arr, T item) {
+	s64 index = index_of(*arr, item);
+	if (index == -1) {
+		return false;
+	}
+	remove_at_index(arr, index);
+	return true;
+}
+
+template <typename T>
+bool remove(Span<T>* arr, Span<T> item) {
+	s64 index = index_of(arr, item);
+	if (index == -1) {
+		return false;
+	}
+	remove_at_index(arr, index, len(item));
+	return true;
+}
+
+template <typename T>
 bool contains(Span<T> span, auto item) {
 	return index_of(span, item) != -1;
 }

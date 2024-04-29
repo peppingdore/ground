@@ -100,33 +100,6 @@ T* add(Array<T>* arr, const T (&src)[N], s64 index = -1, CodeLocation loc = call
 }
 
 template <typename T>
-void remove_at_index(Array<T>* arr, s64 index, s64 remove_count = 1) {
-	assert(remove_count <= (len(*arr) - index));
-	arr->count -= remove_count;
-	memmove(arr->data + index, arr->data + index + remove_count, (len(*arr) - index) * sizeof(T));
-}
-
-template <typename T>
-bool remove(Array<T>* arr, T item) {
-	s64 index = index_of(*arr, item);
-	if (index == -1) {
-		return false;
-	}
-	remove_at_index(arr, index);
-	return true;
-}
-
-template <typename T>
-bool remove(Array<T>* arr, Span<T> item) {
-	s64 index = index_of(arr, item);
-	if (index == -1) {
-		return false;
-	}
-	remove_at_index(arr, index, len(item));
-	return true;
-}
-
-template <typename T>
 void clear(Array<T>* arr, CodeLocation loc = caller_loc()) {
 	arr->count = 0;
 }
