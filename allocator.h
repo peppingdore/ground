@@ -47,6 +47,7 @@ void* malloc_crash_on_failure(u64 size) {
 		return result;
 	}
 	fprintf(stderr, "Failed to malloc(%zx)", (size_t) size);
+	DebugBreak();
 	exit(-1);
 }
 void* realloc_crash_on_failure(void* data, u64 size) {
@@ -55,6 +56,7 @@ void* realloc_crash_on_failure(void* data, u64 size) {
 		return result;
 	}
 	fprintf(stderr, "Failed to realloc(%p, %zx)", data, (size_t) size);
+	DebugBreak();
 	exit(-1);
 }
 
