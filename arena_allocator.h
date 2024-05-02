@@ -59,8 +59,8 @@ void* arena_allocator_proc(AllocatorVerb verb, void* old_data, u64 old_size, u64
 				last = last->next;
 			}
 			if (!found) {
-				u64 size = max(arenas->arena_size, size);
-				last = make_arena(arenas->parent_allocator, size);
+				u64 new_arena_size = max(arenas->arena_size, size);
+				last = make_arena(arenas->parent_allocator, new_arena_size);
 			}
 			void* ptr = ptr_add(last, sizeof(Arena) + last->allocated);
 			last->allocated += size;
