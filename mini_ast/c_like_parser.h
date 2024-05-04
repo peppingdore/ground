@@ -12,6 +12,11 @@
 struct ProgramTextRegion {
 	s64 start  = 0;
 	s64 end    = 0;
+
+	REFLECT(ProgramTextRegion) {
+		MEMBER(start);
+		MEMBER(end);
+	}
 };
 
 struct AstNode {
@@ -35,10 +40,12 @@ T* make_ast_node(Allocator allocator, Optional<ProgramTextRegion> text_region) {
 
 struct AstSymbol: AstNode {
 	UnicodeString name;
+	bool          is_global = false;
 
 	REFLECT(AstSymbol) {
 		BASE_TYPE(AstNode);
 		MEMBER(name);
+		MEMBER(is_global);
 	}
 };
 
@@ -115,6 +122,12 @@ struct AstOperator {
 	UnicodeString op;
 	s32           prec;
 	s32           flags = 0;
+
+	REFLECT(AstOperator) {
+		MEMBER(op);
+		MEMBER(prec);
+		MEMBER(flags);
+	}
 };
 
 AstOperator AST_BINARY_OPERATORS_UNSORTED[] = { 
@@ -228,6 +241,14 @@ struct AstFunction: AstSymbol {
 	}
 };
 
+template <typename T>
+T* make_ast_symbol(CLikeParser* p, bool is_global, UnicodeString name, Optional<ProgramTextRegion> text_region) {
+	auto node = make_ast_node<T>(p->allocator, text_region);
+	node->name = name;
+	node->is_global = is_global;
+	return node;
+}
+
 struct ShaderIntrinFunc: AstFunction {
 
 	REFLECT(ShaderIntrinFunc) {
@@ -237,9 +258,8 @@ struct ShaderIntrinFunc: AstFunction {
 
 void add_c_type_alias(CLikeParser* p, Type* type, UnicodeString name) {
 	// @TODO: check for duplicates
-	auto node = make_ast_node<CTypeAlias>(p->allocator, {});
+	auto node = make_ast_symbol<CTypeAlias>(p, true, name, {});
 	node->c_type = type;
-	node->name = name;
 	add(&p->program->globals, node);
 }
 
@@ -248,17 +268,15 @@ void add_shader_intrinsic_var(CLikeParser* p, UnicodeString name, AstType* type)
 	if (!type) {
 		panic("No type for shader intrinsic var");
 	}
-	auto node = make_ast_node<ShaderIntrinVar>(p->allocator, {});
+	auto node = make_ast_symbol<ShaderIntrinVar>(p, true, name, {});
 	node->var_type = type;
-	node->name = name;
 	add(&p->program->globals, node);
 }
 
 void add_shader_intrinsic_func(CLikeParser* p, UnicodeString name, AstType* return_type, std::initializer_list<AstType*> args) {
 	// @TODO: check for duplicates
-	auto node = make_ast_node<ShaderIntrinFunc>(p->allocator, {});
+	auto node = make_ast_symbol<ShaderIntrinFunc>(p, true, name, {});
 	node->args.allocator = p->allocator;
-	node->name = name;
 	node->return_type = return_type;
 	s64 i = 0;
 	for (auto arg: args) {
@@ -272,7 +290,7 @@ void add_shader_intrinsic_func(CLikeParser* p, UnicodeString name, AstType* retu
 }
 
 struct CPostfixExpr: AstExpr {
-	AstNode* lhs;
+	AstExpr*      lhs;
 	UnicodeString op;
 
 	REFLECT(CPostfixExpr) {
@@ -283,7 +301,7 @@ struct CPostfixExpr: AstExpr {
 };
 
 struct CUnaryExpr: AstExpr {
-	AstNode*      expr;
+	AstExpr*      expr;
 	UnicodeString op;
 
 	REFLECT(CUnaryExpr) {
@@ -294,15 +312,17 @@ struct CUnaryExpr: AstExpr {
 };
 
 struct CBinaryExpr: AstExpr {
-	AstNode*      lhs = NULL;
-	AstNode*      rhs = NULL;
-	UnicodeString op;
+	AstExpr*      lhs = NULL;
+	AstExpr*      rhs = NULL;
+	AstOperator*  op = NULL;
+	AstOperator*  pure_op = NULL;
 
 	REFLECT(CBinaryExpr) {
 		BASE_TYPE(AstExpr);
 		MEMBER(lhs);
 		MEMBER(rhs);
 		MEMBER(op);
+		MEMBER(pure_op);
 	}
 };
 
@@ -795,7 +815,7 @@ Tuple<Token, Error*> parse_ident(CLikeParser* p) {
 Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p);
 Tuple<AstExpr*, Error*> parse_expr(CLikeParser* p, s32 min_prec);
 
-Tuple<AstNode*, Error*> parse_var_decl(CLikeParser* p, AstType* type, Token type_tok, Token ident_tok) {
+Tuple<AstNode*, Error*> parse_var_decl(CLikeParser* p, AstType* type, Token type_tok, Token ident_tok, bool is_global) {
 	Array<AstVarDecl*> var_decls = { .allocator = p->allocator };
 	defer { var_decls.free(); };
 
@@ -804,6 +824,7 @@ Tuple<AstNode*, Error*> parse_var_decl(CLikeParser* p, AstType* type, Token type
 		auto node = make_ast_node<AstVarDecl>(p->allocator, {});
 		node->var_type = type;
 		node->name = current_ident.str;
+		node->is_global = is_global;
 		add(&var_decls, node);
 
 		auto tok = peek(p);
@@ -1032,6 +1053,18 @@ bool is_bool(AstType* type) {
 		}
 	}
 	return false;
+}
+
+s64 get_type_size(AstType* type) {
+	type = resolve_ast_type_alias(type);
+	if (auto c_alias = reflect_cast<CTypeAlias>(type)) {
+		auto c_type = c_alias->c_type;
+		if (auto primitive_type = c_type->as<PrimitiveType>()) {
+			return primitive_type->size;
+		}
+	}
+	// @TODO: implement.
+	return 0;
 }
 
 struct AstStructMember {
@@ -1291,7 +1324,8 @@ Tuple<AstExpr*, Error*> typecheck_binary_expr(CLikeParser* p, AstExpr* lhs, AstE
 		auto node = make_ast_expr<CBinaryExpr>(p->allocator, rhs->expr_type, AST_EXPR_RVALUE, text_region);
 		node->lhs = lhs;
 		node->rhs = rhs;
-		node->op = op_tok.str;
+		node->op = op;
+		node->pure_op = op;
 		return { node, NULL };
 	}
 
@@ -1397,7 +1431,8 @@ Tuple<AstExpr*, Error*> typecheck_binary_expr(CLikeParser* p, AstExpr* lhs, AstE
 	auto node = make_ast_expr<CBinaryExpr>(p->allocator, expr_result_type, AST_EXPR_RVALUE, text_region);
 	node->lhs = lhs;
 	node->rhs = rhs;
-	node->op = op_tok.str;
+	node->op = op;
+	node->pure_op = pure_op;
 	return { node, NULL };
 }
 
@@ -1432,7 +1467,6 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 		literal->tok = tok;
 		literal->f32_value = float_val;
 		literal->f64_value = double_val;
-		println("Parsed fp literal value: %, % from str: %", literal->f32_value, literal->f64_value, lit);
 		next(p);
 		return { literal, NULL };
 	}
@@ -1547,6 +1581,8 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 					next(p);
 				}
 			}
+		} else {
+			return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Expected struct initializer, got '%'.", tok.str) };
 		}
 	} else if (auto var = reflect_cast<AstVar>(sym)) {
 		auto reg = tok.reg;
@@ -1849,7 +1885,7 @@ Tuple<AstNode*, Error*> parse_stmt(CLikeParser* p) {
 		if (e) {
 			return { NULL, e };
 		}
-		auto [decl, ee] = parse_var_decl(p, type, type_tok, ident);
+		auto [decl, ee] = parse_var_decl(p, type, type_tok, ident, false);
 		if (ee) {
 			return { NULL, ee };
 		}
@@ -1967,13 +2003,13 @@ Tuple<AstNode*, Error*> parse_top_level(CLikeParser* p) {
 	if (tok.str == U"("_b) {
 		return parse_function(p, type, ident);
 	} else if (tok.str == U","_b || tok.str == U";"_b || tok.str == U"="_b) {
-		return parse_var_decl(p, type, type_tok, ident);
+		return parse_var_decl(p, type, type_tok, ident, true);
 	} else {
 		return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Expected ( or , or ; or ="_b) };
 	}
 }
 
-Tuple<AstNode*, Error*> parse_c_like(UnicodeString str) {
+Tuple<CLikeProgram*, Error*> parse_c_like(UnicodeString str) {
 	CLikeParser p;
 	p.allocator = make_arena_allocator();
 	p.program = make_ast_node<CLikeProgram>(p.allocator, {});

@@ -15,7 +15,7 @@ void print_expr(AllocatedUnicodeString* sb, AstNode* expr) {
 		append(sb, "(");
 		print_expr(sb, binary_op->lhs);
 		append(sb, " ");
-		append(sb, binary_op->op);
+		append(sb, binary_op->op->op);
 		append(sb, " ");
 		print_expr(sb, binary_op->rhs);
 		append(sb, ")");

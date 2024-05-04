@@ -3,6 +3,7 @@
 #include "../defer.h"
 #include "c_like_parser.h"
 #include "ast_printer.h" 
+#include "ast_runner.h"
 
 // https://twitter.com/zozuar/status/1755381710227755046
 //
@@ -38,9 +39,24 @@ int main() {
 			print(e->text);
 		}
 		print("Generated at %", e->loc);
+		return -1;
 	}
-	else {
-		print(print_ast_node(program));
+	// print(print_ast_node(program));
+
+	for (auto it: program->globals) {
+		if (auto f = reflect_cast<AstFunction>(it)) {
+			if (!f->block) {
+				continue;
+			}
+
+			auto [ssa, e] = emit_function_ssa(c_allocator, f);
+			if (e) {
+				println(e);
+				return -1;
+			}
+			println("Emitted ssa");
+		}
 	}
+
 	return 0;
 }
