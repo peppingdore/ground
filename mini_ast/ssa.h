@@ -27,6 +27,8 @@ enum class SsaOp: s64 {
 	Add        = 10,
 	Sub        = 11,
 	LoadConst  = 12,
+	Subscript  = 13,
+	Swizzle    = 14,
 };
 REFLECT(SsaOp) {
 	ENUM_VALUE(Nop);
@@ -42,6 +44,8 @@ REFLECT(SsaOp) {
 	ENUM_VALUE(Add);
 	ENUM_VALUE(Sub);
 	ENUM_VALUE(LoadConst);
+	ENUM_VALUE(Subscript);
+	ENUM_VALUE(Swizzle);
 }
 
 struct Ssa;
@@ -56,18 +60,26 @@ struct SsaInst {
 };
 
 struct SsaBasicBlock {
+	String                name;
 	Ssa*                  ssa;
 	bool                  is_sealed = false;
 	Array<SsaInst*>       insts;
 	Array<SsaInst*>       incomplete_phis;
 	Array<SsaBasicBlock*> pred;
+	HashMap<AstVar*, s64> var_map;
 };
+
+void add_pred(SsaBasicBlock* block, SsaBasicBlock* pred) {
+	if (block->is_sealed) {
+		panic("Cannot add pred to sealed block");
+	}
+	add(&block->pred, pred);
+}
 
 struct Ssa {
 	Allocator             allocator = c_allocator;
 	SsaBasicBlock*        entry = NULL;
 	s64                   reg_counter = 0;
-	HashMap<AstVar*, s64> var_map;
 
 	void free() {
 		free_allocator(allocator);
@@ -78,13 +90,34 @@ s64 alloc_reg(Ssa* ssa) {
 	return ++ssa->reg_counter;
 }
 
-SsaBasicBlock* make_ssa_basic_block(Ssa* ssa) {
+SsaBasicBlock* make_ssa_basic_block(Ssa* ssa, String name = ""_b) {
 	SsaBasicBlock* block = make<SsaBasicBlock>(ssa->allocator);
+	block->name = name;
 	block->ssa = ssa;
 	block->insts = { .allocator = ssa->allocator };
 	block->incomplete_phis = { .allocator = ssa->allocator };
 	block->pred = { .allocator = ssa->allocator };
+	block->var_map = { .allocator = ssa->allocator };
 	return block;
+}
+
+void write_var(SsaBasicBlock* block, AstVar* var, s64 reg) {
+	put(&block->var_map, var, reg);
+}
+
+s64 read_var_recursive(SsaBasicBlock* block, AstVar* var) {
+	if (!block->is_sealed) {
+		
+	}
+}
+
+s64 read_var(SsaBasicBlock* block, AstVar* var) {
+	assert(var->is_global);
+	auto found = get(&block->var_map, var);
+	if (found) {
+		return *found;
+	}
+
 }
 
 SsaInst* make_ssa_inst(SsaBasicBlock* block, SsaOp op) {
@@ -300,6 +333,37 @@ Tuple<SsaExpr*, Error*> emit_expr(SsaBasicBlock* block, AstExpr* expr) {
 		commit_inst(inst);
 		auto ssa_expr = make_ssa_expr(block, inst->dst, false, false);
 		return { ssa_expr, NULL };
+	} else if (auto arr_access = reflect_cast<AstArrayAccess>(expr)) {
+		auto [lhs, e0] = emit_expr(block, arr_access->lhs);
+		if (e0) {
+			return { NULL, e0 };
+		}
+		auto [rhs, e1] = emit_expr(block, arr_access->index);
+		if (e1) {
+			return { NULL, e1 };
+		}
+		auto inst = make_ssa_inst(block, SsaOp::Subscript);
+		inst->dst = alloc_reg(block->ssa);
+		add(&inst->args, lhs->reg);
+		add(&inst->args, rhs->reg);
+		commit_inst(inst);
+		auto ssa_expr = make_ssa_expr(block, inst->dst, false, false);
+		return { ssa_expr, NULL };
+	} else if (auto swizzle = reflect_cast<AstSwizzleExpr>(expr)) {
+		auto [lhs, e0] = emit_expr(block, swizzle->lhs);
+		if (e0) {
+			return { NULL, e0 };
+		}
+		auto inst = make_ssa_inst(block, SsaOp::Swizzle);
+		inst->dst = alloc_reg(block->ssa);
+		add(&inst->args, lhs->reg);
+		add(&inst->args, swizzle->swizzle_len);
+		for (auto i: range(swizzle->swizzle_len)) {
+			add(&inst->args, swizzle->swizzle[i]);
+		}
+		commit_inst(inst);
+		auto ssa_expr = make_ssa_expr(block, inst->dst, false, false);
+		return { ssa_expr, NULL };
 	} else {
 		return { NULL, format_error("Unsupported expression: %*", expr->type->name) };
 	}
@@ -313,8 +377,27 @@ Error* emit_stmt(SsaBasicBlock* block, AstNode* stmt) {
 		}
 		return NULL;
 	} else if (auto var_decl_group = reflect_cast<AstVarDeclGroup>(stmt)) {
+		auto first = var_decl_group->var_decls[0];
+		s64 init_reg = 0;
+		if (first->init) {
+			auto [var, e] = emit_expr(block, first->init);
+			if (e) {
+				return e;
+			}
+			init_reg = var->reg;
+		}
 		for (auto var_decl: var_decl_group->var_decls) {
-			emit_stmt(block, var_decl);
+			s64 var_reg;
+			if (init_reg) {
+				var_reg = init_reg;
+			} else {
+				auto inst = make_ssa_inst(block, SsaOp::LocalVar);
+				inst->dst = alloc_reg(block->ssa);
+				add(&inst->node_args, var_decl);
+				commit_inst(inst);
+				var_reg = inst->dst;
+			}
+			put(&block->ssa->var_map, var_decl, var_reg);
 		}
 		return NULL;
 	} else if (auto var_decl = reflect_cast<AstVarDecl>(stmt)) {
@@ -334,6 +417,8 @@ Error* emit_stmt(SsaBasicBlock* block, AstNode* stmt) {
 		}
 		put(&block->ssa->var_map, var_decl, reg);
 		return NULL;
+	} else if (auto _for = reflect_cast<AstFor>(stmt)) {
+
 	} else {
 		return format_error("Unsupported statement: %*", stmt->type->name);
 	}
@@ -374,7 +459,6 @@ void print_ast_inst(SsaInst* inst) {
 Tuple<Ssa, Error*> emit_function_ssa(Allocator allocator, AstFunction* f) {
 	Ssa ssa;
 	ssa.allocator = make_arena_allocator(allocator, 1024 * 1024);
-	ssa.var_map.allocator = allocator;
 	if (!f->block) {
 		return { {}, format_error("Function % has no body", f->name) };
 	}

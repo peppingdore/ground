@@ -3,7 +3,7 @@
 #include "../defer.h"
 #include "c_like_parser.h"
 #include "ast_printer.h" 
-#include "ast_runner.h"
+#include "ssa.h"
 
 // https://twitter.com/zozuar/status/1755381710227755046
 //
