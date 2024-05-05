@@ -646,7 +646,7 @@ template <typename T>
 using ReflectMacroPickType = std::conditional_t<std::is_class_v<T>, StructType, EnumType>;
 
 #define REFLECT_NAME(_T, _name)\
-template <typename __T = _T> requires(std::is_same_v<_T, __T>)\
+template <typename __T = _T> requires(std::is_convertible_v<__T, _T>)\
 inline static ReflectMacroPickType<__T>* reflect_type(__T* x, ReflectMacroPickType<__T>* type) {\
 	type->name = _name;\
 	reflect_fill_type(x, type);\

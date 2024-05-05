@@ -10,6 +10,11 @@ struct Vector_Members1 {
 		T x;
 		T components[1];
 	};
+
+	REFLECT(Vector_Members1) {
+		type->name = heap_sprintf("Vector1<%s>", reflect_type_of<T>()->name);
+		MEMBER(x);
+	}
 };
 
 template <typename T>
@@ -21,6 +26,12 @@ struct Vector_Members2 {
 		};
 		T components[2];
 	};
+
+	REFLECT(Vector_Members2) {
+		type->name = heap_sprintf("Vector2<%s>", reflect_type_of<T>()->name);
+		MEMBER(x);
+		MEMBER(y);
+	}
 };
 
 template <typename T>
@@ -38,6 +49,13 @@ struct Vector_Members3 {
 		};
 		T components[3];
 	};
+
+	REFLECT(Vector_Members3) {
+		type->name = heap_sprintf("Vector3<%s>", reflect_type_of<T>()->name);
+		MEMBER(x);
+		MEMBER(y);
+		MEMBER(z);
+	}
 };
 
 template <typename T, int N>
@@ -61,6 +79,14 @@ struct Vector_Members4 {
 		};
 		T components[N];
 	};
+
+	REFLECT(Vector_Members4) {
+		type->name = heap_sprintf("Vector4<%s>", reflect_type_of<T>()->name);
+		MEMBER(x);
+		MEMBER(y);
+		MEMBER(z);
+		MEMBER(w);
+	}
 };
 
 template <int N, typename T>
@@ -76,7 +102,7 @@ struct Vector_Members<N, T>: Vector_Members4<T, N> {};
 
 
 template <int N, typename T>
-struct Base_Vector: Vector_Members<N, T> {
+struct BaseVector: Vector_Members<N, T> {
 	static_assert(N > 0);
 
 	using Vector_Members<N, T>::components;
@@ -86,9 +112,9 @@ struct Base_Vector: Vector_Members<N, T> {
 	}
 
 	template <typename... Pack>
-	static Base_Vector make(Pack... args) {
+	static BaseVector make(Pack... args) {
 		T arr[N] = { (T) args... };
-		Base_Vector vec;
+		BaseVector vec;
 		for (auto i: range(N)) {
 			vec.components[i] = arr[i];
 		}
@@ -98,9 +124,9 @@ struct Base_Vector: Vector_Members<N, T> {
 	template <typename Thing> requires
 		std::is_integral_v<T> &&
 		std::is_floating_point_v<decltype(Thing().components[0])> 
-	static Base_Vector make(Thing thing) {
+	static BaseVector make(Thing thing) {
 		static_assert(N == array_count(thing.components));
-		Base_Vector result;
+		BaseVector result;
 		for (auto i: range(N)) {
 			result.components[i] = round(thing.components[i]);
 		}
@@ -110,14 +136,14 @@ struct Base_Vector: Vector_Members<N, T> {
 	template <int Start, int Length>
 	constexpr auto slice() {
 		static_assert(Length + Start <= N);
-		Base_Vector<Length - Start, T> result;
+		BaseVector<Length - Start, T> result;
 		for (int i = Start; i < Length; i++) {
 			result.components[i - Start] = components[i];
 		}
 		return result;
 	}
 
-	auto operator-(Base_Vector rhs) {
+	auto operator-(BaseVector rhs) {
 		auto result = *this;
 		for (auto i: range(N)) {
 			result.components[i] -= rhs.components[i];
@@ -125,7 +151,7 @@ struct Base_Vector: Vector_Members<N, T> {
 		return result;
 	}
 
-	auto operator+(Base_Vector rhs) {
+	auto operator+(BaseVector rhs) {
 		auto result = *this;
 		for (auto i: range(N)) {
 			result.components[i] += rhs.components[i];
@@ -157,7 +183,7 @@ struct Base_Vector: Vector_Members<N, T> {
 		return result;
 	}
 
-	bool operator==(Base_Vector rhs) {
+	bool operator==(BaseVector rhs) {
 		for (auto i: range(N)) {
 			if (components[i] != rhs.components[i]) {
 				return false;
@@ -166,17 +192,14 @@ struct Base_Vector: Vector_Members<N, T> {
 		return true;
 	}
 
-
-	REFLECT_NAME(Base_Vector,
-		heap_sprintf("Vector%d<%s>", N, reflect_type_of<T>()->name)
-	) {
-		MEMBER(components);
-	}
+	// inline static StructType* reflect_type(BaseVector* x, StructType* type) {
+	// 	Vector_Members<N, T>::reflect_type(x, type);
+	// }
 };
 
-template <typename T> using Vector2_Impl = Base_Vector<2, T>;
-template <typename T> using Vector3_Impl = Base_Vector<3, T>;
-template <typename T> using Vector4_Impl = Base_Vector<4, T>;
+template <typename T> using Vector2_Impl = BaseVector<2, T>;
+template <typename T> using Vector3_Impl = BaseVector<3, T>;
+template <typename T> using Vector4_Impl = BaseVector<4, T>;
 
 using Vector2_f32 = Vector2_Impl<f32>;
 using Vector2_s32 = Vector2_Impl<s32>;
@@ -215,7 +238,7 @@ auto make_vector4(auto x, auto y, auto z, auto w) {
 }
 
 template <int N, typename T>
-auto dot(Base_Vector<N, T> a, Base_Vector<N, T> b) {
+auto dot(BaseVector<N, T> a, BaseVector<N, T> b) {
 	T sum = 0;
 	for (auto i: range(static_array_count(a.components))) {
 		sum += a[i] * b[i];
@@ -224,14 +247,14 @@ auto dot(Base_Vector<N, T> a, Base_Vector<N, T> b) {
 }
 
 template <int N, typename T>
-auto project(Base_Vector<N, T> line_start, Base_Vector<N, T> line_end, Base_Vector<N, T> point) {
+auto project(BaseVector<N, T> line_start, BaseVector<N, T> line_end, BaseVector<N, T> point) {
 	auto line          = line_end - line_start;
 	auto line_to_point = point    - line_start;
 	return line_start + line * (dot(line_to_point, line) / dot(line, line));
 }
 
 template <int N, typename T>
-auto magnitude_squared(Base_Vector<N, T> v) {
+auto magnitude_squared(BaseVector<N, T> v) {
 	T sum = 0;
 	for (auto i: range(N)) {
 		sum += v.components[i] * v.components[i];
@@ -240,12 +263,12 @@ auto magnitude_squared(Base_Vector<N, T> v) {
 }
 
 template <int N, typename T>
-auto magnitude(Base_Vector<N, T> v) {
+auto magnitude(BaseVector<N, T> v) {
 	return sqrt(magnitude_squared(v));
 }
 
 template <int N, typename T>
-auto normalize(Base_Vector<N, T> v) {
+auto normalize(BaseVector<N, T> v) {
 	auto mag = magnitude(v);
 	if (mag == 0) {
 		return v;
@@ -254,6 +277,6 @@ auto normalize(Base_Vector<N, T> v) {
 }
 
 template <int N, typename T>
-auto lerp(Base_Vector<N, T> a, Base_Vector<N, T> b, f64 c) {
+auto lerp(BaseVector<N, T> a, BaseVector<N, T> b, f64 c) {
 	return a + (b - a) * c;
 }
