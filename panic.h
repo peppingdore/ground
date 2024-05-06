@@ -23,7 +23,13 @@ inline void* panic_allocator_proc(AllocatorVerb verb, void* old_data, u64 old_si
 		}
 		break;
 		case ALLOCATOR_VERB_FREE: return NULL;
-		case ALLOCATOR_VERB_REALLOC: return NULL;
+		case ALLOCATOR_VERB_REALLOC: {
+			void* new_data = panic_allocator_proc(ALLOCATOR_VERB_ALLOC, NULL, 0, size, allocator_data, loc);
+			memcpy(new_data, old_data, min(old_size, size));
+			panic_allocator_proc(ALLOCATOR_VERB_FREE, old_data, 0, 0, allocator_data, loc);
+			return new_data;
+		}
+		break;
 		case ALLOCATOR_VERB_GET_TYPE: return NULL;
 		case ALLOCATOR_VERB_FREE_ALLOCATOR: return NULL;
 	}
