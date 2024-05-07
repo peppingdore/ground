@@ -10,7 +10,7 @@ constexpr u64 panic_message_memory_size = 16 * 1024;
 inline u8     panic_message_memory[panic_message_memory_size];
 inline u64    panic_message_memory_offset = 0;
 
-inline void* panic_allocator_proc(AllocatorVerb verb, void* old_data, u64 old_size, u64 size, void* allocator_data, CodeLocation code_location) {
+inline void* panic_allocator_proc(AllocatorVerb verb, void* old_data, u64 old_size, u64 size, void* allocator_data, CodeLocation loc) {
 	switch (verb) {
 		case ALLOCATOR_VERB_ALLOC: {
 			if (size + panic_message_memory_offset > panic_message_memory_size) {
@@ -46,12 +46,23 @@ constexpr Allocator panic_allocator = {
 
 Spinlock PANIC_LOCK;
 
+void panic_write_string(const char* str) {
+	fwrite(str, strlen(str), 1, stderr);
+}
+
 inline void panic(const char* file_name, int line_number, auto... args) {
 	PANIC_LOCK.lock();
 	auto message = sprint_unicode(panic_allocator, args...);
 	String utf8 = encode_utf8(panic_allocator, message);
+	panic_write_string("Panic: ");
 	fwrite(utf8.data, len(utf8), 1, stderr);
-	fwrite("\n", 1, 1, stderr);
+	panic_write_string("\n");
+	panic_write_string("  at ");
+	fwrite(file_name, strlen(file_name), 1, stderr);
+	fwrite(":", 1, 1, stderr);
+	char buf[32];
+	itoa(line_number, buf, 10);
+	fwrite(buf, strlen(buf), 1, stderr);
 	Debug_Break();
 	exit(-1);
 }
