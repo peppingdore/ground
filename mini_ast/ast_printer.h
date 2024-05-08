@@ -32,7 +32,7 @@ void print_expr(AllocatedUnicodeString* sb, AstNode* expr) {
 	} else if (auto member_access = reflect_cast<AstVarMemberAccess>(expr)) {
 		print_expr(sb, member_access->lhs);
 		append(sb, ".");
-		append(sb, member_access->member);
+		append(sb, member_access->member.name);
 	} else if (auto var_decl = reflect_cast<AstVar>(expr)) {
 		append(sb, var_decl->name);
 	} else if (auto literal = reflect_cast<LiteralExpr>(expr)) {

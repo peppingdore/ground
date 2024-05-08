@@ -345,9 +345,29 @@ struct AstVarDeclGroup: AstNode {
 	}
 };
 
+struct AstStructMember {
+	AstType*      type = NULL;
+	UnicodeString name;
+	s64           offset = 0;
+
+	REFLECT(AstStructMember) {
+		MEMBER(type);
+		MEMBER(name);
+		MEMBER(offset);
+	}
+};
+
+AstStructMember make_ast_struct_member(AstType* type, UnicodeString name, s64 offset) {
+	AstStructMember member;
+	member.type = type;
+	member.name = name;
+	member.offset = offset;
+	return member;
+}
+
 struct AstVarMemberAccess: AstExpr {
-	AstNode*      lhs;
-	UnicodeString member;
+	AstExpr*        lhs;
+	AstStructMember member;
 
 	REFLECT(AstVarMemberAccess) {
 		BASE_TYPE(AstExpr);
@@ -782,6 +802,10 @@ AstNode* lookup_symbol(CLikeParser* p, UnicodeString name) {
 }
 
 AstType* find_type(CLikeParser* p, UnicodeString name) {
+	if (name == "f32") {
+		name = U"float"_b;
+	}
+
 	auto symbol = lookup_symbol(p, name);
 	if (symbol) {
 		if (auto tp = reflect_cast<AstType>(symbol)) {
@@ -1067,26 +1091,6 @@ s64 get_type_size(AstType* type) {
 	return 0;
 }
 
-struct AstStructMember {
-	AstType*      type = NULL;
-	UnicodeString name;
-	s64           offset = 0;
-
-	REFLECT(AstStructMember) {
-		MEMBER(type);
-		MEMBER(name);
-		MEMBER(offset);
-	}
-};
-
-AstStructMember make_ast_struct_member(AstType* type, UnicodeString name, s64 offset) {
-	AstStructMember member;
-	member.type = type;
-	member.name = name;
-	member.offset = offset;
-	return member;
-}
-
 s64 get_members_count(AstType* type) {
 	if (auto c_alias = reflect_cast<CTypeAlias>(type)) {
 		auto c_type = c_alias->c_type;
@@ -1143,9 +1147,11 @@ Optional<AstStructMember> get_struct_member(CLikeParser* p, AstType* type, Unico
 			for (auto& member: c_struct_type->members) {
 				if (make_string(member.name) == name) {
 					auto unicode_str = copy_unicode_string(p->allocator, make_string(member.name));
-					auto found = find_type(p, unicode_str);
+					auto type_name_unicode = copy_unicode_string(p->allocator, make_string(member.type->name));
+					defer { type_name_unicode.free(); };
+					auto found = find_type(p, type_name_unicode);
 					if (!found) {
-						panic("Type '%' not found", unicode_str);
+						panic("Type '%' not found", type_name_unicode);
 					}
 					return make_ast_struct_member(found, unicode_str, member.offset);
 				}
@@ -1256,13 +1262,14 @@ Tuple<AstExpr*, Error*> try_parse_swizzle_expr(CLikeParser* p, AstExpr* lhs, Tok
 		}
 
 		if (swizzle_len == 1) {
-			auto expr = make_ast_expr<AstArrayAccess>(p->allocator, swizzle_type, AST_EXPR_LVALUE, text_region);
+			auto expr = make_ast_expr<AstVarMemberAccess>(p->allocator, swizzle_type, lhs->is_lvalue, text_region);
 			expr->lhs = lhs;
-			auto idx = make_ast_expr<LiteralExpr>(p->allocator, find_type(p, U"int"_b), AST_EXPR_RVALUE, {});
-			idx->s64_value = swizzle_idx[0];
-			expr->index = idx;
-			lhs = expr;
-			return { lhs, NULL };
+			auto [member, found] = get_struct_member(p, lhs->expr_type, ident.str);
+			if (!found) {
+				return { NULL, simple_parser_error(p, current_loc(), ident.reg, U"Member '%' not found in struct '%'.", ident.str, lhs->expr_type->name) };
+			}
+			expr->member = member;
+			return { expr, NULL };
 		}
 
 		auto expr = make_ast_expr<AstSwizzleExpr>(p->allocator, lhs->expr_type, AST_EXPR_RVALUE, text_region);
@@ -1667,7 +1674,7 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 			}
 			auto node = make_ast_expr<AstVarMemberAccess>(p->allocator, member.type, lhs->is_lvalue, text_region);
 			node->lhs = lhs;
-			node->member = ident.str;
+			node->member = member;
 			lhs = node;
 			continue;
 		}
@@ -1785,10 +1792,10 @@ Tuple<AstNode*, Error*> parse_if(CLikeParser* p) {
 	return { NULL, simple_parser_error(p, current_loc(), peek(p).reg, U"TODO: parse if"_b) };
 }
 
-Tuple<AstNode*, Error*> parse_block(CLikeParser* p);
+Tuple<AstBlock*, Error*> parse_block(CLikeParser* p);
 Tuple<AstNode*, Error*> parse_stmt(CLikeParser* p);
 
-Tuple<AstNode*, Error*> parse_block_or_one_stmt(CLikeParser* p) {
+Tuple<AstBlock*, Error*> parse_block_or_one_stmt(CLikeParser* p) {
 	auto tok = peek(p);
 	if (tok.str == "{"_b) {
 		next(p);
@@ -1809,10 +1816,10 @@ Tuple<AstNode*, Error*> parse_block_or_one_stmt(CLikeParser* p) {
 }
 
 struct AstFor: AstNode {
-	AstNode* init_expr = NULL;
-	AstNode* cond_expr = NULL;
-	AstNode* incr_expr = NULL;
-	AstNode* body = NULL;
+	AstExpr*  init_expr = NULL;
+	AstExpr*  cond_expr = NULL;
+	AstExpr*  incr_expr = NULL;
+	AstBlock* body = NULL;
 
 	REFLECT(AstFor) {
 		BASE_TYPE(AstNode);
@@ -1895,7 +1902,7 @@ Tuple<AstNode*, Error*> parse_stmt(CLikeParser* p) {
 	return { expr, e };
 }
 
-Tuple<AstNode*, Error*> parse_block(CLikeParser* p) {
+Tuple<AstBlock*, Error*> parse_block(CLikeParser* p) {
 	auto tok = peek(p);
 	if (tok.str != U"{"_b) {
 		return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Expected a {"_b) };
