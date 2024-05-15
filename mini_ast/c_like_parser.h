@@ -1163,8 +1163,8 @@ Optional<AstStructMember> get_struct_member(CLikeParser* p, AstType* type, Unico
 
 struct AstSwizzleExpr: AstExpr {
 	AstExpr* lhs;
-	int      swizzle[4];
-	int      swizzle_len = 0;
+	s32      swizzle[4];
+	s32      swizzle_len = 0;
 
 	REFLECT(AstSwizzleExpr) {
 		BASE_TYPE(AstExpr);
@@ -1174,7 +1174,7 @@ struct AstSwizzleExpr: AstExpr {
 	}
 };
 
-bool parse_swizzle_ident(CLikeParser* p, UnicodeString ident, int* swizzle, int src_len) {
+bool parse_swizzle_ident(CLikeParser* p, UnicodeString ident, s32* swizzle, s32 src_len) {
 	s64 ident_len = len(ident);
 	if (ident_len > 4) {
 		return false;
@@ -1272,7 +1272,7 @@ Tuple<AstExpr*, Error*> try_parse_swizzle_expr(CLikeParser* p, AstExpr* lhs, Tok
 			return { expr, NULL };
 		}
 
-		auto expr = make_ast_expr<AstSwizzleExpr>(p->allocator, lhs->expr_type, AST_EXPR_RVALUE, text_region);
+		auto expr = make_ast_expr<AstSwizzleExpr>(p->allocator, lhs->expr_type, lhs->is_lvalue, text_region);
 		expr->lhs = lhs;
 		expr->swizzle[0] = swizzle_idx[0];
 		expr->swizzle[1] = swizzle_idx[1];
