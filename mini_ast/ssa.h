@@ -12,56 +12,36 @@ AstRunner* make_ast_runner(CLikeProgram* program) {
 	return runner;
 }
 
-struct SsaValue {
-	AstType* type = NULL;
-	
-		
-};
-
-struct Ssa;
-struct SsaBasicBlock;
-
-struct SsaReg {
+struct SsaId { 
 	s64 v = 0;
-
-	bool operator==(SsaReg rhs) {
-		return v == rhs.v;
-	}
-
-	REFLECT(SsaReg) {
-		MEMBER(v);
-	}
 };
 
-void type_format(Formatter* fmt, SsaReg* reg, String spec) {
-	format(fmt, "$%", reg->v);
-}
-
-constexpr SsaReg SSA_NO_REG = { .v = 0 };
-
-struct SsaInst {
-	Type*          type = NULL;
-	SsaBasicBlock* block = NULL;
-	SsaReg         dst = SSA_NO_REG;
-
-	REFLECT(SsaInst) {
-		MEMBER(type); TAG(RealTypeMember{});
-		MEMBER(block);
-		MEMBER(dst);
-	}
+enum class SsaOp {
+	UnfilledPhi,
+	Phi,
+	Add,
+	Sub,
+	Const,
 };
 
-struct SsaPhi;
+struct SsaValue {
+	SsaId            id;
+	SsaBasicBlock*   block = NULL;
+	AstType*         type = NULL;
+	Array<SsaValue*> args;
+	u64              imm = 0;
+	AstVar*          var = NULL;
+};
 
 struct SsaBasicBlock {
-	String                name;
-	Ssa*                  ssa;
-	bool                  is_sealed = false;
-	Array<SsaInst*>       insts;
-	Array<SsaPhi*>       incomplete_phis;
-	Array<SsaBasicBlock*> pred;
-	Array<SsaBasicBlock*> successors;
-	HashMap<AstVar*, SsaReg> var_map;
+	String                      name;
+	Ssa*                        ssa;
+	bool                        is_sealed = false;
+	Array<SsaValue*>            values;
+	Array<SsaValue*>            incomplete_phis;
+	Array<SsaBasicBlock*>       pred;
+	Array<SsaBasicBlock*>       successors;
+	HashMap<AstVar*, SsaValue*> var_map;
 };
 
 void add_pred(SsaBasicBlock* block, SsaBasicBlock* pred) {
@@ -81,15 +61,15 @@ struct Ssa {
 	}
 };
 
-SsaReg alloc_reg(Ssa* ssa) {
-	return SsaReg { ++ssa->reg_counter };
+SsaId alloc_id(Ssa* ssa) {
+	return SsaId { ++ssa->reg_counter };
 }
 
 SsaBasicBlock* make_ssa_basic_block(Ssa* ssa, String name = ""_b) {
 	SsaBasicBlock* block = make<SsaBasicBlock>(ssa->allocator);
 	block->name = name;
 	block->ssa = ssa;
-	block->insts = { .allocator = ssa->allocator };
+	block->values = { .allocator = ssa->allocator };
 	block->incomplete_phis = { .allocator = ssa->allocator };
 	block->pred = { .allocator = ssa->allocator };
 	block->successors = { .allocator = ssa->allocator };
@@ -97,17 +77,11 @@ SsaBasicBlock* make_ssa_basic_block(Ssa* ssa, String name = ""_b) {
 	return block;
 }
 
-void write_var(SsaBasicBlock* block, AstVar* var, SsaReg reg) {
-	put(&block->var_map, var, reg);
+void write_var(SsaBasicBlock* block, AstVar* var, SsaValue* v) {
+	put(&block->var_map, var, v);
 }
 
-SsaReg read_var(SsaBasicBlock* block, AstVar* var);
-
-struct SsaPhi: SsaInst {
-	Array<SsaReg>         args;
-	Array<SsaBasicBlock*> pred;
-	AstVar*               var = NULL;
-};
+SsaValue* read_var(SsaBasicBlock* block, AstVar* var);
 
 template <typename T>
 T* make_ssa_inst(SsaBasicBlock* block) {
@@ -118,38 +92,38 @@ T* make_ssa_inst(SsaBasicBlock* block) {
 	return inst;
 }
 
-void add_phi_args(SsaPhi* phi) {
+void add_phi_args(SsaValue* phi) {
+	if (phi->op == SsaOp::Phi) {
+		return;
+	}
+	assert(phi->op == SsaOp::UnfilledPhi);
 	for (auto pred: phi->block->pred) {
-		SsaReg reg = read_var(pred, phi->var);
-		if (reg == SSA_NO_REG) {
-			panic("Unknown variable: %", phi->var->name);
-		}
-		add(&phi->args, reg);
-		add(&phi->pred, pred);
+		auto v = read_var(pred, phi->var);
+		add(&phi->args, v);
 	}
 }
 
-SsaReg read_var_recursive(SsaBasicBlock* block, AstVar* var) {
-	SsaReg reg = SSA_NO_REG;
+SsaValue* read_var_recursive(SsaBasicBlock* block, AstVar* var) {
+	SsaValue* v = NULL;
 	if (!block->is_sealed) {
 		auto phi = make_ssa_inst<SsaPhi>(block);
 		phi->dst = alloc_reg(block->ssa);
 		phi->var = var;
 		add(&block->incomplete_phis, phi);
-		reg = phi->dst;
+		v = phi;
 	} else if (len(block->pred) == 1) {
-		reg = read_var(block->pred[0], var);
+		v = read_var(block->pred[0], var);
 	} else {
 		auto phi = make_ssa_inst<SsaPhi>(block);
 		phi->dst = alloc_reg(block->ssa);
 		phi->var = var;
 		write_var(block, var, phi->dst);
 		add_phi_args(phi);
-		reg = phi->dst;
+		v = phi;
 	}
-	assert(reg != SSA_NO_REG);
-	write_var(block, var, reg);
-	return reg;
+	assert(v != NULL);
+	write_var(block, var, v);
+	return v;
 }
 
 void seal_block(SsaBasicBlock* block) {
@@ -171,55 +145,13 @@ void add_prec(SsaBasicBlock* block, SsaBasicBlock* pred) {
 	add(&pred->successors, block);
 }
 
-SsaReg read_var(SsaBasicBlock* block, AstVar* var) {
-	assert(var->is_global);
+SsaValue* read_var(SsaBasicBlock* block, AstVar* var) {
 	auto found = get(&block->var_map, var);
 	if (found) {
 		return *found;
 	}
-	return SSA_NO_REG;
+	return NULL;
 }
-
-enum class SsaLValueNodeKind {
-	ArrayIndex,
-	MemberAccess,
-	Swizzle,
-};
-
-struct SsaLValueNode {
-	SsaLValueNodeKind kind;
-	s32               swizzle[4];
-	s32               swizzle_len = 0;
-	SsaReg            idx = SSA_NO_REG;
-	s64               elem_size = 0;
-	s64               member_offset = 0;
-};
-
-struct SsaLvalue {
-	AstVar*              var = NULL;
-	SsaReg               addr_reg = SSA_NO_REG;
-	Array<SsaLValueNode> nodes;
-};
-
-struct SsaLoadConst: SsaInst {
-	AstType*  lit_type = NULL;
-	Array<u8> data;
-
-	REFLECT(SsaLoadConst) {
-		BASE_TYPE(SsaInst);
-		MEMBER(lit_type);
-		MEMBER(data);
-	}
-};
-
-struct SsaLoadCConst: SsaInst {
-	Any data;
-
-	REFLECT(SsaLoadCConst) {
-		BASE_TYPE(SsaInst);
-		MEMBER(data);
-	}
-};
 
 template <typename T>
 SsaReg load_const(SsaBasicBlock* block, T value) {
@@ -237,10 +169,10 @@ s64 resovle_type_size(AstType* type) {
 	return 0;
 }
 
-Tuple<SsaLvalue, Error*> emit_lvalue(SsaBasicBlock* block, AstExpr* expr) {
+Tuple<SsaValue*, Error*> emit_lvalue(SsaBasicBlock* block, AstExpr* expr) {
 	if (!expr->is_lvalue) {
 		println("%*+", expr);
-		panic();
+		panic("Expected lvalue");
 	}
 	assert(expr->is_lvalue);
 
