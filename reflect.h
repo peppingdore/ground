@@ -528,6 +528,7 @@ bool reflect_does_type_inherit(Type* derived, Type* base, s32* out_offset) {
 
 bool reflect_can_cast(Type* derived, Type* base, s32* out_offset) {
 	if (derived == base) {
+		*out_offset = 0;
 		return true;
 	}
 	return reflect_does_type_inherit(derived, base, out_offset);
@@ -544,7 +545,7 @@ T* reflect_cast(auto* x) {
 
 template <typename T>
 T* reflect_cast(Any any) {
-	s32 offset;
+	s32 offset = 0;
 	if (reflect_can_cast(any.type, reflect_type_of<T>(), &offset)) {
 		return (T*) ptr_add(any.ptr, -offset);
 	}
