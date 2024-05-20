@@ -17,25 +17,64 @@ struct SsaId {
 };
 
 enum class SsaOp {
-	UnfilledPhi,
+	Nop = 0,
 	Phi,
 	Add,
 	Sub,
+	Mul,
+	Div,
+	Less,
+	Greater,
 	Const,
+	Call,
+	GlobalVar,
+	MemberAccess,
+	Swizzle,
+	Store,
+	Load,
+	Alloca,
+	Jump,
+	CondJump,
+	Return,
 };
+REFLECT(SsaOp) {
+	ENUM_VALUE(Nop);
+	ENUM_VALUE(Phi);
+	ENUM_VALUE(Add);
+	ENUM_VALUE(Sub);
+	ENUM_VALUE(Mul);
+	ENUM_VALUE(Div);
+	ENUM_VALUE(Less);
+	ENUM_VALUE(Greater);
+	ENUM_VALUE(Const);
+	ENUM_VALUE(Call);
+	ENUM_VALUE(GlobalVar);
+	ENUM_VALUE(MemberAccess);
+	ENUM_VALUE(Swizzle);
+	ENUM_VALUE(Store);
+	ENUM_VALUE(Load);
+	ENUM_VALUE(Alloca);
+	ENUM_VALUE(Jump);
+	ENUM_VALUE(CondJump);
+	ENUM_VALUE(Return);
+}
+
+struct SsaBasicBlock;
+struct Ssa;
 
 struct SsaValue {
 	SsaId            id;
+	SsaOp            op = SsaOp::Nop;
 	SsaBasicBlock*   block = NULL;
 	AstType*         type = NULL;
 	Array<SsaValue*> args;
-	u64              imm = 0;
-	AstVar*          var = NULL;
+	Any              aux;
 };
 
 struct SsaBasicBlock {
 	String                      name;
 	Ssa*                        ssa;
+	SsaValue*                   ending = NULL;
 	bool                        is_sealed = false;
 	Array<SsaValue*>            values;
 	Array<SsaValue*>            incomplete_phis;
@@ -44,17 +83,11 @@ struct SsaBasicBlock {
 	HashMap<AstVar*, SsaValue*> var_map;
 };
 
-void add_pred(SsaBasicBlock* block, SsaBasicBlock* pred) {
-	if (block->is_sealed) {
-		panic("Cannot add pred to sealed block");
-	}
-	add(&block->pred, pred);
-}
-
 struct Ssa {
 	Allocator             allocator = c_allocator;
 	SsaBasicBlock*        entry = NULL;
 	s64                   reg_counter = 0;
+	SsaBasicBlock*        current_block = NULL;
 
 	void free() {
 		free_allocator(allocator);
@@ -78,46 +111,59 @@ SsaBasicBlock* make_ssa_basic_block(Ssa* ssa, String name = ""_b) {
 }
 
 void write_var(SsaBasicBlock* block, AstVar* var, SsaValue* v) {
+	if (block->ending) {
+		panic("Cannot write_var to filled block");
+	}
 	put(&block->var_map, var, v);
 }
 
 SsaValue* read_var(SsaBasicBlock* block, AstVar* var);
 
-template <typename T>
-T* make_ssa_inst(SsaBasicBlock* block) {
-	T* inst = make<T>(block->ssa->allocator);
-	inst->type = reflect_type_of<T>();
-	inst->block = block;
-	add(&block->insts, inst);
-	return inst;
-}
-
-void add_phi_args(SsaValue* phi) {
-	if (phi->op == SsaOp::Phi) {
-		return;
+SsaValue* make_ssa_val(SsaBasicBlock* block, SsaOp op) {
+	if (block->ending) {
+		panic("Cannot make_ssa_val in filled block");
 	}
-	assert(phi->op == SsaOp::UnfilledPhi);
+	auto v = make<SsaValue>(block->ssa->allocator);
+	v->block = block;
+	v->op = op;
+	v->id = alloc_id(block->ssa);
+	add(&block->values, v);
+	return v;
+}
+void add_phi_args(SsaValue* phi) {
+	assert(len(phi->args) == 0);
+	auto var = reflect_cast<AstVar>(phi->aux);
+	if (!var) {
+		panic("Expected var");
+	}
 	for (auto pred: phi->block->pred) {
-		auto v = read_var(pred, phi->var);
+		auto v = read_var(pred, var);
+		assert(v);
 		add(&phi->args, v);
 	}
+	phi->op = SsaOp::Phi;
 }
 
 SsaValue* read_var_recursive(SsaBasicBlock* block, AstVar* var) {
+	// We might add some phi values,
+	//   but we don't want to trigger is_filled assert.
+	auto old_ending = block->ending;
+	block->ending = NULL;
+	defer { block->ending = old_ending; };
+
 	SsaValue* v = NULL;
 	if (!block->is_sealed) {
-		auto phi = make_ssa_inst<SsaPhi>(block);
-		phi->dst = alloc_reg(block->ssa);
-		phi->var = var;
+		auto phi = make_ssa_val(block, SsaOp::Phi);
+		phi->aux = make_any(var);
 		add(&block->incomplete_phis, phi);
 		v = phi;
 	} else if (len(block->pred) == 1) {
+		assert(block->pred[0]->ending);
 		v = read_var(block->pred[0], var);
 	} else {
-		auto phi = make_ssa_inst<SsaPhi>(block);
-		phi->dst = alloc_reg(block->ssa);
-		phi->var = var;
-		write_var(block, var, phi->dst);
+		auto phi = make_ssa_val(block, SsaOp::Phi);
+		phi->aux = make_any(var);
+		write_var(block, var, phi);
 		add_phi_args(phi);
 		v = phi;
 	}
@@ -129,39 +175,77 @@ SsaValue* read_var_recursive(SsaBasicBlock* block, AstVar* var) {
 void seal_block(SsaBasicBlock* block) {
 	for (auto phi: block->incomplete_phis) {
 		add_phi_args(phi);
-		remove(&block->incomplete_phis, phi);
 	}
+	clear(&block->incomplete_phis);
 	block->is_sealed = true;
 }
 
-void add_prec(SsaBasicBlock* block, SsaBasicBlock* pred) {
+void add_pred_inner(SsaBasicBlock* block, SsaBasicBlock* pred) {
 	if (!pred->is_sealed) {
 		panic("Cannot add unsealed pred");
 	}	
 	if (block->is_sealed) {
 		panic("Cannot add pred to sealed block");
 	}
+	if (pred->ending == NULL) {
+		panic("Cannot add unfilled pred");
+	}
 	add(&block->pred, pred);
 	add(&pred->successors, block);
+}
+
+void end_block_jump(SsaBasicBlock* block, SsaBasicBlock* target) {
+	assert(block->ending == NULL);
+	auto v = make_ssa_val(block, SsaOp::Jump);
+	v->aux = make_any(target);
+	block->ending = v;
+	add_pred_inner(target, block);
+}
+
+void end_block_ret(SsaBasicBlock* block, SsaValue* ret) {
+	assert(block->ending == NULL);
+	block->ending = make_ssa_val(block, SsaOp::Return);
+	if (ret) {
+		add(&block->ending->args, ret);
+	}
+}
+
+struct SsaCondJump {
+	SsaBasicBlock* t_block = NULL;
+	SsaBasicBlock* f_block = NULL;
+};
+
+void end_block_cond_jump(SsaBasicBlock* block, SsaValue* cond, SsaBasicBlock* t_block, SsaBasicBlock* f_block) {
+	assert(block->ending == NULL);
+	auto v = make_ssa_val(block, SsaOp::CondJump);
+	add(&v->args, cond);
+	auto cj = make<SsaCondJump>(block->ssa->allocator);
+	cj->t_block = t_block;
+	cj->f_block = f_block;
+	v->aux = make_any(cj);
+	block->ending = v;
+	add_pred_inner(t_block, block);
+	add_pred_inner(f_block, block);
 }
 
 SsaValue* read_var(SsaBasicBlock* block, AstVar* var) {
 	auto found = get(&block->var_map, var);
 	if (found) {
 		return *found;
+	} else {
+		return read_var_recursive(block, var);
 	}
 	return NULL;
 }
 
 template <typename T>
-SsaReg load_const(SsaBasicBlock* block, T value) {
+SsaValue* load_const(Ssa* ssa, T value) {
 	Type* type = reflect_type_of<T>();
-	void* data = Malloc(block->ssa->allocator, sizeof(T));
-	memcpy(data, &value, sizeof(T));
-	auto inst = make_ssa_inst<SsaLoadCConst>(block);
-	inst->dst = alloc_reg(block->ssa);
-	inst->data = make_any(type, data);
-	return inst->dst;
+	auto inst = make_ssa_val(ssa->current_block, SsaOp::Const);
+	// @MemoryLeak
+	auto copied = copy(ssa->allocator, value);
+	inst->aux = make_any(type, copied);
+	return inst;
 }
 
 s64 resovle_type_size(AstType* type) {
@@ -169,212 +253,156 @@ s64 resovle_type_size(AstType* type) {
 	return 0;
 }
 
-Tuple<SsaValue*, Error*> emit_lvalue(SsaBasicBlock* block, AstExpr* expr) {
+Tuple<SsaValue*, Error*> lvalue(Ssa* ssa, AstExpr* expr) {
 	if (!expr->is_lvalue) {
-		println("%*+", expr);
-		panic("Expected lvalue");
+		return { NULL, format_error("Expected lvalue, got %*", expr->type->name) };
 	}
-	assert(expr->is_lvalue);
 
-	if (auto var_access = reflect_cast<AstVariableAccess>(expr)) {
-		return { SsaLvalue { var_access->var }, NULL };
-	} else if (auto arr_access = reflect_cast<AstArrayAccess>(expr)) {
-		auto [lhs, e] = emit_lvalue(block, arr_access->lhs);
+	if (auto var_access = reflect_cast<AstVarMemberAccess>(expr)) {
+		auto [lhs, e] = lvalue(ssa, var_access->lhs);
 		if (e) {
-			return { {}, e };
+			return { NULL, e };
 		}
-		s64 elem_size = resovle_type_size(arr_access->expr_type);
-		auto idx = load_const(block, make_any(&elem_size));
-		auto node = SsaLValueNode { 
-			.kind = SsaLValueNodeKind::ArrayIndex,
-			.idx = idx,
-			.elem_size = elem_size
-		};
-		add(&lhs.nodes, node);
-		return { lhs, NULL };
-	} else if (auto access = reflect_cast<AstVarMemberAccess>(expr)) {
-		auto [lhs, e] = emit_lvalue(block, access->lhs);
+		auto v = make_ssa_val(ssa->current_block, SsaOp::MemberAccess);
+		add(&v->args, lhs);
+		v->aux = make_any(var_access->member);
+		return { v, NULL };
+	} else if (auto var_access = reflect_cast<AstVariableAccess>(expr)) {
+		if (var_access->var->is_global) {
+			auto v = make_ssa_val(ssa->current_block, SsaOp::GlobalVar);
+			v->aux = make_any(var_access->var);
+			return { v, NULL };
+		}
+		auto v = read_var(ssa->current_block, var_access->var);
+		if (!v) {
+			return { NULL, format_error("Unknown variable: %*", var_access->var->type->name) };
+		}
+		return { v, NULL };
+	} else if (auto sw = reflect_cast<AstSwizzleExpr>(expr)) {
+		auto [lhs, e] = lvalue(ssa, sw->lhs);
 		if (e) {
-			return { {}, e };
+			return { NULL, e };
 		}
-		auto node = SsaLValueNode {
-			.kind = SsaLValueNodeKind::MemberAccess,
-			.member_offset = access->member.offset
-		};
-		add(&lhs.nodes, node);
-		return { lhs, NULL };
-	} else if (auto swizzle = reflect_cast<AstSwizzleExpr>(expr)) {
-		auto [lhs, e] = emit_lvalue(block, swizzle->lhs);
-		if (e) {
-			return { {}, e };
-		}
-		auto node = SsaLValueNode {
-			.kind = SsaLValueNodeKind::Swizzle,
-			.swizzle_len = swizzle->swizzle_len,
-		};
-		memcpy(node.swizzle, swizzle->swizzle, sizeof(s32) * swizzle->swizzle_len);
-		add(&lhs.nodes, node);
-		return { lhs, NULL };
+		auto v = make_ssa_val(ssa->current_block, SsaOp::Swizzle);
+		add(&v->args, lhs);
+		v->aux = make_any(sw);
+		return { v, NULL };
+	}
+	return { NULL, format_error("Unsupported lvalue: %*", expr->type->name) };
+}
+
+Tuple<SsaValue*, Error*> load(Ssa* ssa, SsaValue* lhs) {
+	auto v = make_ssa_val(ssa->current_block, SsaOp::Load);
+	add(&v->args, lhs);
+	return { v, NULL };
+}
+
+SsaValue* store(Ssa* ssa, SsaValue* lhs, SsaValue* rhs) {
+	auto v = make_ssa_val(ssa->current_block, SsaOp::Store);
+	add(&v->args, lhs);
+	add(&v->args, rhs);
+	return v;
+}
+
+Tuple<SsaValue*, Error*> emit_binary_op(Ssa* ssa, UnicodeString op, SsaValue* lhs, SsaValue* rhs) {
+	SsaOp ssa_op = SsaOp::Nop;
+	if (op == "+") {
+		ssa_op = SsaOp::Add;
+	} else if (op == "-") {
+		ssa_op = SsaOp::Sub;
+	} else if (op == "*") {
+		ssa_op = SsaOp::Mul;
+	} else if (op == "/") {
+		ssa_op = SsaOp::Div;
+	} else if (op == "<") {
+		ssa_op = SsaOp::Less;
+	} else if (op == ">") {
+		ssa_op = SsaOp::Greater;
+	} else if (op == ",") {
+		return { rhs, NULL };
 	} else {
-		println("%*+", expr);
-		return { {}, format_error("Unsupported expression: %*", expr->type->name) };
+		return { NULL, format_error("Unsupported binary operator: %", op) };
 	}
+	auto v = make_ssa_val(ssa->current_block, ssa_op);
+	add(&v->args, lhs);
+	add(&v->args, rhs);
+	return { v, NULL };
 }
 
-struct SsaBinaryOp: SsaInst {
-	UnicodeString op;
-	SsaReg        lhs = SSA_NO_REG;
-	SsaReg        rhs = SSA_NO_REG;
-
-	REFLECT(SsaBinaryOp) {
-		BASE_TYPE(SsaInst);
-		MEMBER(op);
-		MEMBER(lhs);
-		MEMBER(rhs);
-	}
-};
-
-SsaReg emit_binary_op(SsaBasicBlock* block, UnicodeString op, SsaReg lhs, SsaReg rhs) {
-	auto inst = make_ssa_inst<SsaBinaryOp>(block);
-	inst->dst = alloc_reg(block->ssa);
-	inst->op = op;
-	inst->lhs = lhs;
-	inst->rhs = rhs;
-	return inst->dst;
-}
-
-struct SsaFunctionCall: SsaInst {
-	AstNode* f = NULL;
-	Array<SsaReg> args;
-
-	REFLECT(SsaFunctionCall) {
-		BASE_TYPE(SsaInst);
-		MEMBER(f);
-		MEMBER(args);
-	}
-};
-
-struct SsaStore: SsaInst {
-	SsaLvalue lhs;
-	SsaReg    rhs = SSA_NO_REG;
-
-	REFLECT(SsaStore) {
-		BASE_TYPE(SsaInst);
-		MEMBER(lhs);
-		MEMBER(rhs);
-	}
-};
-
-SsaStore* emit_store(SsaBasicBlock* block, SsaLvalue lhs, SsaReg rhs) {
-	auto inst = make_ssa_inst<SsaStore>(block);
-	inst->dst = alloc_reg(block->ssa);
-	inst->lhs = lhs;
-	inst->rhs = rhs;
-	return inst;
-}
-
-struct SsaLoadLvalue: SsaInst {
-	SsaLvalue lhs;
-
-	REFLECT(SsaLoadLvalue) {
-		BASE_TYPE(SsaInst);
-		MEMBER(lhs);
-	}
-};
-
-SsaReg emit_load_lvalue(SsaBasicBlock* block, SsaLvalue lhs) {
-	auto inst = make_ssa_inst<SsaLoadLvalue>(block);
-	inst->dst = alloc_reg(block->ssa);
-	inst->lhs = lhs;
-	return inst->dst;
-}
-
-Tuple<SsaReg, Error*> emit_expr(SsaBasicBlock* block, AstExpr* expr) {
+Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr) {
 	if (auto call = reflect_cast<AstFunctionCall>(expr)) {
-		auto inst = make_ssa_inst<SsaFunctionCall>(block);
+		auto v = make_ssa_val(ssa->current_block, SsaOp::Call);
+		v->aux = make_any(call->f);
 		for (auto arg: call->args) {
-			auto [var, e] = emit_expr(block, arg);
+			auto [arg_v, e] = emit_expr(ssa, arg);
 			if (e) {
 				return { NULL, e };
 			}
-			add(&inst->args, var);
+			add(&v->args, arg_v);
 		}
-		inst->f = call->f;
-		inst->dst = alloc_reg(block->ssa);
-		return { inst->dst, NULL };
+		return { v, NULL };
 	} else if (auto binary_expr = reflect_cast<CBinaryExpr>(expr)) {
-		auto [rhs, e0] = emit_expr(block, binary_expr->rhs);
+		auto [rhs, e0] = emit_expr(ssa, binary_expr->rhs);
 		if (e0) {
 			return { NULL, e0 };
 		}
 		if (binary_expr->op->op == "=") {
-			auto [lhs, e] = emit_lvalue(block, binary_expr->lhs);
-			if (e) {
-				return { NULL, e };
+			auto [lhs, e1] = lvalue(ssa, binary_expr->lhs);
+			if (e1) {
+				return { NULL, e1 };
 			}
-			emit_store(block, lhs, rhs);
+			auto v = store(ssa, lhs, rhs);
 			return { rhs, NULL };
 		} else if (binary_expr->op->flags & AST_OP_FLAG_MOD_ASSIGN) {
-			auto [lhs, e] = emit_lvalue(block, binary_expr->lhs);
-			if (e) {
-				return { NULL, e };
+			auto [lhs, e1] = lvalue(ssa, binary_expr->lhs);
+			if (e1) {
+				return { NULL, e1 };
 			}
-			auto loaded = emit_load_lvalue(block, lhs);
-			auto oped = emit_binary_op(block, binary_expr->pure_op->op, loaded, rhs);
-			emit_store(block, lhs, oped);
+			auto [loaded, e2] = load(ssa, lhs);
+			if (e2) {
+				return { NULL, e2 };
+			}
+			auto [oped, e3] = emit_binary_op(ssa, binary_expr->pure_op->op, loaded, rhs);
+			if (e3) {
+				return { NULL, e3 };
+			}
+			store(ssa, lhs, oped);
 			return { oped, NULL };
 		} else {
-			auto [lhs, e] = emit_expr(block, binary_expr->lhs);
+			auto [lhs, e] = emit_expr(ssa, binary_expr->lhs);
 			if (e) {
 				return { NULL, e };
 			}
-			auto oped = emit_binary_op(block, binary_expr->op->op, lhs, rhs);
+			auto [oped, e2] = emit_binary_op(ssa, binary_expr->op->op, lhs, rhs);
+			if (e2) {
+				return { NULL, e2 };
+			}
 			return { oped, NULL };
 		}
 	} else if (auto var_access = reflect_cast<AstVariableAccess>(expr)) {
-		auto [lvalue, e] = emit_lvalue(block, expr);
+		auto [lv, e] = lvalue(ssa, var_access);
 		if (e) {
 			return { NULL, e };
 		}
-		auto loaded = emit_load_lvalue(block, lvalue);
-		return { loaded, NULL };
-	} else if (auto literal_expr = reflect_cast<LiteralExpr>(expr)) {
-		auto lit = make_ssa_inst<SsaLoadConst>(block);
-		lit->dst = alloc_reg(block->ssa);
-		lit->lit_type = literal_expr->expr_type;
-		if (literal_expr->expr_type->name == U"int"_b) {
-			lit->data.allocator = block->ssa->allocator;
-			add(&lit->data, (u8*) &literal_expr->s64_value, sizeof(literal_expr->s64_value));
-		} else if (literal_expr->expr_type->name == U"float"_b) {
-			lit->data.allocator = block->ssa->allocator;
-			add(&lit->data, (u8*) &literal_expr->f32_value, sizeof(literal_expr->f32_value));
-		} else if (literal_expr->expr_type->name == U"double"_b) {
-			lit->data.allocator = block->ssa->allocator;
-			add(&lit->data, (u8*) &literal_expr->f64_value, sizeof(literal_expr->f64_value));
-		} else {
-			return { NULL, format_error("Unsupported literal type: %", literal_expr->expr_type->name) };
+		auto [loaded, e2] = load(ssa, lv);
+		if (e2) {
+			return { NULL, e2 };
 		}
-		return { lit->dst, NULL };
-	} else if (auto arr_access = reflect_cast<AstArrayAccess>(expr)) {
-		auto [lvalue, e] = emit_lvalue(block, arr_access->lhs);
-		if (e) {
-			return { NULL, e };
-		}
-		auto loaded = emit_load_lvalue(block, lvalue);
 		return { loaded, NULL };
-	} else if (auto swizzle = reflect_cast<AstSwizzleExpr>(expr)) {
-		auto [lvalue, e] = emit_lvalue(block, swizzle);
-		if (e) {
-			return { NULL, e };
-		}
-		auto loaded = emit_load_lvalue(block, lvalue);
-		return { loaded, NULL };
+	} else if (auto literal_expr = reflect_cast<AstLiteralExpr>(expr)) {
+		auto any = make_any(literal_expr->lit_type, &literal_expr->lit_value);
+		auto inst = make_ssa_val(ssa->current_block, SsaOp::Const);
+		inst->aux = any;
+		return { inst, NULL };
 	} else if (auto postfix_expr = reflect_cast<CPostfixExpr>(expr)) {
-		auto [lvalue, eo] = emit_lvalue(block, postfix_expr->lhs);
-		if (eo) {
-			return { NULL, eo };
+		auto [lv, e] = lvalue(ssa, postfix_expr->lhs);
+		if (e) {
+			return { NULL, e };
 		}
-		auto loaded = emit_load_lvalue(block, lvalue);
+		auto [loaded, e2] = load(ssa, lv);
+		if (e2) {
+			return { NULL, e2 };
+		}
 		UnicodeString op;
 		if (postfix_expr->op == "++") {
 			op = U"+"_b;
@@ -383,94 +411,154 @@ Tuple<SsaReg, Error*> emit_expr(SsaBasicBlock* block, AstExpr* expr) {
 		} else {
 			return { NULL, format_error("Unsupported postfix operator: %", postfix_expr->op) };
 		}
-		auto const_one = load_const(block, (s64) 1);
-		auto oped = emit_binary_op(block, op, loaded, const_one);
-		return { oped, NULL };
-	} else if (auto access = reflect_cast<AstVarMemberAccess>(expr)) {
-		auto [lvalue, e] = emit_lvalue(block, access);
-		if (e) {
-			return { NULL, e };
+		auto const_one = load_const(ssa, (s64) 1);
+		auto [oped, e3] = emit_binary_op(ssa, op, loaded, const_one);
+		if (e3) {
+			return { NULL, e3 };
 		}
-		auto loaded = emit_load_lvalue(block, lvalue);
-		return { loaded, NULL };
+		return { oped, NULL };
+	} else if (auto ternary = reflect_cast<AstTernary>(expr)) {
+		auto cond_block = make_ssa_basic_block(ssa, "ternary_cond"_b);
+		auto pred = ssa->current_block;
+		ssa->current_block = cond_block;
+		auto [cond_value, e1] = emit_expr(ssa, ternary->cond);
+		if (e1) {
+			return { NULL, e1 };
+		}
+		seal_block(pred);
+		end_block_jump(pred, cond_block);
+		seal_block(cond_block);
+		auto then_block = make_ssa_basic_block(ssa, "ternary_then"_b);
+		ssa->current_block = then_block;
+		auto [then_expr, e2] = emit_expr(ssa, ternary->then);
+		if (e2) {
+			return { NULL, e2 };
+		}
+		auto else_block = make_ssa_basic_block(ssa, "ternary_else"_b);
+		ssa->current_block = else_block;
+		auto [else_expr, e3] = emit_expr(ssa, ternary->else_);
+		if (e3) {
+			return { NULL, e3 };
+		}
+		end_block_cond_jump(cond_block, cond_value, then_block, else_block);
+		seal_block(then_block);
+		seal_block(else_block);
+
+		ssa->current_block = make_ssa_basic_block(ssa, "ternary_after"_b);
+		end_block_jump(then_block, ssa->current_block);
+		end_block_jump(else_block, ssa->current_block);
+
+		auto phi = make_ssa_val(ssa->current_block, SsaOp::Phi);
+		add(&phi->args, then_expr);
+		add(&phi->args, else_expr);
+		return { phi, NULL };
 	} else {
-		return { NULL, format_error("Unsupported expression: %*", expr->type->name) };
+		auto [lv, e] = lvalue(ssa, expr);
+		if (e == NULL) {
+			auto [loaded, e2] = load(ssa, lv);
+			if (e2) {
+				return { NULL, e2 };
+			}
+			return { loaded, NULL };
+		}
 	}
+	return { NULL, format_error("Unsupported expression: %*", expr->type->name) };
 }
 
-struct SsaLocalVar: SsaInst {
-	AstVarDecl* var = NULL;
+Error* emit_block(Ssa* ssa, AstBlock* block);
 
-	REFLECT(SsaLocalVar) {
-		BASE_TYPE(SsaInst);
-		MEMBER(var);
-	}
-};
-
-Error* emit_stmt(SsaBasicBlock* block, AstNode* stmt) {
+Error* emit_stmt(Ssa* ssa, AstNode* stmt) {
 	if (auto expr = reflect_cast<AstExpr>(stmt)) {
-		auto [var, e] = emit_expr(block, expr);
+		auto [var, e] = emit_expr(ssa, expr);
 		if (e) {
 			return e;
 		}
 		return NULL;
 	} else if (auto var_decl_group = reflect_cast<AstVarDeclGroup>(stmt)) {
 		auto first = var_decl_group->var_decls[0];
-		SsaReg init_reg = SSA_NO_REG;
+		SsaValue* v = NULL;
 		if (first->init) {
-			auto [var, e] = emit_expr(block, first->init);
+			auto [var, e] = emit_expr(ssa, first->init);
 			if (e) {
 				return e;
 			}
-			init_reg = var;
+			v = var;
 		}
 		for (auto var_decl: var_decl_group->var_decls) {
-			SsaReg var_reg = SSA_NO_REG;
-			if (init_reg != SSA_NO_REG) {
-				var_reg = init_reg;
-			} else {
-				auto inst = make_ssa_inst<SsaLocalVar>(block);
-				inst->dst = alloc_reg(block->ssa);
-				inst->var = var_decl;
-				var_reg = inst->dst;
+			auto var_v = make_ssa_val(ssa->current_block, SsaOp::Alloca);
+			var_v->aux = make_any(var_decl);
+			write_var(ssa->current_block, var_decl, var_v);
+			if (v) {
+				auto stored = store(ssa, var_v, v);
+				write_var(ssa->current_block, var_decl, stored);
 			}
-			write_var(block, var_decl, var_reg);
 		}
 		return NULL;
 	} else if (auto var_decl = reflect_cast<AstVarDecl>(stmt)) {
-		SsaReg reg = SSA_NO_REG;
+		SsaValue* v = NULL;
 		if (var_decl->init) {
-			auto [var, e] = emit_expr(block, var_decl->init);
+			auto [var, e] = emit_expr(ssa, var_decl->init);
 			if (e) {
 				return e;
 			}
-			reg = var;
-		} else {
-			auto inst = make_ssa_inst<SsaLocalVar>(block);
-			inst->dst = alloc_reg(block->ssa);
-			inst->var = var_decl;
-			reg = inst->dst;
+			v = var;
 		}
-		write_var(block, var_decl, reg);
+		auto var_v = make_ssa_val(ssa->current_block, SsaOp::Alloca);
+		var_v->aux = make_any(var_decl);
+		write_var(ssa->current_block, var_decl, var_v);
+		if (v) {
+			auto stored = store(ssa, var_v, v);
+			write_var(ssa->current_block, var_decl, stored);
+		}
 		return NULL;
 	} else if (auto _for = reflect_cast<AstFor>(stmt)) {
-		auto init_block = make_ssa_basic_block(block->ssa, "for_init"_b);
-		auto [_, e0] = emit_expr(init_block, _for->init_expr);
+		seal_block(ssa->current_block);
+		auto pred = ssa->current_block;
+		auto init_block = make_ssa_basic_block(ssa, "for_init"_b);
+		ssa->current_block = init_block;
+		auto [_, e0] = emit_expr(ssa, _for->init_expr);
 		if (e0) {
 			return e0;
 		}
-		seal_block(block);
-		add_prec(init_block, block);
+		end_block_jump(pred, init_block);
+
+		auto cond_block = make_ssa_basic_block(ssa, "for_cond"_b);
+		ssa->current_block = cond_block;
+		auto [cond_value, e1] = emit_expr(ssa, _for->cond_expr);
+		if (e1) {
+			return e1;
+		}
+
+		auto incr_block = make_ssa_basic_block(ssa, "for_inc"_b);
+		ssa->current_block = incr_block;
+		auto [xxxx, e2] = emit_expr(ssa, _for->incr_expr);
+		if (e2) {
+			return e2;
+		}
+		end_block_jump(incr_block, cond_block);
+		auto body_block = make_ssa_basic_block(ssa, "for_body"_b);
+		ssa->current_block = body_block;
+		auto e3 = emit_block(ssa, _for->body);
+		if (e3) {
+			return e3;
+		}
+		ssa->current_block = make_ssa_basic_block(ssa, "for_after"_b);
+		end_block_jump(body_block, incr_block);
+		end_block_cond_jump(cond_block, cond_value, body_block, ssa->current_block);
+
 		seal_block(init_block);
+		seal_block(cond_block);
+		seal_block(incr_block);
+		seal_block(body_block);
 		return NULL;
 	} else {
 		return format_error("Unsupported statement: %*", stmt->type->name);
 	}
 }
 
-Error* emit_block(SsaBasicBlock* ssa_block, AstBlock* block) {
+Error* emit_block(Ssa* ssa, AstBlock* block) {
 	for (auto stmt: block->statements) {
-		auto e = emit_stmt(ssa_block, stmt);
+		auto e = emit_stmt(ssa, stmt);
 		if (e) {
 			return e;
 		}
@@ -478,34 +566,25 @@ Error* emit_block(SsaBasicBlock* ssa_block, AstBlock* block) {
 	return NULL;
 }
 
-void print_ssa_inst(SsaInst* inst) {
-	auto type = inst->type->as<StructType>();
-	if (!type) {
-		panic("Unsupported type: %*", inst->type->name);
+void print_ssa_value(SsaValue* inst) { 
+	print("$% = ", inst->id.v);
+	print("% ", inst->op);
+	for (auto arg: inst->args) {
+		print("$% ", arg->id.v);
 	}
-	if (inst->dst != SSA_NO_REG) {
-		print("% = ", inst->dst);
-	}
-	print("%* ", inst->type->name);
-	for (auto m: type->members) {
-		if (strcmp(m.name, "type") == 0) {
-			continue;
+	if (inst->aux.ptr) {
+		print(" %* ", inst->aux.type->name);
+		if (auto var = reflect_cast<AstVar>(inst->aux)) {
+			print(" '%' ", var->name);
 		}
-		if (strcmp(m.name, "dst") == 0) {
-			continue;
-		}
-		void* ptr = ptr_add(inst, m.offset);
-		auto any = make_any(m.type, ptr);
-		print("%", any);
 	}
-	println();
 }
 
 void print_ssa_block(SsaBasicBlock* block) {
 	println("%", block->name);
-	for (auto inst: block->insts) {
-		print("  ");
-		print_ssa_inst(inst);
+	for (auto v: block->values) {
+		print_ssa_value(v);
+		println();
 	}
 	println();
 	for (auto succ: block->successors) {
@@ -523,7 +602,9 @@ Tuple<Ssa, Error*> emit_function_ssa(Allocator allocator, AstFunction* f) {
 	defer { 
 		print_ssa_block(entry_block);
 	};
-	auto e = emit_block(entry_block, f->block);
+	ssa.entry = entry_block;
+	ssa.current_block = entry_block;
+	auto e = emit_block(&ssa, f->block);
 	if (e) {
 		return { {}, e };
 	}

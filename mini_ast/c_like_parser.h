@@ -387,21 +387,9 @@ struct AstArrayAccess: AstExpr {
 	}
 };
 
-struct LiteralExpr: AstExpr {
-	Token tok;
-	f32   f32_value = 0;
-	f64   f64_value = 0;
-	u64   u64_value = 0;
-	s64   s64_value = 0;
-
-	REFLECT(LiteralExpr) {
-		BASE_TYPE(AstNode);
-		MEMBER(tok);
-		MEMBER(f32_value);
-		MEMBER(f64_value);
-		MEMBER(u64_value);
-		MEMBER(s64_value);
-	}
+struct AstLiteralExpr: AstExpr {
+	PrimitiveType* lit_type = NULL;
+	PrimitiveValue lit_value = {};
 };
 
 enum CParserErrorTokenColor: u64 {
@@ -975,9 +963,9 @@ Tuple<AstExpr*, Error*> parse_function_call(CLikeParser* p, Token func_token, As
 }
 
 struct AstTernary: AstExpr {
-	AstNode* cond;
-	AstNode* then;
-	AstNode* else_;
+	AstExpr* cond;
+	AstExpr* then;
+	AstExpr* else_;
 
 	REFLECT(AstTernary) {
 		BASE_TYPE(AstExpr);
@@ -1459,21 +1447,25 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 			}
 		}
 
+		PrimitiveValue lit_value;
+		PrimitiveType* lit_type = NULL;
 		f64 float_val;
 		f64 double_val;
+
 		bool ok = false;
 		if (parse_as_float) {
-			ok = parse_float(lit, &float_val);
+			ok = parse_float(lit, &lit_value.f32_value);
+			lit_type = reflect_type_of<f32>()->as<PrimitiveType>();
 		} else {
-			ok = parse_float(lit, &double_val);
+			ok = parse_float(lit, &lit_value.f64_value);
+			lit_type = reflect_type_of<f64>()->as<PrimitiveType>();
 		}
 		if (!ok) {
 			return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Could not parse floating point literal."_b) };
 		}
-		auto literal = make_ast_expr<LiteralExpr>(p->allocator, find_type(p, parse_as_float ? U"float"_b : U"double"_b), AST_EXPR_RVALUE, tok.reg);
-		literal->tok = tok;
-		literal->f32_value = float_val;
-		literal->f64_value = double_val;
+		auto literal = make_ast_expr<AstLiteralExpr>(p->allocator, find_type(p, parse_as_float ? U"float"_b : U"double"_b), AST_EXPR_RVALUE, tok.reg);
+		literal->lit_type = lit_type;
+		literal->lit_value = lit_value;
 		next(p);
 		return { literal, NULL };
 	}
@@ -1484,9 +1476,9 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 		if (!ok) {
 			return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Could not parse integer literal."_b) };
 		}
-		auto literal = make_ast_expr<LiteralExpr>(p->allocator, find_type(p, U"int"_b), AST_EXPR_RVALUE, tok.reg);
-		literal->tok = tok;
-		literal->s64_value = u;
+		auto literal = make_ast_expr<AstLiteralExpr>(p->allocator, find_type(p, U"int"_b), AST_EXPR_RVALUE, tok.reg);
+		literal->lit_value.s64_value = u;
+		literal->lit_type = reflect_type_of(u)->as<PrimitiveType>();
 		next(p);
 		return { literal, NULL };
 	}

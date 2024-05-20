@@ -35,16 +35,9 @@ void print_expr(AllocatedUnicodeString* sb, AstNode* expr) {
 		append(sb, member_access->member.name);
 	} else if (auto var_decl = reflect_cast<AstVar>(expr)) {
 		append(sb, var_decl->name);
-	} else if (auto literal = reflect_cast<LiteralExpr>(expr)) {
-		if (literal->expr_type->name == "int") {
-			format(sb, "%", literal->s64_value);
-		} else if (literal->expr_type->name == "float") {
-			format(sb, "%", literal->f32_value);
-		} else if (literal->expr_type->name == "double") {
-			format(sb, "%", literal->f64_value);
-		} else {
-			append(sb, "Unknown literal type: ");
-		}
+	} else if (auto literal = reflect_cast<AstLiteralExpr>(expr)) {
+		auto any = make_any(literal->lit_type, &literal->lit_value);
+		format(sb, "%", any);
 	} else if (auto ternary = reflect_cast<AstTernary>(expr)) {
 		append(sb, "(");
 		print_expr(sb, ternary->cond);
