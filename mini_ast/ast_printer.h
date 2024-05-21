@@ -11,7 +11,7 @@ void print_c_program(AllocatedUnicodeString* sb, CLikeProgram* program) {
 }
 
 void print_expr(AllocatedUnicodeString* sb, AstNode* expr) {
-	if (auto binary_op = reflect_cast<CBinaryExpr>(expr)) {
+	if (auto binary_op = reflect_cast<AstBinaryExpr>(expr)) {
 		append(sb, "(");
 		print_expr(sb, binary_op->lhs);
 		append(sb, " ");
@@ -19,15 +19,15 @@ void print_expr(AllocatedUnicodeString* sb, AstNode* expr) {
 		append(sb, " ");
 		print_expr(sb, binary_op->rhs);
 		append(sb, ")");
-	} else if (auto unary_op = reflect_cast<CUnaryExpr>(expr)) {
+	} else if (auto unary_op = reflect_cast<AstUnaryExpr>(expr)) {
 		append(sb, "(");
-		append(sb, unary_op->op);
-		print_expr(sb, unary_op->expr);
-		append(sb, ")");
-	} else if (auto postfix_op = reflect_cast<CPostfixExpr>(expr)) {
-		append(sb, "(");
-		print_expr(sb, postfix_op->lhs);
-		append(sb, postfix_op->op);
+		if (unary_op->op->flags & AST_OP_FLAG_PREFIX) {
+			append(sb, unary_op->op->op);
+			print_expr(sb, unary_op->expr);
+		} else {
+			print_expr(sb, unary_op->expr);
+			append(sb, unary_op->op->op);
+		}
 		append(sb, ")");
 	} else if (auto member_access = reflect_cast<AstVarMemberAccess>(expr)) {
 		print_expr(sb, member_access->lhs);
@@ -75,7 +75,7 @@ void print_expr(AllocatedUnicodeString* sb, AstNode* expr) {
 		append(sb, "{");
 		s64 i = 0;
 		for (auto it: init->members) {
-			print_expr(sb, it);
+			print_expr(sb, it.expr);
 			if (i < len(init->members) - 1) {
 				append(sb, ", ");
 			}
