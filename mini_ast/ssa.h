@@ -87,6 +87,18 @@ struct SsaBasicBlock {
 	Array<SsaBasicBlock*>       pred;
 	Array<SsaBasicBlock*>       successors;
 	HashMap<AstVar*, SsaValue*> var_map;
+
+	REFLECT(SsaBasicBlock) {
+		MEMBER(name);
+		MEMBER(ssa);
+		MEMBER(ending);
+		MEMBER(is_sealed);
+		MEMBER(values);
+		MEMBER(incomplete_phis);
+		MEMBER(pred);
+		MEMBER(successors);
+		MEMBER(var_map);
+	}
 };
 
 struct Ssa {
@@ -94,6 +106,7 @@ struct Ssa {
 	SsaBasicBlock*        entry = NULL;
 	s64                   reg_counter = 0;
 	SsaBasicBlock*        current_block = NULL;
+	s64                   construct_id_counter = 0;
 
 	void free() {
 		free_allocator(allocator);
@@ -104,9 +117,17 @@ SsaId alloc_id(Ssa* ssa) {
 	return SsaId { ++ssa->reg_counter };
 }
 
-SsaBasicBlock* make_ssa_basic_block(Ssa* ssa, String name = ""_b) {
+s64 alloc_construct_id(Ssa* ssa) {
+	return ++ssa->construct_id_counter;
+}
+
+SsaBasicBlock* make_ssa_basic_block(Ssa* ssa, String name = ""_b, s64 construct_id = 0) {
 	SsaBasicBlock* block = make<SsaBasicBlock>(ssa->allocator);
-	block->name = name;
+	if (construct_id > 0) {
+		block->name = sprint(ssa->allocator, "%_%", construct_id, name);
+	} else {
+		block->name = name;
+	}
 	block->ssa = ssa;
 	block->values = { .allocator = ssa->allocator };
 	block->incomplete_phis = { .allocator = ssa->allocator };
@@ -117,23 +138,21 @@ SsaBasicBlock* make_ssa_basic_block(Ssa* ssa, String name = ""_b) {
 }
 
 void write_var(SsaBasicBlock* block, AstVar* var, SsaValue* v) {
-	if (block->ending) {
-		panic("Cannot write_var to filled block");
-	}
 	put(&block->var_map, var, v);
 }
 
 SsaValue* read_var(SsaBasicBlock* block, AstVar* var);
 
 SsaValue* make_ssa_val(SsaBasicBlock* block, SsaOp op) {
-	if (block->ending) {
-		panic("Cannot make_ssa_val in filled block");
-	}
 	auto v = make<SsaValue>(block->ssa->allocator);
 	v->block = block;
 	v->op = op;
 	v->id = alloc_id(block->ssa);
-	add(&block->values, v);
+	if (block->ending) {
+		add(&block->values, v, len(block->values) - 1);
+	} else {
+		add(&block->values, v);
+	}
 	return v;
 }
 void add_phi_args(SsaValue* phi) {
@@ -151,12 +170,6 @@ void add_phi_args(SsaValue* phi) {
 }
 
 SsaValue* read_var_recursive(SsaBasicBlock* block, AstVar* var) {
-	// We might add some phi values,
-	//   but we don't want to trigger is_filled assert.
-	auto old_ending = block->ending;
-	block->ending = NULL;
-	defer { block->ending = old_ending; };
-
 	SsaValue* v = NULL;
 	if (!block->is_sealed) {
 		auto phi = make_ssa_val(block, SsaOp::Phi);
@@ -420,7 +433,9 @@ Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr) {
 		inst->aux = any;
 		return { inst, NULL };
 	} else if (auto ternary = reflect_cast<AstTernary>(expr)) {
-		auto cond_block = make_ssa_basic_block(ssa, "ternary_cond"_b);
+		auto construct_id = alloc_construct_id(ssa);
+
+		auto cond_block = make_ssa_basic_block(ssa, "ternary_cond"_b, construct_id);
 		auto pred = ssa->current_block;
 		ssa->current_block = cond_block;
 		auto [cond_value, e1] = emit_expr(ssa, ternary->cond);
@@ -430,13 +445,13 @@ Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr) {
 		seal_block(pred);
 		end_block_jump(pred, cond_block);
 		seal_block(cond_block);
-		ssa->current_block = make_ssa_basic_block(ssa, "ternary_then"_b);
+		ssa->current_block = make_ssa_basic_block(ssa, "ternary_then"_b, construct_id);
 		auto [then_expr, e2] = emit_expr(ssa, ternary->then);
 		if (e2) {
 			return { NULL, e2 };
 		}
 		auto then_block = ssa->current_block;
-		ssa->current_block = make_ssa_basic_block(ssa, "ternary_else"_b);
+		ssa->current_block = make_ssa_basic_block(ssa, "ternary_else"_b, construct_id);
 		auto [else_expr, e3] = emit_expr(ssa, ternary->else_);
 		if (e3) {
 			return { NULL, e3 };
@@ -446,7 +461,7 @@ Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr) {
 		seal_block(then_block);
 		seal_block(else_block);
 
-		ssa->current_block = make_ssa_basic_block(ssa, "ternary_after"_b);
+		ssa->current_block = make_ssa_basic_block(ssa, "ternary_after"_b, construct_id);
 		end_block_jump(then_block, ssa->current_block);
 		end_block_jump(else_block, ssa->current_block);
 
@@ -555,52 +570,102 @@ Error* emit_stmt(Ssa* ssa, AstNode* stmt) {
 		}
 		return NULL;
 	} else if (auto _for = reflect_cast<AstFor>(stmt)) {
+		auto construct_id = alloc_construct_id(ssa);
+
 		seal_block(ssa->current_block);
 		auto pred = ssa->current_block;
-		ssa->current_block = make_ssa_basic_block(ssa, "for_init"_b);
+		// b_s = block start, b_e = block end
+		auto init_b_s = make_ssa_basic_block(ssa, "for_init"_b, construct_id);
+		ssa->current_block = init_b_s;
 		auto [_, e0] = emit_expr(ssa, _for->init_expr);
 		if (e0) {
 			return e0;
 		}
-		auto init_block = ssa->current_block;
+		auto init_b_e = ssa->current_block;
 		seal_block(pred);
-		end_block_jump(pred, init_block);
-		seal_block(init_block);
+		end_block_jump(pred, init_b_s);
+		seal_block(init_b_e);
 
-		ssa->current_block = make_ssa_basic_block(ssa, "for_cond"_b);
-		end_block_jump(init_block, ssa->current_block);
+		auto cond_b_s = make_ssa_basic_block(ssa, "for_cond"_b, construct_id);
+		end_block_jump(init_b_e, cond_b_s);
+		ssa->current_block = cond_b_s;
 		auto [cond_value, e1] = emit_expr(ssa, _for->cond_expr);
 		if (e1) {
 			return e1;
 		}
-		auto cond_block = ssa->current_block;
+		auto cond_b_e = ssa->current_block;
 
-		auto body_block = make_ssa_basic_block(ssa, "for_body"_b);
-		auto after_block = make_ssa_basic_block(ssa, "for_after"_b);
-		end_block_cond_jump(cond_block, cond_value, body_block, ssa->current_block);
-
-		ssa->current_block = make_ssa_basic_block(ssa, "for_incr"_b);
-		auto [xxxx, e2] = emit_expr(ssa, _for->incr_expr);
-		if (e2) {
-			return e2;
-		}
-		auto incr_block = ssa->current_block;
-		end_block_jump(incr_block, cond_block);
+		auto body_b_s = make_ssa_basic_block(ssa, "for_body"_b, construct_id);
+		auto after_b_s = make_ssa_basic_block(ssa, "for_after"_b, construct_id);
+		end_block_cond_jump(cond_b_e, cond_value, body_b_s, after_b_s);
 		
-		ssa->current_block = body_block;
+		ssa->current_block = body_b_s;
 		auto e3 = emit_block(ssa, _for->body);
 		if (e3) {
 			return e3;
 		}
-		body_block = ssa->current_block;
+		auto body_b_e = ssa->current_block;
 
-		ssa->current_block = after_block;
-		end_block_jump(body_block, incr_block);
+		auto incr_b_s = make_ssa_basic_block(ssa, "for_incr"_b, construct_id);
+		end_block_jump(body_b_e, incr_b_s);
 
-		seal_block(body_block);
-		seal_block(incr_block);
-		seal_block(cond_block);
+		ssa->current_block = incr_b_s;
+		auto [xxxx, e2] = emit_expr(ssa, _for->incr_expr);
+		if (e2) {
+			return e2;
+		}
+		auto incr_b_e = ssa->current_block;
+		end_block_jump(incr_b_e, cond_b_s);
+
+		seal_block(body_b_e);
+		seal_block(incr_b_e);
+		seal_block(cond_b_e);
+
+		ssa->current_block = after_b_s;
 		return NULL;
+	} else if (auto if_ = reflect_cast<AstIf>(stmt)) {
+		auto construct_id = alloc_construct_id(ssa);
+
+		seal_block(ssa->current_block);
+		auto pred = ssa->current_block;
+		// b_s = block start, b_e = block end
+		auto cond_b_s = make_ssa_basic_block(ssa, "if_cond"_b, construct_id);
+		ssa->current_block = cond_b_s;
+		auto [cond_value, e1] = emit_expr(ssa, if_->cond);
+		if (e1) {
+			return e1;
+		}
+		seal_block(pred);
+		end_block_jump(pred, cond_b_s);
+		seal_block(cond_b_s);
+		auto cond_b_e = ssa->current_block;
+
+		auto t_b_s = make_ssa_basic_block(ssa, "if_then"_b, construct_id);
+		auto else_b_s = make_ssa_basic_block(ssa, "if_else"_b, construct_id);
+		end_block_cond_jump(cond_b_e, cond_value, t_b_s, else_b_s);
+
+		ssa->current_block = t_b_s;
+		auto e3 = emit_block(ssa, if_->then);
+		if (e3) {
+			return e3;
+		}
+		auto t_b_e = ssa->current_block;
+		end_block_jump(t_b_e, else_b_s);
+
+		if (if_->else_if) {
+			ssa->current_block = else_b_s;
+			auto e3 = emit_stmt(ssa, if_->else_if);
+			if (e3) {
+				return e3;
+			}
+		} else if (if_->else_block) {
+			ssa->current_block = else_b_s;
+			auto e3 = emit_block(ssa, if_->else_block);
+			if (e3) {
+				return e3;
+			}
+		}
+
 	} else {
 		return format_error("Unsupported statement: %*", stmt->type->name);
 	}
@@ -628,6 +693,8 @@ void print_ssa_value(SsaValue* inst) {
 			print(" '%' ", var->name);
 		} else if (auto block = reflect_cast<SsaBasicBlock>(inst->aux)) {
 			print(" %* ", block->name);
+		} else if (auto cj = reflect_cast<SsaCondJump>(inst->aux)) {
+			print(" %*, %* ", cj->t_block->name, cj->f_block->name);
 		}
 	}
 }

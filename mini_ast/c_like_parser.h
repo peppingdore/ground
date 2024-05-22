@@ -957,6 +957,21 @@ struct AstTernary: AstExpr {
 	}
 };
 
+struct AstIf: AstNode {
+	AstExpr*  cond = NULL;
+	AstBlock* then = NULL;
+	AstBlock* else_block = NULL;
+	AstIf*    else_if = NULL;
+
+	REFLECT(AstIf) {
+		BASE_TYPE(AstNode);
+		MEMBER(cond);
+		MEMBER(then);
+		MEMBER(else_block);
+		MEMBER(else_if);
+	}
+};
+
 AstType* resolve_ast_type_alias(AstType* type) {
 	// @TODO: implement.
 	return type;
@@ -1403,6 +1418,7 @@ Tuple<AstExpr*, Error*> typecheck_binary_expr(CLikeParser* p, AstExpr* lhs, AstE
 			op->op == ">="
 		) {
 			expr_result_type = find_type(p, U"bool"_b);
+			assert(expr_result_type);
 		} else {
 			expr_result_type = lhs->expr_type;
 		}
@@ -1730,7 +1746,7 @@ Tuple<AstExpr*, Error*> parse_expr(CLikeParser* p, s32 min_prec) {
 			}
 			auto tok = peek(p);
 			if (tok.str != ":"_b) {
-				return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Expected a :"_b) };
+				return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Expected :"_b) };
 			}
 			next(p);
 			auto [else_expr, e3] = parse_expr(p, (op->flags & AST_OP_FLAG_LEFT_ASSOC) ? op->prec + 1 : op->prec);
@@ -1772,34 +1788,83 @@ Tuple<AstExpr*, Error*> parse_expr(CLikeParser* p, s32 min_prec) {
 	return { lhs, NULL };
 }
 
-Tuple<AstNode*, Error*> parse_if(CLikeParser* p) {
+Tuple<AstBlock*, Error*> parse_block(CLikeParser* p);
+Tuple<AstNode*, Error*, bool> parse_stmt(CLikeParser* p);
+Tuple<AstBlock*, Error*> parse_block_or_one_stmt(CLikeParser* p);
+
+Tuple<AstIf*, Error*> parse_if(CLikeParser* p, Token if_tok) {
 	if (peek(p).str != "("_b) {
 		return { NULL, simple_parser_error(p, current_loc(), peek(p).reg, U"Expected ("_b) };
 	}
 	next(p);
-	auto [expr, e] = parse_expr(p, 0);
+	auto [cond, e] = parse_expr(p, 0);
 	if (e) {
 		return { NULL, e };
 	}
-	return { NULL, simple_parser_error(p, current_loc(), peek(p).reg, U"TODO: parse if"_b) };
+	if (cond->expr_type != find_type(p, U"bool"_b)) {
+		auto error_reg = if_tok.reg;
+		if (cond->text_region.has_value) {
+			error_reg = cond->text_region.value;
+		}
+		return { NULL, simple_parser_error(p, current_loc(), error_reg, U"Condition must be bool, but it's '%'"_b, cond->expr_type->name) };
+	}
+	if (peek(p).str != ")"_b) {
+		return { NULL, simple_parser_error(p, current_loc(), peek(p).reg, U"Expected )"_b) };
+	}
+	next(p);
+	auto [then, e2] = parse_block_or_one_stmt(p);
+	if (e2) {
+		return { NULL, e2 };
+	}
+	ProgramTextRegion reg = if_tok.reg;
+	if (then->text_region.has_value) {
+		reg.end = then->text_region.value.end;
+	}
+	auto node = make_ast_node<AstIf>(p->allocator, reg);
+	node->cond = cond;
+	node->then = then;
+	auto tok = peek(p);
+	if (tok.str == U"else"_b) {
+		next(p);
+		tok = peek(p);
+		if (tok.str == U"if"_b) {
+			next(p);
+			auto [else_if, e3] = parse_if(p, tok);
+			if (e3) {
+				return { NULL, e3 };
+			}
+			node->else_if = else_if;
+			return { node, NULL };
+		}
+		auto [else_block, e3] = parse_block_or_one_stmt(p);
+		if (e3) {
+			return { NULL, e3 };
+		}
+		node->else_block = else_block;
+		return { node, NULL };
+	} else {
+		return { node, NULL };
+	}
 }
-
-Tuple<AstBlock*, Error*> parse_block(CLikeParser* p);
-Tuple<AstNode*, Error*> parse_stmt(CLikeParser* p);
 
 Tuple<AstBlock*, Error*> parse_block_or_one_stmt(CLikeParser* p) {
 	auto tok = peek(p);
 	if (tok.str == "{"_b) {
-		next(p);
 		auto [block, e] = parse_block(p);
 		if (e) {
 			return { NULL, e };
 		}
 		return { block, NULL };
 	} else {
-		auto [stmt, e] = parse_stmt(p);
+		auto [stmt, e, semicolon_opt] = parse_stmt(p);
 		if (e) {
 			return { NULL, e };
+		}
+		if (!semicolon_opt) {
+			if (peek(p).str != U";"_b) {
+				return { NULL, simple_parser_error(p, current_loc(), peek(p).reg, U"Expected ;"_b) };
+			}
+			next(p);
 		}
 		auto block = make_ast_node<AstBlock>(p->allocator, stmt->text_region);
 		add(&block->statements, stmt);
@@ -1867,14 +1932,22 @@ Tuple<AstNode*, Error*> parse_for(CLikeParser* p, Token for_tok) {
 	return { node, NULL };
 }
 
-Tuple<AstNode*, Error*> parse_stmt(CLikeParser* p) {
+Tuple<AstNode*, Error*, bool> parse_stmt(CLikeParser* p) {
 	auto type_tok = peek(p);
 	if (type_tok.str == "if"_b) {
 		next(p);
-		return parse_if(p);
+		auto [if_, e] = parse_if(p, type_tok);
+		if (e) {
+			return { NULL, e };
+		}
+		return { if_, NULL, true };
 	} else if (type_tok.str == "for"_b) {
 		next(p);
-		return parse_for(p, type_tok);
+		auto [for_, e] = parse_for(p, type_tok);
+		if (e) {
+			return { NULL, e };
+		}
+		return { for_, NULL, true };
 	}
 
 	auto type = find_type(p, type_tok.str);
@@ -1888,16 +1961,16 @@ Tuple<AstNode*, Error*> parse_stmt(CLikeParser* p) {
 		if (ee) {
 			return { NULL, ee };
 		}
-		return { decl, NULL };
+		return { decl, NULL, false };
 	}
 	auto [expr, e] = parse_expr(p, 0);
-	return { expr, e };
+	return { expr, e, false };
 }
 
 Tuple<AstBlock*, Error*> parse_block(CLikeParser* p) {
 	auto tok = peek(p);
 	if (tok.str != U"{"_b) {
-		return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Expected a {"_b) };
+		return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Expected {"_b) };
 	}
 	next(p);
 	auto block = make_ast_node<AstBlock>(p->allocator, {});
@@ -1914,15 +1987,16 @@ Tuple<AstBlock*, Error*> parse_block(CLikeParser* p) {
 			next(p);
 			break;
 		}
-		auto [stmt, e] = parse_stmt(p);
+		auto [stmt, e, semicolon_opt] = parse_stmt(p);
 		if (e) {
 			return { NULL, e };
 		}
-		tok = peek(p);
-		if (tok.str != U";"_b) {
-			return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Expected ;"_b) };
+		if (!semicolon_opt) {
+			if (peek(p).str != U";"_b) {
+				return { NULL, simple_parser_error(p, current_loc(), peek(p).reg, U"Expected ;"_b) };
+			}
+			next(p);
 		}
-		next(p);
 		add(&block->statements, stmt);
 	}
 	assert(region_end != -1);
@@ -2030,6 +2104,7 @@ Tuple<CLikeProgram*, Error*> parse_c_like(UnicodeString str) {
 	add_c_type_alias(&p, reflect_type_of<double>(), U"double"_b);
 	add_c_type_alias(&p, reflect_type_of<float>(), U"float"_b);
 	add_c_type_alias(&p, reflect_type_of<void>(), U"void"_b);
+	add_c_type_alias(&p, reflect_type_of<bool>(), U"bool"_b);
 	add_c_type_alias(&p, reflect_type_of<Vector2_f32>(), U"vec2"_b);
 	add_c_type_alias(&p, reflect_type_of<Vector3_f32>(), U"vec3"_b);
 	add_c_type_alias(&p, reflect_type_of<Vector4_f32>(), U"vec4"_b);

@@ -16,16 +16,27 @@
 //     for (s = 2.; s < 1e3; s /=- .5)
 //         e -= abs(cos(dot(m = cos(p * s), q / q))) / s, z -= m.y;
 
-UnicodeString PROGRAM = UR"TAG(
-float PI = 3.14;
+// UnicodeString PROGRAM = UR"TAG(
+// float PI = 3.14;
 
+// void main() {
+// float i,e,R,s,z;
+// vec3 m,q,p,d=FC.rgb/r.y-.5;
+// q=hsv(t/6.0f/PI,2.0f,.4f);
+// for(q.z--;i++<1e2f;q-=d*e*R*.4,o+=log(++R+sin(vec4(1f,2f,3f,0f)+z*z/2e4f))/2e2f,p=vec3(log(R=length(q))-t/2.f,e=-q.z/R,atan(q.x,q.y)),z=s,i>60.f?d/=d,e+=1e-4f:e)
+// 	for(s=2.f;s<1e3f;s/=-.5f)
+// 		e-=abs(cos(dot_vec3(m=cos(p*s),q/q)))/s,z-=m.y;
+// }
+// )TAG"_b;
+
+UnicodeString PROGRAM = UR"TAG(
 void main() {
-float i,e,R,s,z;
-vec3 m,q,p,d=FC.rgb/r.y-.5;
-q=hsv(t/6.0f/PI,2.0f,.4f);
-for(q.z--;i++<1e2f;q-=d*e*R*.4,o+=log(++R+sin(vec4(1f,2f,3f,0f)+z*z/2e4f))/2e2f,p=vec3(log(R=length(q))-t/2.f,e=-q.z/R,atan(q.x,q.y)),z=s,i>60.f?d/=d,e+=1e-4f:e)
-	for(s=2.f;s<1e3f;s/=-.5f)
-		e-=abs(cos(dot_vec3(m=cos(p*s),q/q)))/s,z-=m.y;
+	int k = 43;
+	int a = 16;
+	if (k == 15) {
+		a = a + 1;
+	}
+	int b = a;
 }
 )TAG"_b;
 
