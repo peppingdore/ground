@@ -248,6 +248,11 @@ V* get(HashMap<K, V>* map, std::type_identity_t<K> key) {
 	return &e->value;
 }
 
+template <typename K, typename V>
+s64 len(HashMap<K, V>* map) {
+	return map->count;
+}
+
 struct HashMapType: MapType {
 	s32 key_offset   = 0;
 	s32 value_offset = 0;
@@ -271,17 +276,17 @@ HashMapType* reflect_type(HashMap<K, V>* x, HashMapType* type) {
 
 	type->key_offset   = offsetof(Entry, key);
 	type->value_offset = offsetof(Entry, value);
-	type->hash_offset  = offsetof(Entry, hash);
+	type->hash_offset  = offsetof(Entry, normalized_hash);
 	type->entry_size   = sizeof(Entry);
 
 	type->get_count = [](void* map) {
 		auto casted = (HashMap<int, int>*) map;
-		return casted->count();
+		return len(casted);
 	};
 
 	type->get_capacity = [](void* map) {
 		auto casted = (HashMap<int, int>*) map;
-		return casted->capacity();
+		return casted->capacity;
 	};
 
 	type->iterate = [](void* map) -> Generator<MapType::Item*> {
@@ -289,12 +294,12 @@ HashMapType* reflect_type(HashMap<K, V>* x, HashMapType* type) {
 
 		HashMapType::Item item;
 
-		for (auto i: range(casted_map->capacity())) {
-			auto* entry = (Entry*) ptr_add(casted_map->entries.data, i * sizeof(Entry));
-			if (entry->hash >= HASH_MAP_SLOT_HASH_FIRST_OCCUPIED) {
+		for (auto i: range(casted_map->capacity)) {
+			auto* entry = (Entry*) ptr_add(casted_map->data, i * sizeof(Entry));
+			if (entry->normalized_hash >= HASH_MAP_SLOT_HASH_FIRST_OCCUPIED) {
 				item.key   = &entry->key;
 				item.value = &entry->value;
-				item.hash  = &entry->hash;
+				item.hash  = &entry->normalized_hash;
 				co_yield &item;
 			}
 		}
