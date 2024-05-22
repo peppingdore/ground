@@ -50,8 +50,11 @@ struct AstSymbol: AstNode {
 };
 
 struct AstType: AstSymbol {
+	u64 size = 0;
+
 	REFLECT(AstType) {
 		BASE_TYPE(AstSymbol);
+		MEMBER(size);
 	}
 };
 
@@ -116,6 +119,8 @@ enum AstOperatorFlags {
 	AST_OP_FLAG_INT        = 1 << 4,
 	AST_OP_FLAG_PRIMITIVE  = 1 << 5,
 	AST_OP_FLAG_NUMERIC    = 1 << 6,
+	AST_OP_FLAG_POSTFIX    = 1 << 7,
+	AST_OP_FLAG_PREFIX     = 1 << 8,
 };
 
 struct AstOperator {
@@ -165,19 +170,19 @@ AstOperator AST_BINARY_OPERATORS_UNSORTED[] = {
 };
 
 AstOperator AST_PREFIX_UNARY_OPERATORS_UNSORTED[] = {
-	{ U"!"_b, 30 },
-	{ U"~"_b, 30 },
-	{ U"+"_b, 30 },
-	{ U"-"_b, 30 },
-	{ U"++"_b, 30 },
-	{ U"--"_b, 30 },
-	{ U"*"_b, 30 },
-	{ U"&"_b, 30 },
+	{ U"!"_b, 30, AST_OP_FLAG_PREFIX },
+	{ U"~"_b, 30, AST_OP_FLAG_PREFIX },
+	{ U"+"_b, 30, AST_OP_FLAG_PREFIX },
+	{ U"-"_b, 30, AST_OP_FLAG_PREFIX },
+	{ U"++"_b, 30, AST_OP_FLAG_PREFIX },
+	{ U"--"_b, 30, AST_OP_FLAG_PREFIX },
+	{ U"*"_b, 30, AST_OP_FLAG_PREFIX },
+	{ U"&"_b, 30, AST_OP_FLAG_PREFIX },
 };
 
 AstOperator AST_POSTFIX_UNARY_OPERATORS_UNSORTED[] = {
-	{ U"++"_b, 40 },
-	{ U"--"_b, 40 },
+	{ U"++"_b, 40, AST_OP_FLAG_POSTFIX },
+	{ U"--"_b, 40, AST_OP_FLAG_POSTFIX },
 };
 
 enum CTokenFlags {
@@ -289,35 +294,24 @@ void add_shader_intrinsic_func(CLikeParser* p, UnicodeString name, AstType* retu
 	add(&p->program->globals, node);
 }
 
-struct CPostfixExpr: AstExpr {
-	AstExpr*      lhs;
-	UnicodeString op;
-
-	REFLECT(CPostfixExpr) {
-		BASE_TYPE(AstExpr);
-		MEMBER(lhs);
-		MEMBER(op);
-	}
-};
-
-struct CUnaryExpr: AstExpr {
+struct AstUnaryExpr: AstExpr {
 	AstExpr*      expr;
-	UnicodeString op;
+	AstOperator*  op;
 
-	REFLECT(CUnaryExpr) {
+	REFLECT(AstUnaryExpr) {
 		BASE_TYPE(AstExpr);
 		MEMBER(expr);
 		MEMBER(op);
 	}
 };
 
-struct CBinaryExpr: AstExpr {
+struct AstBinaryExpr: AstExpr {
 	AstExpr*      lhs = NULL;
 	AstExpr*      rhs = NULL;
 	AstOperator*  op = NULL;
 	AstOperator*  pure_op = NULL;
 
-	REFLECT(CBinaryExpr) {
+	REFLECT(AstBinaryExpr) {
 		BASE_TYPE(AstExpr);
 		MEMBER(lhs);
 		MEMBER(rhs);
@@ -883,18 +877,6 @@ Tuple<AstNode*, Error*> parse_var_decl(CLikeParser* p, AstType* type, Token type
 	}
 }
 
-Tuple<AstNode*, Error*> parse_unary_expr(CLikeParser* p, Token op_token, UnicodeString op, s32 min_prec) {
-	auto [expr, e] = parse_expr(p, min_prec);
-	if (e) {
-		return { NULL, e };
-	}
-	auto reg = ProgramTextRegion { op_token.reg.start, peek(p).reg.start };
-	auto unary = make_ast_node<CUnaryExpr>(p->allocator, reg);
-	unary->expr = (AstExpr*) expr;
-	unary->op = op;
-	return { unary, NULL };
-}
-
 struct AstFunctionCall: AstExpr {
 	AstNode*        f;
 	Array<AstExpr*> args;
@@ -1272,9 +1254,14 @@ Tuple<AstExpr*, Error*> try_parse_swizzle_expr(CLikeParser* p, AstExpr* lhs, Tok
 	return { NULL, NULL };
 }
 
+struct AstStructInitMember {
+	AstExpr*        expr = NULL;
+	AstStructMember member;
+};
+
 struct AstStructInitializer: AstExpr {
-	AstType*        struct_type = NULL;
-	Array<AstExpr*> members;
+	AstType*                   struct_type = NULL;
+	Array<AstStructInitMember> members;
 
 	REFLECT(AstStructInitializer) {
 		BASE_TYPE(AstExpr);
@@ -1316,7 +1303,7 @@ Tuple<AstExpr*, Error*> typecheck_binary_expr(CLikeParser* p, AstExpr* lhs, AstE
 	}
 
 	if (op->op == ",") {
-		auto node = make_ast_expr<CBinaryExpr>(p->allocator, rhs->expr_type, AST_EXPR_RVALUE, text_region);
+		auto node = make_ast_expr<AstBinaryExpr>(p->allocator, rhs->expr_type, AST_EXPR_RVALUE, text_region);
 		node->lhs = lhs;
 		node->rhs = rhs;
 		node->op = op;
@@ -1423,7 +1410,7 @@ Tuple<AstExpr*, Error*> typecheck_binary_expr(CLikeParser* p, AstExpr* lhs, AstE
 	if (!expr_result_type) {
 		return { NULL, simple_parser_error(p, current_loc(), op_tok.reg, U"Unexpected error: could not determine result type of binary expression '%'.", op->op) };
 	}
-	auto node = make_ast_expr<CBinaryExpr>(p->allocator, expr_result_type, AST_EXPR_RVALUE, text_region);
+	auto node = make_ast_expr<AstBinaryExpr>(p->allocator, expr_result_type, AST_EXPR_RVALUE, text_region);
 	node->lhs = lhs;
 	node->rhs = rhs;
 	node->op = op;
@@ -1515,9 +1502,9 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 			return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Operator '%' can only be applied to numeric types, got '%'.", op, expr->expr_type->name) };
 		}
 		ProgramTextRegion text_region = { op.reg.start, peek(p).reg.start };
-		auto unary = make_ast_expr<CUnaryExpr>(p->allocator, expr->expr_type, AST_EXPR_RVALUE, text_region);
+		auto unary = make_ast_expr<AstUnaryExpr>(p->allocator, expr->expr_type, AST_EXPR_RVALUE, text_region);
 		unary->expr = expr;
-		unary->op = tok.str;
+		unary->op = unary_op;
 		return { unary, NULL };
 	}
 
@@ -1556,7 +1543,20 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 					ProgramTextRegion text_region = { initializer_reg_start, tok.reg.end };
 					auto node = make_ast_expr<AstStructInitializer>(p->allocator, type, AST_EXPR_RVALUE, text_region);
 					node->struct_type = type;
-					node->members = args;
+					node->members.allocator = p->allocator;
+					s64 idx = 0;
+					for (auto it: args) {
+						auto member = get_struct_member(p, type, idx);
+						if (!member.has_value) {
+							panic("Member not found");
+						}
+						auto m = AstStructInitMember {
+							.expr = it,
+							.member = member.value,
+						};
+						add(&node->members, m);
+						idx += 1;
+					}
 					args = {};
 					next(p);
 					lhs = node;
@@ -1618,9 +1618,9 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 			if (lhs->text_region.has_value) {
 				text_region.start = lhs->text_region.value.start;
 			}
-			auto node = make_ast_expr<CPostfixExpr>(p->allocator, lhs->expr_type, false, text_region);
-			node->lhs = lhs;
-			node->op = tok.str;
+			auto node = make_ast_expr<AstUnaryExpr>(p->allocator, lhs->expr_type, AST_EXPR_RVALUE, text_region);
+			node->expr = lhs;
+			node->op = postfix_op;
 			lhs = node;
 			continue;
 		}

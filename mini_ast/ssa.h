@@ -36,6 +36,9 @@ enum class SsaOp {
 	Jump,
 	CondJump,
 	Return,
+	GetElement,
+	UnaryNeg,
+	UnaryNot,
 };
 REFLECT(SsaOp) {
 	ENUM_VALUE(Nop);
@@ -57,6 +60,9 @@ REFLECT(SsaOp) {
 	ENUM_VALUE(Jump);
 	ENUM_VALUE(CondJump);
 	ENUM_VALUE(Return);
+	ENUM_VALUE(GetElement);
+	ENUM_VALUE(UnaryNeg);
+	ENUM_VALUE(UnaryNot);
 }
 
 struct SsaBasicBlock;
@@ -181,9 +187,6 @@ void seal_block(SsaBasicBlock* block) {
 }
 
 void add_pred_inner(SsaBasicBlock* block, SsaBasicBlock* pred) {
-	if (!pred->is_sealed) {
-		panic("Cannot add unsealed pred");
-	}	
 	if (block->is_sealed) {
 		panic("Cannot add pred to sealed block");
 	}
@@ -213,6 +216,11 @@ void end_block_ret(SsaBasicBlock* block, SsaValue* ret) {
 struct SsaCondJump {
 	SsaBasicBlock* t_block = NULL;
 	SsaBasicBlock* f_block = NULL;
+
+	REFLECT(SsaCondJump) {
+		MEMBER(t_block);
+		MEMBER(f_block);
+	}
 };
 
 void end_block_cond_jump(SsaBasicBlock* block, SsaValue* cond, SsaBasicBlock* t_block, SsaBasicBlock* f_block) {
@@ -246,11 +254,6 @@ SsaValue* load_const(Ssa* ssa, T value) {
 	auto copied = copy(ssa->allocator, value);
 	inst->aux = make_any(type, copied);
 	return inst;
-}
-
-s64 resovle_type_size(AstType* type) {
-	// @TODO:
-	return 0;
 }
 
 Tuple<SsaValue*, Error*> lvalue(Ssa* ssa, AstExpr* expr) {
@@ -304,6 +307,12 @@ SsaValue* store(Ssa* ssa, SsaValue* lhs, SsaValue* rhs) {
 	return v;
 }
 
+SsaValue* ssa_alloca(Ssa* ssa, u64 size) {
+	auto v = make_ssa_val(ssa->current_block, SsaOp::Alloca);
+	add(&v->args, load_const(ssa, size));
+	return v;
+}
+
 Tuple<SsaValue*, Error*> emit_binary_op(Ssa* ssa, UnicodeString op, SsaValue* lhs, SsaValue* rhs) {
 	SsaOp ssa_op = SsaOp::Nop;
 	if (op == "+") {
@@ -329,6 +338,22 @@ Tuple<SsaValue*, Error*> emit_binary_op(Ssa* ssa, UnicodeString op, SsaValue* lh
 	return { v, NULL };
 }
 
+Tuple<SsaValue*, Error*> emit_unary_op(Ssa* ssa, UnicodeString op, SsaValue* lhs) {
+	SsaOp ssa_op = SsaOp::Nop;
+	if (op == "+") {
+		return { lhs, NULL };
+	} else if (op == "-") {
+		ssa_op = SsaOp::UnaryNeg;
+	} else if (op == "!") {
+		ssa_op = SsaOp::UnaryNot;
+	} else {
+		return { NULL, format_error("Unsupported unary operator: %", op) };
+	}
+	auto v = make_ssa_val(ssa->current_block, ssa_op);
+	add(&v->args, lhs);
+	return { v, NULL };
+}
+
 Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr) {
 	if (auto call = reflect_cast<AstFunctionCall>(expr)) {
 		auto v = make_ssa_val(ssa->current_block, SsaOp::Call);
@@ -341,7 +366,7 @@ Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr) {
 			add(&v->args, arg_v);
 		}
 		return { v, NULL };
-	} else if (auto binary_expr = reflect_cast<CBinaryExpr>(expr)) {
+	} else if (auto binary_expr = reflect_cast<AstBinaryExpr>(expr)) {
 		auto [rhs, e0] = emit_expr(ssa, binary_expr->rhs);
 		if (e0) {
 			return { NULL, e0 };
@@ -394,29 +419,6 @@ Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr) {
 		auto inst = make_ssa_val(ssa->current_block, SsaOp::Const);
 		inst->aux = any;
 		return { inst, NULL };
-	} else if (auto postfix_expr = reflect_cast<CPostfixExpr>(expr)) {
-		auto [lv, e] = lvalue(ssa, postfix_expr->lhs);
-		if (e) {
-			return { NULL, e };
-		}
-		auto [loaded, e2] = load(ssa, lv);
-		if (e2) {
-			return { NULL, e2 };
-		}
-		UnicodeString op;
-		if (postfix_expr->op == "++") {
-			op = U"+"_b;
-		} else if (postfix_expr->op == "--") {
-			op = U"-"_b;
-		} else {
-			return { NULL, format_error("Unsupported postfix operator: %", postfix_expr->op) };
-		}
-		auto const_one = load_const(ssa, (s64) 1);
-		auto [oped, e3] = emit_binary_op(ssa, op, loaded, const_one);
-		if (e3) {
-			return { NULL, e3 };
-		}
-		return { oped, NULL };
 	} else if (auto ternary = reflect_cast<AstTernary>(expr)) {
 		auto cond_block = make_ssa_basic_block(ssa, "ternary_cond"_b);
 		auto pred = ssa->current_block;
@@ -428,18 +430,18 @@ Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr) {
 		seal_block(pred);
 		end_block_jump(pred, cond_block);
 		seal_block(cond_block);
-		auto then_block = make_ssa_basic_block(ssa, "ternary_then"_b);
-		ssa->current_block = then_block;
+		ssa->current_block = make_ssa_basic_block(ssa, "ternary_then"_b);
 		auto [then_expr, e2] = emit_expr(ssa, ternary->then);
 		if (e2) {
 			return { NULL, e2 };
 		}
-		auto else_block = make_ssa_basic_block(ssa, "ternary_else"_b);
-		ssa->current_block = else_block;
+		auto then_block = ssa->current_block;
+		ssa->current_block = make_ssa_basic_block(ssa, "ternary_else"_b);
 		auto [else_expr, e3] = emit_expr(ssa, ternary->else_);
 		if (e3) {
 			return { NULL, e3 };
 		}
+		auto else_block = ssa->current_block;
 		end_block_cond_jump(cond_block, cond_value, then_block, else_block);
 		seal_block(then_block);
 		seal_block(else_block);
@@ -452,6 +454,48 @@ Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr) {
 		add(&phi->args, then_expr);
 		add(&phi->args, else_expr);
 		return { phi, NULL };
+	} else if (auto init = reflect_cast<AstStructInitializer>(expr)) {
+		auto slot = ssa_alloca(ssa, init->struct_type->size);
+		for (auto m: init->members) {
+			auto [expr, e] = emit_expr(ssa, m.expr);
+			if (e) {
+				return { NULL, e };
+			}
+			auto ptr = make_ssa_val(ssa->current_block, SsaOp::GetElement);
+			add(&ptr->args, slot);
+			add(&ptr->args, load_const(ssa, m.member.offset));
+			store(ssa, ptr, expr);
+		}
+		return { slot, NULL };
+	} else if (auto unary = reflect_cast<AstUnaryExpr>(expr)) {
+		auto [lhs, e] = emit_expr(ssa, unary->expr);
+		if (e) {
+			return { NULL, e };
+		}
+		if (unary->op->op == "--" || unary->op->op == "++") {
+			auto [loaded, e2] = load(ssa, lhs);
+			if (e2) {
+				return { NULL, e2 };
+			}
+			auto const_one = load_const(ssa, (s64) 1);
+			auto [oped, e3] = emit_binary_op(ssa, U"+"_b, loaded, const_one);
+			if (e3) {
+				return { NULL, e3 };
+			}
+			store(ssa, lhs, oped);
+
+			if (unary->op->flags & AST_OP_FLAG_POSTFIX) {
+				return { loaded, NULL };
+			} else {
+				return { oped, NULL };
+			}
+		} else {
+			auto [oped, e2] = emit_unary_op(ssa, unary->op->op, lhs);
+			if (e2) {
+				return { NULL, e2 };
+			}
+			return { oped, NULL };
+		}
 	} else {
 		auto [lv, e] = lvalue(ssa, expr);
 		if (e == NULL) {
@@ -485,11 +529,10 @@ Error* emit_stmt(Ssa* ssa, AstNode* stmt) {
 			v = var;
 		}
 		for (auto var_decl: var_decl_group->var_decls) {
-			auto var_v = make_ssa_val(ssa->current_block, SsaOp::Alloca);
-			var_v->aux = make_any(var_decl);
-			write_var(ssa->current_block, var_decl, var_v);
+			auto slot = ssa_alloca(ssa, var_decl->type->size);
+			write_var(ssa->current_block, var_decl, slot);
 			if (v) {
-				auto stored = store(ssa, var_v, v);
+				auto stored = store(ssa, slot, v);
 				write_var(ssa->current_block, var_decl, stored);
 			}
 		}
@@ -514,42 +557,49 @@ Error* emit_stmt(Ssa* ssa, AstNode* stmt) {
 	} else if (auto _for = reflect_cast<AstFor>(stmt)) {
 		seal_block(ssa->current_block);
 		auto pred = ssa->current_block;
-		auto init_block = make_ssa_basic_block(ssa, "for_init"_b);
-		ssa->current_block = init_block;
+		ssa->current_block = make_ssa_basic_block(ssa, "for_init"_b);
 		auto [_, e0] = emit_expr(ssa, _for->init_expr);
 		if (e0) {
 			return e0;
 		}
+		auto init_block = ssa->current_block;
+		seal_block(pred);
 		end_block_jump(pred, init_block);
+		seal_block(init_block);
 
-		auto cond_block = make_ssa_basic_block(ssa, "for_cond"_b);
-		ssa->current_block = cond_block;
+		ssa->current_block = make_ssa_basic_block(ssa, "for_cond"_b);
+		end_block_jump(init_block, ssa->current_block);
 		auto [cond_value, e1] = emit_expr(ssa, _for->cond_expr);
 		if (e1) {
 			return e1;
 		}
+		auto cond_block = ssa->current_block;
 
-		auto incr_block = make_ssa_basic_block(ssa, "for_inc"_b);
-		ssa->current_block = incr_block;
+		auto body_block = make_ssa_basic_block(ssa, "for_body"_b);
+		auto after_block = make_ssa_basic_block(ssa, "for_after"_b);
+		end_block_cond_jump(cond_block, cond_value, body_block, ssa->current_block);
+
+		ssa->current_block = make_ssa_basic_block(ssa, "for_incr"_b);
 		auto [xxxx, e2] = emit_expr(ssa, _for->incr_expr);
 		if (e2) {
 			return e2;
 		}
+		auto incr_block = ssa->current_block;
 		end_block_jump(incr_block, cond_block);
-		auto body_block = make_ssa_basic_block(ssa, "for_body"_b);
+		
 		ssa->current_block = body_block;
 		auto e3 = emit_block(ssa, _for->body);
 		if (e3) {
 			return e3;
 		}
-		ssa->current_block = make_ssa_basic_block(ssa, "for_after"_b);
-		end_block_jump(body_block, incr_block);
-		end_block_cond_jump(cond_block, cond_value, body_block, ssa->current_block);
+		body_block = ssa->current_block;
 
-		seal_block(init_block);
-		seal_block(cond_block);
-		seal_block(incr_block);
+		ssa->current_block = after_block;
+		end_block_jump(body_block, incr_block);
+
 		seal_block(body_block);
+		seal_block(incr_block);
+		seal_block(cond_block);
 		return NULL;
 	} else {
 		return format_error("Unsupported statement: %*", stmt->type->name);
@@ -576,11 +626,17 @@ void print_ssa_value(SsaValue* inst) {
 		print(" %* ", inst->aux.type->name);
 		if (auto var = reflect_cast<AstVar>(inst->aux)) {
 			print(" '%' ", var->name);
+		} else if (auto block = reflect_cast<SsaBasicBlock>(inst->aux)) {
+			print(" %* ", block->name);
 		}
 	}
 }
 
-void print_ssa_block(SsaBasicBlock* block) {
+void print_ssa_block(SsaBasicBlock* block, Array<SsaBasicBlock*>* printed_blocks) {
+	if (contains(*printed_blocks, block)) {
+		return;
+	}
+	add(printed_blocks, block);
 	println("%", block->name);
 	for (auto v: block->values) {
 		print_ssa_value(v);
@@ -588,7 +644,7 @@ void print_ssa_block(SsaBasicBlock* block) {
 	}
 	println();
 	for (auto succ: block->successors) {
-		print_ssa_block(succ);
+		print_ssa_block(succ, printed_blocks);
 	}
 }
 
@@ -599,8 +655,11 @@ Tuple<Ssa, Error*> emit_function_ssa(Allocator allocator, AstFunction* f) {
 		return { {}, format_error("Function % has no body", f->name) };
 	}
 	auto entry_block = make_ssa_basic_block(&ssa);
+	Array<SsaBasicBlock*> printed_blocks;
+	printed_blocks.allocator = ssa.allocator;
+	defer { printed_blocks.free(); };
 	defer { 
-		print_ssa_block(entry_block);
+		print_ssa_block(entry_block, &printed_blocks);
 	};
 	ssa.entry = entry_block;
 	ssa.current_block = entry_block;

@@ -41,7 +41,7 @@ int main() {
 		print("Generated at %", e->loc);
 		return -1;
 	}
-	// print(print_ast_node(program));
+	// println(print_ast_node(program));
 
 	for (auto it: program->globals) {
 		if (auto f = reflect_cast<AstFunction>(it)) {
