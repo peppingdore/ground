@@ -25,6 +25,7 @@ enum class SsaOp {
 	Div,
 	Less,
 	Greater,
+	Equal,
 	Const,
 	Call,
 	GlobalVar,
@@ -49,6 +50,7 @@ REFLECT(SsaOp) {
 	ENUM_VALUE(Div);
 	ENUM_VALUE(Less);
 	ENUM_VALUE(Greater);
+	ENUM_VALUE(Equal);
 	ENUM_VALUE(Const);
 	ENUM_VALUE(Call);
 	ENUM_VALUE(GlobalVar);
@@ -156,6 +158,7 @@ SsaValue* make_ssa_val(SsaBasicBlock* block, SsaOp op) {
 	return v;
 }
 void add_phi_args(SsaValue* phi) {
+	assert(phi->block->is_sealed);
 	assert(len(phi->args) == 0);
 	auto var = reflect_cast<AstVar>(phi->aux);
 	if (!var) {
@@ -192,11 +195,11 @@ SsaValue* read_var_recursive(SsaBasicBlock* block, AstVar* var) {
 }
 
 void seal_block(SsaBasicBlock* block) {
+	block->is_sealed = true;
 	for (auto phi: block->incomplete_phis) {
 		add_phi_args(phi);
 	}
 	clear(&block->incomplete_phis);
-	block->is_sealed = true;
 }
 
 void add_pred_inner(SsaBasicBlock* block, SsaBasicBlock* pred) {
@@ -340,6 +343,8 @@ Tuple<SsaValue*, Error*> emit_binary_op(Ssa* ssa, UnicodeString op, SsaValue* lh
 		ssa_op = SsaOp::Less;
 	} else if (op == ">") {
 		ssa_op = SsaOp::Greater;
+	} else if (op == "==") {
+		ssa_op = SsaOp::Equal;
 	} else if (op == ",") {
 		return { rhs, NULL };
 	} else {
@@ -624,48 +629,60 @@ Error* emit_stmt(Ssa* ssa, AstNode* stmt) {
 		ssa->current_block = after_b_s;
 		return NULL;
 	} else if (auto if_ = reflect_cast<AstIf>(stmt)) {
-		auto construct_id = alloc_construct_id(ssa);
+		auto after_c_id = alloc_construct_id(ssa);
 
-		seal_block(ssa->current_block);
 		auto pred = ssa->current_block;
-		// b_s = block start, b_e = block end
-		auto cond_b_s = make_ssa_basic_block(ssa, "if_cond"_b, construct_id);
-		ssa->current_block = cond_b_s;
-		auto [cond_value, e1] = emit_expr(ssa, if_->cond);
-		if (e1) {
-			return e1;
-		}
 		seal_block(pred);
-		end_block_jump(pred, cond_b_s);
-		seal_block(cond_b_s);
-		auto cond_b_e = ssa->current_block;
 
-		auto t_b_s = make_ssa_basic_block(ssa, "if_then"_b, construct_id);
-		auto else_b_s = make_ssa_basic_block(ssa, "if_else"_b, construct_id);
-		end_block_cond_jump(cond_b_e, cond_value, t_b_s, else_b_s);
+		auto if_after = make_ssa_basic_block(ssa, "if_after"_b, after_c_id);
+		
+		auto ptr_b_s = make_ssa_basic_block(ssa, "if_cond"_b, after_c_id);
+		end_block_jump(pred, ptr_b_s);
+		seal_block(ptr_b_s);
 
-		ssa->current_block = t_b_s;
-		auto e3 = emit_block(ssa, if_->then);
-		if (e3) {
-			return e3;
-		}
-		auto t_b_e = ssa->current_block;
-		end_block_jump(t_b_e, else_b_s);
+		auto curr_if = if_;
+		while (curr_if) {
+			auto construct_id = alloc_construct_id(ssa);
 
-		if (if_->else_if) {
-			ssa->current_block = else_b_s;
-			auto e3 = emit_stmt(ssa, if_->else_if);
-			if (e3) {
-				return e3;
+			auto cond_b_s = ptr_b_s;
+			ssa->current_block = cond_b_s;
+			auto [cond_value, e1] = emit_expr(ssa, curr_if->cond);
+			if (e1) {
+				return e1;
 			}
-		} else if (if_->else_block) {
-			ssa->current_block = else_b_s;
-			auto e3 = emit_block(ssa, if_->else_block);
-			if (e3) {
-				return e3;
+			auto cond_b_e = ssa->current_block;
+			auto body_b_s = make_ssa_basic_block(ssa, "if_body"_b, construct_id);
+			ssa->current_block = body_b_s;
+			auto e = emit_block(ssa, curr_if->then);
+			if (e) {
+				return e;
+			}
+			auto body_b_e = ssa->current_block;
+			end_block_jump(body_b_e, if_after);
+			ptr_b_s = make_ssa_basic_block(ssa, "if_else"_b, construct_id);
+			end_block_cond_jump(cond_b_e, cond_value, body_b_s, ptr_b_s);
+			seal_block(body_b_s);
+			seal_block(ptr_b_s);
+
+			if (curr_if->else_if) {
+				curr_if = curr_if->else_if;
+				continue;
+			} else if (curr_if->else_block) {
+				ssa->current_block = ptr_b_s;
+				auto e = emit_block(ssa, curr_if->else_block);
+				if (e) {
+					return e;
+				}
+				auto else_b_e = ssa->current_block;
+				end_block_jump(else_b_e, if_after);
+				break;
+			} else {
+				break;
 			}
 		}
-
+		seal_block(if_after);
+		ssa->current_block = if_after;
+		return NULL;
 	} else {
 		return format_error("Unsupported statement: %*", stmt->type->name);
 	}
@@ -689,7 +706,9 @@ void print_ssa_value(SsaValue* inst) {
 	}
 	if (inst->aux.ptr) {
 		print(" %* ", inst->aux.type->name);
-		if (auto var = reflect_cast<AstVar>(inst->aux)) {
+		if (inst->op == SsaOp::Const) {
+			print(" '%*' ", inst->aux);
+		} else if (auto var = reflect_cast<AstVar>(inst->aux)) {
 			print(" '%' ", var->name);
 		} else if (auto block = reflect_cast<SsaBasicBlock>(inst->aux)) {
 			print(" %* ", block->name);
@@ -700,6 +719,9 @@ void print_ssa_value(SsaValue* inst) {
 }
 
 void print_ssa_block(SsaBasicBlock* block, Array<SsaBasicBlock*>* printed_blocks) {
+	if (!block->is_sealed) {
+		panic("Block % is not sealed", block->name);
+	}
 	if (contains(*printed_blocks, block)) {
 		return;
 	}

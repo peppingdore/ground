@@ -35,6 +35,12 @@ void main() {
 	int a = 16;
 	if (k == 15) {
 		a = a + 1;
+	} else if (k == 16) {
+		a = a + 2;
+	} else if (k == 17) {
+		a = a + 3;
+	} else {
+		a = a + 4;
 	}
 	int b = a;
 }
