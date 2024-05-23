@@ -169,7 +169,6 @@ void add_phi_args(SsaValue* phi) {
 		assert(v);
 		add(&phi->args, v);
 	}
-	phi->op = SsaOp::Phi;
 }
 
 SsaValue* read_var_recursive(SsaBasicBlock* block, AstVar* var) {
@@ -197,6 +196,7 @@ SsaValue* read_var_recursive(SsaBasicBlock* block, AstVar* var) {
 void seal_block(SsaBasicBlock* block) {
 	block->is_sealed = true;
 	for (auto phi: block->incomplete_phis) {
+		assert(len(block->pred) > 0);
 		add_phi_args(phi);
 	}
 	clear(&block->incomplete_phis);
@@ -440,6 +440,7 @@ Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr) {
 		return { inst, NULL };
 	} else if (auto ternary = reflect_cast<AstTernary>(expr)) {
 		auto construct_id = alloc_construct_id(ssa);
+		// @TODO: This is not correct! Rewrite with starting and ending blocks.
 
 		auto cond_block = make_ssa_basic_block(ssa, "ternary_cond"_b, construct_id);
 		auto pred = ssa->current_block;
@@ -567,8 +568,7 @@ Error* emit_stmt(Ssa* ssa, AstNode* stmt) {
 			}
 			v = var;
 		}
-		auto var_v = make_ssa_val(ssa->current_block, SsaOp::Alloca);
-		var_v->aux = make_any(var_decl);
+		auto var_v = ssa_alloca(ssa, var_decl->type->size);
 		write_var(ssa->current_block, var_decl, var_v);
 		if (v) {
 			auto stored = store(ssa, var_v, v);
@@ -653,6 +653,10 @@ Error* emit_stmt(Ssa* ssa, AstNode* stmt) {
 			}
 			auto cond_b_e = ssa->current_block;
 			auto body_b_s = make_ssa_basic_block(ssa, "if_body"_b, construct_id);
+			ptr_b_s = make_ssa_basic_block(ssa, "if_else"_b, construct_id);
+			end_block_cond_jump(cond_b_e, cond_value, body_b_s, ptr_b_s);
+			seal_block(body_b_s);
+			seal_block(ptr_b_s);
 			ssa->current_block = body_b_s;
 			auto e = emit_block(ssa, curr_if->then);
 			if (e) {
@@ -660,10 +664,6 @@ Error* emit_stmt(Ssa* ssa, AstNode* stmt) {
 			}
 			auto body_b_e = ssa->current_block;
 			end_block_jump(body_b_e, if_after);
-			ptr_b_s = make_ssa_basic_block(ssa, "if_else"_b, construct_id);
-			end_block_cond_jump(cond_b_e, cond_value, body_b_s, ptr_b_s);
-			seal_block(body_b_s);
-			seal_block(ptr_b_s);
 
 			if (curr_if->else_if) {
 				curr_if = curr_if->else_if;
