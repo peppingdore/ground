@@ -324,8 +324,9 @@ SsaValue* store(Ssa* ssa, SsaValue* lhs, SsaValue* rhs) {
 }
 
 SsaValue* ssa_alloca(Ssa* ssa, u64 size) {
+	auto sz = load_const(ssa, size);
 	auto v = make_ssa_val(ssa->current_block, SsaOp::Alloca);
-	add(&v->args, load_const(ssa, size));
+	add(&v->args, sz);
 	return v;
 }
 
