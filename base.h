@@ -45,9 +45,9 @@
 #endif
 
 #if COMPILER_MSVC
-	#define Debug_Break() __debugbreak()
+	#define DebugBreak() __debugbreak()
 #else
-	#define Debug_Break() __builtin_debugtrap()
+	#define DebugBreak() __builtin_debugtrap()
 #endif
 
 #define STRINGIFY(x) #x

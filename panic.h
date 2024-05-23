@@ -61,9 +61,9 @@ inline void panic(const char* file_name, int line_number, auto... args) {
 	fwrite(file_name, strlen(file_name), 1, stderr);
 	fwrite(":", 1, 1, stderr);
 	char buf[32];
-	itoa(line_number, buf, 10);
+	snprintf(buf, sizeof(buf), "%d", line_number);
 	fwrite(buf, strlen(buf), 1, stderr);
-	Debug_Break();
+	DebugBreak();
 	exit(-1);
 }
 

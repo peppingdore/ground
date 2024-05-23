@@ -214,9 +214,9 @@ HashMapEntry<K, V>* remove_entry(HashMap<K, V>* map, std::type_identity_t<K> key
 				}
 				assert(distance_from_home(hash_map_get_home(map, shift_e), shift_idx) > distance_from_home(hash_map_get_home(map, shift_e), prev_idx));
 
-				entries.data[prev_idx] = *shift_e;
+				map->data[prev_idx] = *shift_e;
 				prev_idx = shift_idx;
-				current->normalized_hash = HASH_MAP_HASH_EMPTY;
+				shift_e->normalized_hash = HASH_MAP_HASH_EMPTY;
 				shift_idx = hash_map_next_index_wraparound(shift_idx, map->capacity);
 			}
 

@@ -131,7 +131,7 @@ Posix_Error* posix_error(CodeLocation loc = caller_loc()) {
 	append(num_str.buf, num_str.length);
 	append_c_str(": ");
 	strerror_r(errno, buf + cursor, static_array_count(buf) - cursor);
-	auto e = make_error<Posix_Error>(make_string(buf).copy(), loc);
+	auto e = make_error<Posix_Error>(copy_string(make_string(buf)), loc);
 	e->code = errno;
 	return e;
 }
