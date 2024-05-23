@@ -726,8 +726,14 @@ void print_ssa_block(SsaBasicBlock* block, Array<SsaBasicBlock*>* printed_blocks
 		return;
 	}
 	add(printed_blocks, block);
-	println("%", block->name);
+	println("Block: %", block->name);
+	print("Predecessors: ");
+	for (auto pred: block->pred) {
+		print(" % ", pred->name);
+	}
+	println();
 	for (auto v: block->values) {
+		print("  ");
 		print_ssa_value(v);
 		println();
 	}
