@@ -44,10 +44,12 @@
 	#define force_inline __forceinline
 #endif
 
-#if COMPILER_MSVC
-	#define DebugBreak() __debugbreak()
-#else
-	#define DebugBreak() __builtin_debugtrap()
+#if OS_WINDOWS == 0
+	#if COMPILER_MSVC
+		#define DebugBreak() __debugbreak()
+	#else
+		#define DebugBreak() __builtin_debugtrap()
+	#endif
 #endif
 
 #define STRINGIFY(x) #x
