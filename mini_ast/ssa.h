@@ -593,12 +593,12 @@ Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr) {
 		}
 		return { slot, NULL };
 	} else if (auto unary = reflect_cast<AstUnaryExpr>(expr)) {
-		auto [lhs, e] = emit_expr(ssa, unary->expr);
-		if (e) {
-			return { NULL, e };
-		}
 		if (unary->op->op == "--" || unary->op->op == "++") {
-			auto [loaded, e2] = load(ssa, lhs);
+			auto [lv, e] = lvalue(ssa, unary->expr);
+			if (e) {
+				return { NULL, e };
+			}
+			auto [loaded, e2] = load(ssa, lv);
 			if (e2) {
 				return { NULL, e2 };
 			}
@@ -607,7 +607,7 @@ Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr) {
 			if (e3) {
 				return { NULL, e3 };
 			}
-			store(ssa, lhs, oped);
+			store(ssa, lv, oped);
 
 			if (unary->op->flags & AST_OP_FLAG_POSTFIX) {
 				return { loaded, NULL };
@@ -615,6 +615,10 @@ Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr) {
 				return { oped, NULL };
 			}
 		} else {
+			auto [lhs, e] = emit_expr(ssa, unary->expr);
+			if (e) {
+				return { NULL, e };
+			}
 			auto [oped, e2] = emit_unary_op(ssa, unary->op->op, lhs);
 			if (e2) {
 				return { NULL, e2 };
@@ -748,6 +752,7 @@ Error* emit_stmt(Ssa* ssa, AstNode* stmt) {
 		seal_block(cond_b_e);
 
 		ssa->current_block = after_b_s;
+		seal_block(after_b_s);
 		return NULL;
 	} else if (auto if_ = reflect_cast<AstIf>(stmt)) {
 		auto after_c_id = alloc_construct_id(ssa);
