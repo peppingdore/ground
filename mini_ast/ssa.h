@@ -40,6 +40,8 @@ enum class SsaOp {
 	GetElement,
 	UnaryNeg,
 	UnaryNot,
+	SsaLvalue,
+	ZeroInit,
 };
 REFLECT(SsaOp) {
 	ENUM_VALUE(Nop);
@@ -65,6 +67,8 @@ REFLECT(SsaOp) {
 	ENUM_VALUE(GetElement);
 	ENUM_VALUE(UnaryNeg);
 	ENUM_VALUE(UnaryNot);
+	ENUM_VALUE(SsaLvalue);
+	ENUM_VALUE(ZeroInit);
 }
 
 struct SsaBasicBlock;
@@ -76,6 +80,7 @@ struct SsaValue {
 	SsaBasicBlock*   block = NULL;
 	AstType*         type = NULL;
 	Array<SsaValue*> args;
+	Array<SsaValue*> uses;
 	Any              aux;
 };
 
@@ -88,7 +93,7 @@ struct SsaBasicBlock {
 	Array<SsaValue*>            incomplete_phis;
 	Array<SsaBasicBlock*>       pred;
 	Array<SsaBasicBlock*>       successors;
-	HashMap<AstVar*, SsaValue*> var_map;
+	HashMap<AstVar*, SsaValue*> ssa_vars;
 
 	REFLECT(SsaBasicBlock) {
 		MEMBER(name);
@@ -99,16 +104,17 @@ struct SsaBasicBlock {
 		MEMBER(incomplete_phis);
 		MEMBER(pred);
 		MEMBER(successors);
-		MEMBER(var_map);
+		MEMBER(ssa_vars);
 	}
 };
 
 struct Ssa {
-	Allocator             allocator = c_allocator;
-	SsaBasicBlock*        entry = NULL;
-	s64                   reg_counter = 0;
-	SsaBasicBlock*        current_block = NULL;
-	s64                   construct_id_counter = 0;
+	Allocator                   allocator = c_allocator;
+	SsaBasicBlock*              entry = NULL;
+	s64                         reg_counter = 0;
+	SsaBasicBlock*              current_block = NULL;
+	s64                         construct_id_counter = 0;
+	HashMap<AstVar*, SsaValue*> non_ssa_vars;
 
 	void free() {
 		free_allocator(allocator);
@@ -135,12 +141,28 @@ SsaBasicBlock* make_ssa_basic_block(Ssa* ssa, String name = ""_b, s64 construct_
 	block->incomplete_phis = { .allocator = ssa->allocator };
 	block->pred = { .allocator = ssa->allocator };
 	block->successors = { .allocator = ssa->allocator };
-	block->var_map = { .allocator = ssa->allocator };
+	block->ssa_vars = { .allocator = ssa->allocator };
 	return block;
 }
 
+bool can_ssa(AstVar* var) {
+	if (var->is_global) {
+		return false;
+	}
+	if (auto alias = reflect_cast<CTypeAlias>(var->var_type)) {
+		if (auto prim = alias->c_type->as<PrimitiveType>()) {
+			return true;
+		}
+	}
+	return false;
+}
+
 void write_var(SsaBasicBlock* block, AstVar* var, SsaValue* v) {
-	put(&block->var_map, var, v);
+	if (can_ssa(var)) {
+		put(&block->ssa_vars, var, v);
+	} else {
+		put(&block->ssa->non_ssa_vars, var, v);
+	}
 }
 
 SsaValue* read_var(SsaBasicBlock* block, AstVar* var);
@@ -155,8 +177,20 @@ SsaValue* make_ssa_val(SsaBasicBlock* block, SsaOp op) {
 	} else {
 		add(&block->values, v);
 	}
+	v->args.allocator = block->ssa->allocator;
+	v->uses.allocator = block->ssa->allocator;
 	return v;
 }
+
+void use(SsaValue* by, SsaValue* v) {
+	add(&v->uses, by);
+}
+
+void add_arg(SsaValue* v, SsaValue* arg) {
+	use(v, arg);
+	add(&v->args, arg);
+}
+
 void add_phi_args(SsaValue* phi) {
 	assert(phi->block->is_sealed);
 	assert(len(phi->args) == 0);
@@ -167,7 +201,7 @@ void add_phi_args(SsaValue* phi) {
 	for (auto pred: phi->block->pred) {
 		auto v = read_var(pred, var);
 		assert(v);
-		add(&phi->args, v);
+		add_arg(phi, v);
 	}
 }
 
@@ -225,7 +259,7 @@ void end_block_ret(SsaBasicBlock* block, SsaValue* ret) {
 	assert(block->ending == NULL);
 	block->ending = make_ssa_val(block, SsaOp::Return);
 	if (ret) {
-		add(&block->ending->args, ret);
+		add_arg(block->ending, ret);
 	}
 }
 
@@ -242,7 +276,7 @@ struct SsaCondJump {
 void end_block_cond_jump(SsaBasicBlock* block, SsaValue* cond, SsaBasicBlock* t_block, SsaBasicBlock* f_block) {
 	assert(block->ending == NULL);
 	auto v = make_ssa_val(block, SsaOp::CondJump);
-	add(&v->args, cond);
+	add_arg(v, cond);
 	auto cj = make<SsaCondJump>(block->ssa->allocator);
 	cj->t_block = t_block;
 	cj->f_block = f_block;
@@ -253,13 +287,21 @@ void end_block_cond_jump(SsaBasicBlock* block, SsaValue* cond, SsaBasicBlock* t_
 }
 
 SsaValue* read_var(SsaBasicBlock* block, AstVar* var) {
-	auto found = get(&block->var_map, var);
-	if (found) {
-		return *found;
+	if (can_ssa(var)) {
+		auto found = get(&block->ssa_vars, var);
+		if (found) {
+			return *found;
+		} else {
+			return read_var_recursive(block, var);
+		}
+		return NULL;
 	} else {
-		return read_var_recursive(block, var);
+		auto v = get(&block->ssa->non_ssa_vars, var);
+		if (v == NULL) {
+			panic("Unknown variable: %*", var->type->name);
+		}
+		return *v;
 	}
-	return NULL;
 }
 
 template <typename T>
@@ -270,6 +312,24 @@ SsaValue* load_const(Ssa* ssa, T value) {
 	auto copied = copy(ssa->allocator, value);
 	inst->aux = make_any(type, copied);
 	return inst;
+}
+
+Tuple<SsaValue*, Error*> get_lvalue_root(Ssa* ssa, SsaValue* lvalue) {
+	if (lvalue->op == SsaOp::MemberAccess) {
+		auto lhs = lvalue->args[0];
+		return get_lvalue_root(ssa, lhs);
+	} else if (lvalue->op == SsaOp::GlobalVar) {
+		return { lvalue, NULL };
+	} else if (lvalue->op == SsaOp::Swizzle) {
+		auto lhs = lvalue->args[0];
+		return get_lvalue_root(ssa, lhs);
+	} else if (lvalue->op == SsaOp::SsaLvalue) {
+		return { lvalue, NULL };
+	} else if (lvalue->op == SsaOp::Alloca) {
+		return { lvalue, NULL };
+	} else {
+		return { NULL, format_error("Unsupported lvalue op: %", lvalue->op) }; 
+	}
 }
 
 Tuple<SsaValue*, Error*> lvalue(Ssa* ssa, AstExpr* expr) {
@@ -283,7 +343,7 @@ Tuple<SsaValue*, Error*> lvalue(Ssa* ssa, AstExpr* expr) {
 			return { NULL, e };
 		}
 		auto v = make_ssa_val(ssa->current_block, SsaOp::MemberAccess);
-		add(&v->args, lhs);
+		add_arg(v, lhs);
 		v->aux = make_any(var_access->member);
 		return { v, NULL };
 	} else if (auto var_access = reflect_cast<AstVariableAccess>(expr)) {
@@ -291,6 +351,23 @@ Tuple<SsaValue*, Error*> lvalue(Ssa* ssa, AstExpr* expr) {
 			auto v = make_ssa_val(ssa->current_block, SsaOp::GlobalVar);
 			v->aux = make_any(var_access->var);
 			return { v, NULL };
+		} else {
+			if (can_ssa(var_access->var)) {
+				SsaValue* v = read_var(ssa->current_block, var_access->var);
+				if (!v) {
+					return { NULL, format_error("Unknown variable: %*", var_access->var->type->name) };
+				}
+				auto lv = make_ssa_val(ssa->current_block, SsaOp::SsaLvalue);
+				add_arg(lv, v);
+				lv->aux = make_any(var_access->var);
+				return { lv, NULL };
+			} else {
+				SsaValue* v = read_var(ssa->current_block, var_access->var);
+				if (!v) {
+					return { NULL, format_error("Unknown variable: %*", var_access->var->type->name) };
+				}
+				return { v, NULL };
+			}
 		}
 		auto v = read_var(ssa->current_block, var_access->var);
 		if (!v) {
@@ -303,7 +380,7 @@ Tuple<SsaValue*, Error*> lvalue(Ssa* ssa, AstExpr* expr) {
 			return { NULL, e };
 		}
 		auto v = make_ssa_val(ssa->current_block, SsaOp::Swizzle);
-		add(&v->args, lhs);
+		add_arg(v, lhs);
 		v->aux = make_any(sw);
 		return { v, NULL };
 	}
@@ -311,22 +388,41 @@ Tuple<SsaValue*, Error*> lvalue(Ssa* ssa, AstExpr* expr) {
 }
 
 Tuple<SsaValue*, Error*> load(Ssa* ssa, SsaValue* lhs) {
+	auto [root, e] = get_lvalue_root(ssa, lhs);
+	if (e) {
+		return { NULL, e };
+	}
+	if (root->op == SsaOp::SsaLvalue) {
+		return { root->args[0], NULL };
+	}
 	auto v = make_ssa_val(ssa->current_block, SsaOp::Load);
-	add(&v->args, lhs);
+	add_arg(v, lhs);
 	return { v, NULL };
 }
 
-SsaValue* store(Ssa* ssa, SsaValue* lhs, SsaValue* rhs) {
+Error* store(Ssa* ssa, SsaValue* lhs, SsaValue* rhs) {
+	auto [root, e] = get_lvalue_root(ssa, lhs);
+	if (e) {
+		return e;
+	}
+	if (root->op == SsaOp::SsaLvalue) {
+		auto var = reflect_cast<AstVar>(root->aux);
+		if (!var) {
+			return format_error("Expected var");
+		}
+		write_var(ssa->current_block, var, rhs);
+		return NULL;
+	}
 	auto v = make_ssa_val(ssa->current_block, SsaOp::Store);
-	add(&v->args, lhs);
-	add(&v->args, rhs);
-	return v;
+	add_arg(v, lhs);
+	add_arg(v, rhs);
+	return NULL;
 }
 
 SsaValue* ssa_alloca(Ssa* ssa, u64 size) {
 	auto sz = load_const(ssa, size);
 	auto v = make_ssa_val(ssa->current_block, SsaOp::Alloca);
-	add(&v->args, sz);
+	add_arg(v, sz);
 	return v;
 }
 
@@ -352,8 +448,8 @@ Tuple<SsaValue*, Error*> emit_binary_op(Ssa* ssa, UnicodeString op, SsaValue* lh
 		return { NULL, format_error("Unsupported binary operator: %", op) };
 	}
 	auto v = make_ssa_val(ssa->current_block, ssa_op);
-	add(&v->args, lhs);
-	add(&v->args, rhs);
+	add_arg(v, lhs);
+	add_arg(v, rhs);
 	return { v, NULL };
 }
 
@@ -369,7 +465,7 @@ Tuple<SsaValue*, Error*> emit_unary_op(Ssa* ssa, UnicodeString op, SsaValue* lhs
 		return { NULL, format_error("Unsupported unary operator: %", op) };
 	}
 	auto v = make_ssa_val(ssa->current_block, ssa_op);
-	add(&v->args, lhs);
+	add_arg(v, lhs);
 	return { v, NULL };
 }
 
@@ -382,7 +478,7 @@ Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr) {
 			if (e) {
 				return { NULL, e };
 			}
-			add(&v->args, arg_v);
+			add_arg(v, arg_v);
 		}
 		return { v, NULL };
 	} else if (auto binary_expr = reflect_cast<AstBinaryExpr>(expr)) {
@@ -395,7 +491,10 @@ Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr) {
 			if (e1) {
 				return { NULL, e1 };
 			}
-			auto v = store(ssa, lhs, rhs);
+			auto e = store(ssa, lhs, rhs);
+			if (e) {
+				return { NULL, e };
+			}
 			return { rhs, NULL };
 		} else if (binary_expr->op->flags & AST_OP_FLAG_MOD_ASSIGN) {
 			auto [lhs, e1] = lvalue(ssa, binary_expr->lhs);
@@ -410,7 +509,10 @@ Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr) {
 			if (e3) {
 				return { NULL, e3 };
 			}
-			store(ssa, lhs, oped);
+			auto e = store(ssa, lhs, oped);
+			if (e) {
+				return { NULL, e };
+			}
 			return { oped, NULL };
 		} else {
 			auto [lhs, e] = emit_expr(ssa, binary_expr->lhs);
@@ -473,8 +575,8 @@ Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr) {
 		end_block_jump(else_block, ssa->current_block);
 
 		auto phi = make_ssa_val(ssa->current_block, SsaOp::Phi);
-		add(&phi->args, then_expr);
-		add(&phi->args, else_expr);
+		add_arg(phi, then_expr);
+		add_arg(phi, else_expr);
 		return { phi, NULL };
 	} else if (auto init = reflect_cast<AstStructInitializer>(expr)) {
 		auto slot = ssa_alloca(ssa, init->struct_type->size);
@@ -483,9 +585,10 @@ Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr) {
 			if (e) {
 				return { NULL, e };
 			}
+			auto offset = load_const(ssa, m.member.offset);
 			auto ptr = make_ssa_val(ssa->current_block, SsaOp::GetElement);
-			add(&ptr->args, slot);
-			add(&ptr->args, load_const(ssa, m.member.offset));
+			add_arg(ptr, slot);
+			add_arg(ptr, offset);
 			store(ssa, ptr, expr);
 		}
 		return { slot, NULL };
@@ -533,6 +636,27 @@ Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr) {
 
 Error* emit_block(Ssa* ssa, AstBlock* block);
 
+Error* decl_var(Ssa* ssa, AstVarDecl* var_decl, SsaValue* init) {
+	if (can_ssa(var_decl)) {
+		if (init == NULL) {
+			auto sz = load_const(ssa, var_decl->type->size);
+			init = make_ssa_val(ssa->current_block, SsaOp::ZeroInit);
+			add_arg(init, sz);
+		}
+		write_var(ssa->current_block, var_decl, init);
+	} else {
+		auto slot = ssa_alloca(ssa, var_decl->type->size);
+		write_var(ssa->current_block, var_decl, slot);
+		if (init) {
+			auto e = store(ssa, slot, init);
+			if (e) {
+				return e;
+			}
+		}
+	}
+	return NULL;
+}
+
 Error* emit_stmt(Ssa* ssa, AstNode* stmt) {
 	if (auto expr = reflect_cast<AstExpr>(stmt)) {
 		auto [var, e] = emit_expr(ssa, expr);
@@ -551,11 +675,9 @@ Error* emit_stmt(Ssa* ssa, AstNode* stmt) {
 			v = var;
 		}
 		for (auto var_decl: var_decl_group->var_decls) {
-			auto slot = ssa_alloca(ssa, var_decl->type->size);
-			write_var(ssa->current_block, var_decl, slot);
-			if (v) {
-				auto stored = store(ssa, slot, v);
-				write_var(ssa->current_block, var_decl, stored);
+			auto e = decl_var(ssa, var_decl, v);
+			if (e) {
+				return e;
 			}
 		}
 		return NULL;
@@ -568,11 +690,9 @@ Error* emit_stmt(Ssa* ssa, AstNode* stmt) {
 			}
 			v = var;
 		}
-		auto var_v = ssa_alloca(ssa, var_decl->type->size);
-		write_var(ssa->current_block, var_decl, var_v);
-		if (v) {
-			auto stored = store(ssa, var_v, v);
-			write_var(ssa->current_block, var_decl, stored);
+		auto e = decl_var(ssa, var_decl, v);
+		if (e) {
+			return e;
 		}
 		return NULL;
 	} else if (auto _for = reflect_cast<AstFor>(stmt)) {
@@ -717,6 +837,10 @@ void print_ssa_value(SsaValue* inst) {
 			print(" %*, %* ", cj->t_block->name, cj->f_block->name);
 		}
 	}
+	print("     used by ");
+	for (auto use: inst->uses) {
+		print("$% ", use->id.v);
+	}
 }
 
 void print_ssa_block(SsaBasicBlock* block, Array<SsaBasicBlock*>* printed_blocks) {
@@ -759,6 +883,8 @@ Tuple<Ssa, Error*> emit_function_ssa(Allocator allocator, AstFunction* f) {
 	};
 	ssa.entry = entry_block;
 	ssa.current_block = entry_block;
+	ssa.non_ssa_vars.allocator = ssa.allocator;
+	seal_block(entry_block);
 	auto e = emit_block(&ssa, f->block);
 	if (e) {
 		return { {}, e };
