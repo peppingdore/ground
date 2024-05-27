@@ -880,6 +880,12 @@ void print_ssa_block(SsaBasicBlock* block, Array<SsaBasicBlock*>* printed_blocks
 	}
 }
 
+void print_ssa(SsaBasicBlock* entry) {
+	Array<SsaBasicBlock*> printed_blocks;
+	print_ssa_block(entry, &printed_blocks);
+	printed_blocks.free();
+}
+
 Tuple<Ssa, Error*> emit_function_ssa(Allocator allocator, AstFunction* f) {
 	Ssa ssa;
 	ssa.allocator = make_arena_allocator(allocator, 1024 * 1024);
@@ -887,12 +893,6 @@ Tuple<Ssa, Error*> emit_function_ssa(Allocator allocator, AstFunction* f) {
 		return { {}, format_error("Function % has no body", f->name) };
 	}
 	auto entry_block = make_ssa_basic_block(&ssa);
-	Array<SsaBasicBlock*> printed_blocks;
-	printed_blocks.allocator = ssa.allocator;
-	defer { printed_blocks.free(); };
-	defer { 
-		print_ssa_block(entry_block, &printed_blocks);
-	};
 	ssa.entry = entry_block;
 	ssa.current_block = entry_block;
 	ssa.non_ssa_vars.allocator = ssa.allocator;
@@ -905,4 +905,98 @@ Tuple<Ssa, Error*> emit_function_ssa(Allocator allocator, AstFunction* f) {
 		end_block_ret_void(ssa.current_block);
 	}
 	return { ssa, NULL };
+}
+
+#include "../third_party/spirv.h"
+
+struct SpirvEmitter {
+	Array<u32>             spv;
+	HashMap<AstType*, u32> type_ids;
+	u32                    id_counter = 0;
+};
+
+u32 alloc_id(SpirvEmitter* emitter) {
+	return ++emitter->id_counter;
+}
+
+void spv_word(SpirvEmitter* emitter, u32 word) {
+	add(&emitter->spv, word);
+}
+
+void spv_opcode(SpirvEmitter* emitter, SpvOp op, u32 word_count) {
+	spv_word(emitter, u32(op) | ((word_count + 1) << 16));
+}
+
+void spv_op(SpirvEmitter* emitter, SpvOp op, std::initializer_list<u32> words) {
+	spv_opcode(emitter, op, u32(words.size()));
+	for (auto word: words) {
+		spv_word(emitter, word); 
+	}
+}
+
+Tuple<u32, Error*> get_type_id(SpirvEmitter* emitter, AstType* type) {
+	auto found = get(&emitter->type_ids, type);
+	if (found) {
+		return { *found, NULL };
+	}
+	u32 id = 0;
+	if (auto alias = reflect_cast<CTypeAlias>(type)) {
+		if (alias->c_type == reflect_type_of<void>()) {
+			id = alloc_id(emitter);
+			spv_op(emitter, SpvOpTypeVoid, { id });
+		}
+	} else {
+		return { NULL, format_error("Unsupported type: %*", type->name) };
+	}
+	put(&emitter->type_ids, type, id);
+	return { id, NULL };
+}
+
+Tuple<u32, Error*> decl_pointer_type(SpirvEmitter* emitter, AstType* type, u32 storage_class) {
+	auto [id, e] = get_type_id(emitter, type);
+	if (e) {
+		return { NULL, e };
+	}
+	auto res = alloc_id(emitter);
+	spv_op(emitter, SpvOpTypePointer, { res, storage_class, id });
+	return { res, NULL };
+}
+
+SpirvEmitter make_spirv_emitter(Allocator allocator) {
+	SpirvEmitter emitter;
+	emitter.spv.allocator = allocator;
+	spv_word(&emitter, 0x07230203); // magic
+	spv_word(&emitter, 0x00010000); // version
+	spv_word(&emitter, 0x00000000); // generator magic
+	spv_word(&emitter, 65536); // id bound // @TODO: patch it later.
+	spv_word(&emitter, 0); // reserved
+	spv_op(&emitter, SpvOpCapability, { SpvCapabilityShader });
+	spv_op(&emitter, SpvOpMemoryModel, { SpvAddressingModelLogical, SpvMemoryModelGLSL450 });
+	return emitter;
+}
+
+Error* emit_spirv_function(SpirvEmitter* emitter, AstFunction* f) {
+	auto [return_type_id, e] = get_type_id(emitter, f->return_type);
+	if (e) {
+		return e;
+	}
+	spv_opcode(emitter, SpvOpTypeFunction, 1 + 1 + len(f->args));
+	u32 function_type_id = alloc_id(emitter);
+	spv_word(emitter, function_type_id);
+	spv_word(emitter, return_type_id);
+	for (auto arg: f->args) {
+		auto [id, e] = decl_pointer_type(emitter, arg->arg_type, SpvStorageClassFunction);
+		if (e) {
+			return e;
+		}
+		spv_word(emitter, id);
+	}
+	u32 function_id = alloc_id(emitter);
+	spv_opcode(emitter, SpvOpFunction, 0);
+	spv_word(emitter, return_type_id);
+	spv_word(emitter, function_id);
+	spv_word(emitter, SpvFunctionControlMaskNone);
+	spv_word(emitter, function_type_id);
+	spv_word(emitter, SpvOpFunctionEnd);
+	return NULL;
 }
