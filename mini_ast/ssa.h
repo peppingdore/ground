@@ -37,6 +37,7 @@ enum class SsaOp {
 	Jump,
 	CondJump,
 	Return,
+	ReturnVoid,
 	GetElement,
 	UnaryNeg,
 	UnaryNot,
@@ -64,6 +65,7 @@ REFLECT(SsaOp) {
 	ENUM_VALUE(Jump);
 	ENUM_VALUE(CondJump);
 	ENUM_VALUE(Return);
+	ENUM_VALUE(ReturnVoid);
 	ENUM_VALUE(GetElement);
 	ENUM_VALUE(UnaryNeg);
 	ENUM_VALUE(UnaryNot);
@@ -261,6 +263,11 @@ void end_block_ret(SsaBasicBlock* block, SsaValue* ret) {
 	if (ret) {
 		add_arg(block->ending, ret);
 	}
+}
+
+void end_block_ret_void(SsaBasicBlock* block) {
+	assert(block->ending == NULL);
+	block->ending = make_ssa_val(block, SsaOp::ReturnVoid);
 }
 
 struct SsaCondJump {
@@ -893,6 +900,9 @@ Tuple<Ssa, Error*> emit_function_ssa(Allocator allocator, AstFunction* f) {
 	auto e = emit_block(&ssa, f->block);
 	if (e) {
 		return { {}, e };
+	}
+	if (ssa.current_block->ending == NULL) {
+		end_block_ret_void(ssa.current_block);
 	}
 	return { ssa, NULL };
 }
