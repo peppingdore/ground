@@ -26,7 +26,7 @@ struct Reader {
 Tuple<Array<u8>, Error*> read_all(Allocator allocator, Reader reader) {
 	Array<u8> data = { .allocator = allocator };
 	while (true) {
-		void* dst = data.reserve_at_index(len(data), 128);
+		void* dst = reserve(&data, 128);
 		auto [read, e] = reader.read(dst, 128);
 		if (e) {
 			data.count -= 128;
