@@ -14,7 +14,15 @@ AstRunner* make_ast_runner(CLikeProgram* program) {
 
 struct SsaId { 
 	s64 v = 0;
+
+	bool operator==(SsaId other) const {
+		return v == other.v;
+	}
 };
+
+Hash64 hash_key(SsaId id) {
+	return hash64(id.v);
+}
 
 enum class SsaOp {
 	Nop = 0,
@@ -117,6 +125,7 @@ struct Ssa {
 	SsaBasicBlock*              current_block = NULL;
 	s64                         construct_id_counter = 0;
 	HashMap<AstVar*, SsaValue*> non_ssa_vars;
+	AstFunction*                function = NULL;
 
 	void free() {
 		free_allocator(allocator);
@@ -426,10 +435,9 @@ Error* store(Ssa* ssa, SsaValue* lhs, SsaValue* rhs) {
 	return NULL;
 }
 
-SsaValue* ssa_alloca(Ssa* ssa, u64 size) {
-	auto sz = load_const(ssa, size);
+SsaValue* ssa_alloca(Ssa* ssa, AstType* type) {
 	auto v = make_ssa_val(ssa->current_block, SsaOp::Alloca);
-	add_arg(v, sz);
+	v->aux = make_any(type);
 	return v;
 }
 
@@ -586,7 +594,7 @@ Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr) {
 		add_arg(phi, else_expr);
 		return { phi, NULL };
 	} else if (auto init = reflect_cast<AstStructInitializer>(expr)) {
-		auto slot = ssa_alloca(ssa, init->struct_type->size);
+		auto slot = ssa_alloca(ssa, init->struct_type);
 		for (auto m: init->members) {
 			auto [expr, e] = emit_expr(ssa, m.expr);
 			if (e) {
@@ -650,13 +658,12 @@ Error* emit_block(Ssa* ssa, AstBlock* block);
 Error* decl_var(Ssa* ssa, AstVarDecl* var_decl, SsaValue* init) {
 	if (can_ssa(var_decl)) {
 		if (init == NULL) {
-			auto sz = load_const(ssa, var_decl->type->size);
 			init = make_ssa_val(ssa->current_block, SsaOp::ZeroInit);
-			add_arg(init, sz);
+			init->aux = make_any(var_decl->var_type);
 		}
 		write_var(ssa->current_block, var_decl, init);
 	} else {
-		auto slot = ssa_alloca(ssa, var_decl->type->size);
+		auto slot = ssa_alloca(ssa, var_decl->var_type);
 		write_var(ssa->current_block, var_decl, slot);
 		if (init) {
 			auto e = store(ssa, slot, init);
@@ -888,6 +895,7 @@ void print_ssa(SsaBasicBlock* entry) {
 
 Tuple<Ssa, Error*> emit_function_ssa(Allocator allocator, AstFunction* f) {
 	Ssa ssa;
+	ssa.function = f;
 	ssa.allocator = make_arena_allocator(allocator, 1024 * 1024);
 	if (!f->block) {
 		return { {}, format_error("Function % has no body", f->name) };
@@ -912,7 +920,9 @@ Tuple<Ssa, Error*> emit_function_ssa(Allocator allocator, AstFunction* f) {
 struct SpirvEmitter {
 	Array<u32>             spv;
 	HashMap<AstType*, u32> type_ids;
+	HashMap<Type*, u32>    c_type_ids;
 	u32                    id_counter = 0;
+	HashMap<SsaId, u32>    id_map;
 };
 
 u32 alloc_id(SpirvEmitter* emitter) {
@@ -934,6 +944,27 @@ void spv_op(SpirvEmitter* emitter, SpvOp op, std::initializer_list<u32> words) {
 	}
 }
 
+Tuple<u32, Error*> get_c_type_id(SpirvEmitter* m, Type* type) {
+	u32 id = 0;
+	if (type == reflect_type_of<void>()) {
+		id = alloc_id(m);
+		spv_op(m, SpvOpTypeVoid, { id });
+	} else if (type == reflect_type_of<u32>()) {
+		id = alloc_id(m);
+		spv_op(m, SpvOpTypeInt, { id, 32, 0 });
+	} else if (type == reflect_type_of<f32>()) {
+		id = alloc_id(m);
+		spv_op(m, SpvOpTypeFloat, { id, 32 });
+	} else if (type == reflect_type_of<f64>()) {
+		id = alloc_id(m);
+		spv_op(m, SpvOpTypeFloat, { id, 64 });
+	} else {
+		return { NULL, format_error("Unsupported type: %*", type->name) };
+	}
+	put(&m->c_type_ids, type, id);
+	return { id, NULL };
+}
+
 Tuple<u32, Error*> get_type_id(SpirvEmitter* emitter, AstType* type) {
 	auto found = get(&emitter->type_ids, type);
 	if (found) {
@@ -941,10 +972,7 @@ Tuple<u32, Error*> get_type_id(SpirvEmitter* emitter, AstType* type) {
 	}
 	u32 id = 0;
 	if (auto alias = reflect_cast<CTypeAlias>(type)) {
-		if (alias->c_type == reflect_type_of<void>()) {
-			id = alloc_id(emitter);
-			spv_op(emitter, SpvOpTypeVoid, { id });
-		}
+		return get_c_type_id(emitter, alias->c_type);
 	} else {
 		return { NULL, format_error("Unsupported type: %*", type->name) };
 	}
@@ -975,7 +1003,69 @@ SpirvEmitter make_spirv_emitter(Allocator allocator) {
 	return emitter;
 }
 
-Error* emit_spirv_function(SpirvEmitter* emitter, AstFunction* f) {
+void spv_map_id(SpirvEmitter* emitter, SsaId id, u32 value) {
+	put(&emitter->id_map, id, value);
+}
+
+Error* emit_spirv_block(SpirvEmitter* m, SsaBasicBlock* block) {
+	for (auto v: block->values) {
+		switch (v->op) {
+			case SsaOp::Const: {
+				auto id = alloc_id(m);
+				if (auto f = reflect_cast<f32>(v->aux)) {
+					auto [tp, e] = get_c_type_id(m, reflect_type_of<f32>());
+					if (e) {
+						return e;
+					}
+					u32 w = bitcast<u32>(*f);
+					spv_op(m, SpvOpConstant, { tp, id, w });
+				} else if (auto f = reflect_cast<f64>(v->aux)) {
+					auto [tp, e] = get_c_type_id(m, reflect_type_of<f64>());
+					if (e) {
+						return e;
+					}
+					u64 w = bitcast<u64>(*f);
+					u32 w0 = w & 0xffffffff;
+					u32 w1 = w >> 32;
+					spv_op(m, SpvOpConstant, { tp, id, w0, w1 });
+				} else if (auto i = reflect_cast<u32>(v->aux)) {
+					auto [tp, e] = get_c_type_id(m, reflect_type_of<u32>());
+					if (e) {
+						return e;
+					}
+					spv_op(m, SpvOpConstant, { tp, id, *i });
+				} else {
+					return format_error("Unsupported constant type: %*", v->aux.type->name);
+				}
+				spv_map_id(m, v->id, id);
+			}
+			break;
+			case SsaOp::ZeroInit: {
+				auto type = reflect_cast<AstType>(v->aux);
+				auto [tp, e] = get_type_id(m, type);
+				if (e) {
+					return e;
+				}
+				auto id = alloc_id(m);
+				spv_op(m, SpvOpConstantNull, { tp, id });
+				spv_map_id(m, v->id, id);
+			}
+			break;
+			case SsaOp::GlobalVar: {
+				auto var = reflect_cast<AstVar>(v->aux);
+				
+			}
+			break;
+			default: {
+				return format_error("Unsupported op: %", v->op);
+			}
+		}
+	}
+	return NULL;
+}
+
+Error* emit_spirv_function(SpirvEmitter* emitter, Ssa* ssa) {
+	auto f = ssa->function;
 	auto [return_type_id, e] = get_type_id(emitter, f->return_type);
 	if (e) {
 		return e;
@@ -992,11 +1082,15 @@ Error* emit_spirv_function(SpirvEmitter* emitter, AstFunction* f) {
 		spv_word(emitter, id);
 	}
 	u32 function_id = alloc_id(emitter);
-	spv_opcode(emitter, SpvOpFunction, 0);
+	spv_opcode(emitter, SpvOpFunction, 4);
 	spv_word(emitter, return_type_id);
 	spv_word(emitter, function_id);
 	spv_word(emitter, SpvFunctionControlMaskNone);
 	spv_word(emitter, function_type_id);
-	spv_word(emitter, SpvOpFunctionEnd);
+	e = emit_spirv_block(emitter, ssa->entry);
+	if (e) {
+		return e;
+	}
+	spv_opcode(emitter, SpvOpFunctionEnd, 0);
 	return NULL;
 }

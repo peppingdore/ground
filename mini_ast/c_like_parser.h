@@ -234,15 +234,24 @@ struct AstFunctionArg: AstNode {
 	}
 };
 
+enum class AstFunctionKind {
+	Plain = 1,
+	Vertex = 2,
+	Fragment = 3,
+};
+
 struct AstFunction: AstSymbol {
 	AstType*               return_type = NULL;
 	Array<AstFunctionArg*> args;
 	AstBlock*              block = NULL;
+	AstFunctionKind        kind = AstFunctionKind::Plain;
 
 	REFLECT(AstFunction) {
 		BASE_TYPE(AstSymbol);
+		MEMBER(return_type);
 		MEMBER(args);
 		MEMBER(block);
+		MEMBER(kind);
 	}
 };
 
@@ -2005,7 +2014,7 @@ Tuple<AstBlock*, Error*> parse_block(CLikeParser* p) {
 	return { block, NULL };
 }
 
-Tuple<AstNode*, Error*> parse_function(CLikeParser* p, AstType* return_type, Token ident) {
+Tuple<AstNode*, Error*> parse_function(CLikeParser* p, AstType* return_type, AstFunctionKind kind, Token start_tok, Token ident) {
 	Array<AstFunctionArg*> args = { .allocator = p->allocator };
 	defer { args.free(); };
 
@@ -2034,12 +2043,13 @@ Tuple<AstNode*, Error*> parse_function(CLikeParser* p, AstType* return_type, Tok
 		add(&args, arg_node);
 	}
 
-	ProgramTextRegion text_region = { ident.reg.start, peek(p).reg.end };
+	ProgramTextRegion text_region = { start_tok.reg.start, peek(p).reg.end };
 	auto f = make_ast_node<AstFunction>(p->allocator, text_region);
 	f->args.allocator = p->allocator;
 	f->return_type = return_type;
 	f->name = ident.str;
 	f->args = args;
+	f->kind = kind;
 
 	auto tok = peek(p);
 	if (tok.str == ";") {
@@ -2062,7 +2072,64 @@ Tuple<AstNode*, Error*> parse_function(CLikeParser* p, AstType* return_type, Tok
 	return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Expected ; or { after function header"_b) };
 }
 
+Tuple<AstType*, Error*> parse_struct(CLikeParser* p, Token start_tok) {
+	auto [ident, e] = parse_ident(p);
+	if (e) {
+		return { NULL, e };
+	}
+	auto tok = peek(p);
+	if (tok.str != U"{"_b) {
+		return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Expected {"_b) };
+	}
+	next(p);
+	
+	while (true) {
+		auto tok = peek(p);
+		if (tok.str == U"}"_b) {
+			next(p);
+			break;
+		}
+		auto [tp, e] = parse_type(p);
+		if (e) {
+			return { NULL, e };
+		}
+		auto [name, e] = parse_ident(p);
+		if (e) {
+			return { NULL, e };
+		}
+		tok = peek(p);
+		if (tok.str == "=") {
+			next(p);
+			
+		}
+	}
+
+}
+
 Tuple<AstNode*, Error*> parse_top_level(CLikeParser* p) {
+	auto start_tok = peek(p);
+
+	if (start_tok.str == "struct") {
+		next(p);
+		auto [type, e] = parse_struct(p, start_tok);
+		if (e) {
+			return { NULL, e };
+		}
+		return { type, NULL };
+	}
+	
+	bool must_be_function = false; 
+	AstFunctionKind function_kind = AstFunctionKind::Plain;
+	if (start_tok.str == "fragment") {
+		next(p);
+		must_be_function = true;
+		function_kind = AstFunctionKind::Fragment;
+	} else if (start_tok.str == "vertex") {
+		next(p);
+		must_be_function = true;
+		function_kind = AstFunctionKind::Vertex;
+	}
+
 	auto type_tok = peek(p);
 	auto [type, error] = parse_type(p);
 	if (error) {
@@ -2073,8 +2140,8 @@ Tuple<AstNode*, Error*> parse_top_level(CLikeParser* p) {
 		return { NULL, e };
 	}
 	auto tok = peek(p);
-	if (tok.str == U"("_b) {
-		return parse_function(p, type, ident);
+	if (must_be_function || tok.str == U"("_b) {
+		return parse_function(p, type, function_kind, start_tok, ident);
 	} else if (tok.str == U","_b || tok.str == U";"_b || tok.str == U"="_b) {
 		return parse_var_decl(p, type, type_tok, ident, true);
 	} else {

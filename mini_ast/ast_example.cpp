@@ -4,6 +4,7 @@
 #include "c_like_parser.h"
 #include "ast_printer.h" 
 #include "ssa.h"
+#include "../file.h"
 
 // https://twitter.com/zozuar/status/1755381710227755046
 //
@@ -20,13 +21,22 @@
 UnicodeString PROGRAM = UR"TAG(
 float PI = 3.14;
 
-void main() {
-float i,e,R,s,z;
-vec3 m,q,p,d=FC.rgb/r.y-.5;
-q=hsv(t/6.0f/PI,2.0f,.4f);
-for(q.z--;i++<1e2f;q-=d*e*R*.4,o+=log(++R+sin(vec4(1f,2f,3f,0f)+z*z/2e4f))/2e2f,p=vec3(log(R=length(q))-t/2.f,e=-q.z/R,atan(q.x,q.y)),z=s,i>60.f?d/=d,e+=1e-4f:e)
-	for(s=2.f;s<1e3f;s/=-.5f)
-		e-=abs(cos(dot_vec3(m=cos(p*s),q/q)))/s,z-=m.y;
+struct VertexOutput {
+	float4 position [[position]];
+};
+
+fragment float4 main(
+	constant float* t,
+	constant float* r,
+	constant float* FC,
+	VertexOutput in [[stage_in]],
+) {
+	float i,e,R,s,z;
+	vec3 m,q,p,d=FC.rgb/r.y-.5;
+	q=hsv(t/6.0f/PI,2.0f,.4f);
+	for(q.z--;i++<1e2f;q-=d*e*R*.4,o+=log(++R+sin(vec4(1f,2f,3f,0f)+z*z/2e4f))/2e2f,p=vec3(log(R=length(q))-t/2.f,e=-q.z/R,atan(q.x,q.y)),z=s,i>60.f?d/=d,e+=1e-4f:e)
+		for(s=2.f;s<1e3f;s/=-.5f)
+			e-=abs(cos(dot_vec3(m=cos(p*s),q/q)))/s,z-=m.y;
 }
 )TAG"_b;
 
@@ -72,6 +82,23 @@ int main() {
 			}
 
 			auto [ssa, e] = emit_function_ssa(c_allocator, f);
+			if (e) {
+				println(e);
+				return -1;
+			}
+
+			auto [file, e1] = open_file(U"xxx.spv"_b, FILE_WRITE | FILE_CREATE_NEW);
+			if (e1) {
+				println(e1);
+				return -1;
+			}
+			auto emitter = make_spirv_emitter(c_allocator);
+			e = emit_spirv_function(&emitter, &ssa);
+			if (e) {
+				println(e);
+				return -1;
+			}
+			e = write_file(&file, emitter.spv.data, len(emitter.spv) * sizeof(u32));
 			if (e) {
 				println(e);
 				return -1;
