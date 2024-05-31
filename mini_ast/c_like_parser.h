@@ -348,29 +348,38 @@ struct AstVarDeclGroup: AstNode {
 	}
 };
 
-struct AstStructMember {
-	AstType*      type = NULL;
-	UnicodeString name;
-	s64           offset = 0;
+struct AstStructType;
+struct AstAttr;
+
+struct AstStructMember: AstNode {
+	AstStructType*  struct_type = NULL;
+	AstType*        member_type = NULL;
+	UnicodeString   name;
+	s64             offset = 0;
+	Array<AstAttr*> attrs;
 
 	REFLECT(AstStructMember) {
-		MEMBER(type);
+		BASE_TYPE(AstNode);
+		MEMBER(struct_type);
+		MEMBER(member_type);
 		MEMBER(name);
 		MEMBER(offset);
+		MEMBER(attrs);
 	}
 };
 
-AstStructMember make_ast_struct_member(AstType* type, UnicodeString name, s64 offset) {
-	AstStructMember member;
-	member.type = type;
-	member.name = name;
-	member.offset = offset;
-	return member;
-}
+struct AstStructType: AstType {
+	Array<AstStructMember*> members;
+
+	REFLECT(AstStructType) {
+		BASE_TYPE(AstType);
+		MEMBER(members);
+	}
+};
 
 struct AstVarMemberAccess: AstExpr {
-	AstExpr*        lhs;
-	AstStructMember member;
+	AstExpr*         lhs;
+	AstStructMember* member;
 
 	REFLECT(AstVarMemberAccess) {
 		BASE_TYPE(AstExpr);
@@ -728,7 +737,7 @@ Token next(CLikeParser* p) {
 			return set_current_token(p, int_end, CTOKEN_FLAG_INTEGER);
 		}
 
-		for (auto c: {',',';','/','.','-','=','(',')','?',':','+','*','-','<','>'}) {
+		for (auto c: {',',';','/','.','-','=','(',')','?',':','+','*','-','<','>', '[', ']'}) {
 			if (p->str[i] == c) {
 				if (p->cursor < i) {
 					return set_current_token(p, i);
@@ -1102,57 +1111,13 @@ s64 get_members_count(AstType* type) {
 	return -1;
 }
 
-Optional<AstStructMember> get_struct_member(CLikeParser* p, AstType* type, s64 index) {
-	if (auto c_alias = reflect_cast<CTypeAlias>(type)) {
-		auto c_type = c_alias->c_type;
-		if (auto casted = c_type->as<StructType>()) {
-			if (casted == reflect_type_of<Vector2_f32>()) {
-				if (index == 0)      return make_ast_struct_member(find_type(p, U"float"_b), U"x"_b, 0);
-				else if (index == 1) return make_ast_struct_member(find_type(p, U"float"_b), U"y"_b, 4);
-			} else if (casted == reflect_type_of<Vector3_f32>()) {
-				if (index == 0)      return make_ast_struct_member(find_type(p, U"float"_b), U"x"_b, 0);
-				else if (index == 1) return make_ast_struct_member(find_type(p, U"float"_b), U"y"_b, 4);
-				else if (index == 2) return make_ast_struct_member(find_type(p, U"float"_b), U"z"_b, 8);
-			} else if (casted == reflect_type_of<Vector4_f32>()) {
-				if (index == 0)      return make_ast_struct_member(find_type(p, U"float"_b), U"x"_b, 0);
-				else if (index == 1) return make_ast_struct_member(find_type(p, U"float"_b), U"y"_b, 4);
-				else if (index == 2) return make_ast_struct_member(find_type(p, U"float"_b), U"z"_b, 8);
-				else if (index == 3) return make_ast_struct_member(find_type(p, U"float"_b), U"w"_b, 12);
-			}
-
-			if (index < casted->members.count) {
-				auto unicode_str = copy_unicode_string(make_string(casted->members[index]->name));
-
-				auto found = find_type(p, unicode_str);
-				if (!found) {
-					panic("Type '%' not found", unicode_str);
-				}
-				return make_ast_struct_member(found, unicode_str, casted->members[index]->offset);
-			}
+AstStructMember* find_struct_member(CLikeParser* p, AstStructType* type, UnicodeString name) {
+	for (auto it: type->members) {
+		if (it->name == name) {
+			return it;
 		}
 	}
-	return {};
-}
-
-Optional<AstStructMember> get_struct_member(CLikeParser* p, AstType* type, UnicodeString name) {
-	if (auto c_alias = reflect_cast<CTypeAlias>(type)) {
-		auto c_type = c_alias->c_type;
-		if (auto c_struct_type = c_type->as<StructType>()) {
-			for (auto& member: c_struct_type->members) {
-				if (make_string(member.name) == name) {
-					auto unicode_str = copy_unicode_string(p->allocator, make_string(member.name));
-					auto type_name_unicode = copy_unicode_string(p->allocator, make_string(member.type->name));
-					defer { type_name_unicode.free(); };
-					auto found = find_type(p, type_name_unicode);
-					if (!found) {
-						panic("Type '%' not found", type_name_unicode);
-					}
-					return make_ast_struct_member(found, unicode_str, member.offset);
-				}
-			}
-		}
-	}
-	return {};
+	return NULL;
 }
 
 struct AstSwizzleExpr: AstExpr {
@@ -1258,8 +1223,12 @@ Tuple<AstExpr*, Error*> try_parse_swizzle_expr(CLikeParser* p, AstExpr* lhs, Tok
 		if (swizzle_len == 1) {
 			auto expr = make_ast_expr<AstVarMemberAccess>(p->allocator, swizzle_type, lhs->is_lvalue, text_region);
 			expr->lhs = lhs;
-			auto [member, found] = get_struct_member(p, lhs->expr_type, ident.str);
-			if (!found) {
+			auto struct_tp = reflect_cast<AstStructType>(lhs->expr_type);
+			if (!struct_tp) {
+				return { NULL, simple_parser_error(p, current_loc(), ident.reg, U"Expected struct type but got '%'"_b, lhs->expr_type->name) };
+			}
+			auto member = find_struct_member(p, struct_tp, ident.str);
+			if (!member) {
 				return { NULL, simple_parser_error(p, current_loc(), ident.reg, U"Member '%' not found in struct '%'.", ident.str, lhs->expr_type->name) };
 			}
 			expr->member = member;
@@ -1279,8 +1248,8 @@ Tuple<AstExpr*, Error*> try_parse_swizzle_expr(CLikeParser* p, AstExpr* lhs, Tok
 }
 
 struct AstStructInitMember {
-	AstExpr*        expr = NULL;
-	AstStructMember member;
+	AstExpr*         expr = NULL;
+	AstStructMember* member;
 };
 
 struct AstStructInitializer: AstExpr {
@@ -1556,6 +1525,10 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 		next(p);
 		if (peek(p).str == "("_b) {
 			next(p);
+			auto struct_tp = reflect_cast<AstStructType>(type);
+			if (!struct_tp) {
+				return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Expected struct type but got '%'"_b, type->name) };
+			}
 			s64 member_index = 0;
 			Array<AstExpr*> args = { .allocator = p->allocator };
 			defer { args.free(); };
@@ -1571,13 +1544,10 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 					node->members.allocator = p->allocator;
 					s64 idx = 0;
 					for (auto it: args) {
-						auto member = get_struct_member(p, type, idx);
-						if (!member.has_value) {
-							panic("Member not found");
-						}
+						auto member = struct_tp->members[idx];
 						auto m = AstStructInitMember {
 							.expr = it,
-							.member = member.value,
+							.member = member,
 						};
 						add(&node->members, m);
 						idx += 1;
@@ -1592,12 +1562,12 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 				if (e) {
 					return { NULL, e };
 				}
-				auto [member, found] = get_struct_member(p, type, member_index);
-				if (!found) {
+				if (member_index >= len(struct_tp->members)) {
 					return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Exceeded arguments count in initializer, struct '%' has % members.", type->name, get_members_count(type)) };
 				}
-				if (member.type != expr->expr_type) {
-					return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Initializer type mismatch, expected '%' but got '%'.", member.type->name, expr->expr_type->name) };
+				auto member = struct_tp->members[member_index];
+				if (member->member_type != expr->expr_type) {
+					return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Initializer type mismatch, expected '%' but got '%'.", member->member_type->name, expr->expr_type->name) };
 				}
 				add(&args, expr);
 				member_index += 1;
@@ -1663,7 +1633,8 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 			continue;
 		}
 		if (tok.str == "."_b) {
-			if (!is_struct(lhs->expr_type)) {
+			auto struct_tp = reflect_cast<AstStructType>(lhs->expr_type);
+			if (struct_tp) {
 				return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Expected a struct, got '%'"_b, lhs->expr_type->name) };
 			}
 			next(p);
@@ -1681,15 +1652,15 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 				continue;
 			}
 
-			auto [member, ok] = get_struct_member(p, lhs->expr_type, ident.str);
-			if (!ok) {
+			auto member = find_struct_member(p, struct_tp, ident.str);
+			if (!member) {
 				return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Member '%' not found in struct '%'.", ident, lhs->expr_type->name) };
 			}
 			ProgramTextRegion text_region = { ident.reg.start, ident.reg.end };
 			if (lhs->text_region.has_value) {
 				text_region.start = lhs->text_region.value.start;
 			}
-			auto node = make_ast_expr<AstVarMemberAccess>(p->allocator, member.type, lhs->is_lvalue, text_region);
+			auto node = make_ast_expr<AstVarMemberAccess>(p->allocator, member->member_type, lhs->is_lvalue, text_region);
 			node->lhs = lhs;
 			node->member = member;
 			lhs = node;
@@ -2072,7 +2043,65 @@ Tuple<AstNode*, Error*> parse_function(CLikeParser* p, AstType* return_type, Ast
 	return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Expected ; or { after function header"_b) };
 }
 
-Tuple<AstType*, Error*> parse_struct(CLikeParser* p, Token start_tok) {
+struct AstAttr: AstNode {
+	UnicodeString   name;
+	Array<AstExpr*> args;
+
+	REFLECT(AstAttr) {
+		BASE_TYPE(AstNode);
+		MEMBER(name);
+		MEMBER(args);
+	}
+};
+
+Tuple<Array<AstAttr*>, Error*> parse_attrs(CLikeParser* p) {
+	Array<AstAttr*> attrs;
+	attrs.allocator = p->allocator;
+	while (true) {
+		auto start_tok = peek(p);
+		if (start_tok.str != "[[") {
+			break;
+		}
+		next(p);
+		auto [name, e] = parse_ident(p);
+		if (e) {
+			return { {}, e };
+		}
+		auto tok = peek(p);
+		Array<AstExpr*> args = { .allocator = p->allocator };
+		if (tok.str == "(") {
+			next(p);
+			while (true) {
+				auto tok = peek(p);
+				if (tok.str == ")") {
+					next(p);
+					break;
+				}
+				auto [expr, e] = parse_expr(p, 0);
+				if (e) {
+					return { {}, e };
+				}
+				add(&args, expr);
+				if (peek(p).str != ",") {
+					next(p);
+				}
+			}
+		}
+		auto end_tok = peek(p);
+		if (end_tok.str != "]]") {
+			return { {}, simple_parser_error(p, current_loc(), tok.reg, U"Expected ]]"_b) };
+		}
+		next(p);
+		ProgramTextRegion reg = { start_tok.reg.start, end_tok.reg.end };
+		auto attr = make_ast_node<AstAttr>(p->allocator, reg);
+		attr->args = args;
+		attr->name = name.str;
+		add(&attrs, attr);
+	}
+	return { attrs, NULL };
+}
+
+Tuple<AstStructType*, Error*> parse_struct(CLikeParser* p, Token start_tok) {
 	auto [ident, e] = parse_ident(p);
 	if (e) {
 		return { NULL, e };
@@ -2082,10 +2111,18 @@ Tuple<AstType*, Error*> parse_struct(CLikeParser* p, Token start_tok) {
 		return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Expected {"_b) };
 	}
 	next(p);
-	
+
+	Array<AstStructMember*> members = { .allocator = p->allocator };
+	defer { members.free(); };
+
+	ProgramTextRegion st_reg;
+	st_reg.start = start_tok.reg.start;
+	st_reg.end = start_tok.reg.end;
+
 	while (true) {
 		auto tok = peek(p);
 		if (tok.str == U"}"_b) {
+			st_reg.end = tok.reg.end;
 			next(p);
 			break;
 		}
@@ -2093,17 +2130,53 @@ Tuple<AstType*, Error*> parse_struct(CLikeParser* p, Token start_tok) {
 		if (e) {
 			return { NULL, e };
 		}
-		auto [name, e] = parse_ident(p);
-		if (e) {
-			return { NULL, e };
+		auto [name, e2] = parse_ident(p);
+		if (e2) {
+			return { NULL, e2 };
 		}
 		tok = peek(p);
+		AstExpr* init_expr = NULL;
 		if (tok.str == "=") {
 			next(p);
-			
+			auto [expr, e] = parse_expr(p, 0);
+			if (e) {
+				return { NULL, e };
+			}
+			init_expr = expr;
 		}
+		auto [attrs, e3] = parse_attrs(p);
+		if (e3) {
+			return { NULL, e3 };
+		}
+
+		if (peek(p).str != ";") {
+			return { NULL, simple_parser_error(p, current_loc(), peek(p).reg, U"Expected ;"_b) };
+		}
+		next(p);
+
+		ProgramTextRegion reg;
+		reg.start = start_tok.reg.start;
+		reg.end = name.reg.end;
+		if (init_expr && init_expr->text_region.has_value) {
+			reg.end = init_expr->text_region.value.end;
+		}
+		if (len(attrs) > 0) {
+			auto last = attrs[-1];
+			if (last->text_region.has_value) {
+				reg.end = last->text_region.value.end;
+			}
+		}
+		auto member = make_ast_node<AstStructMember>(p->allocator, reg);
+		member->member_type = tp;
+		member->name = name.str;
+		member->attrs = attrs;
+		add(&members, member);
 	}
 
+	auto st = make_ast_node<AstStructType>(p->allocator, st_reg);
+	st->members = members;
+	members = {};
+	return { st, NULL };
 }
 
 Tuple<AstNode*, Error*> parse_top_level(CLikeParser* p) {
@@ -2165,6 +2238,8 @@ Tuple<CLikeProgram*, Error*> parse_c_like(UnicodeString str) {
 	for (auto it: AST_POSTFIX_UNARY_OPERATORS_UNSORTED) {
 		add(&p.op_tokens_sorted, it.op);
 	}
+	add(&p.op_tokens_sorted, U"[["_b);
+	add(&p.op_tokens_sorted, U"]]"_b);
 	sort(p.op_tokens_sorted, lambda(len($0[$1]) > len($0[$2]))); 
 
 	add_c_type_alias(&p, reflect_type_of<s64>(), U"int"_b);

@@ -600,7 +600,7 @@ Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr) {
 			if (e) {
 				return { NULL, e };
 			}
-			auto offset = load_const(ssa, m.member.offset);
+			auto offset = load_const(ssa, m.member->offset);
 			auto ptr = make_ssa_val(ssa->current_block, SsaOp::GetElement);
 			add_arg(ptr, slot);
 			add_arg(ptr, offset);
@@ -1053,7 +1053,7 @@ Error* emit_spirv_block(SpirvEmitter* m, SsaBasicBlock* block) {
 			break;
 			case SsaOp::GlobalVar: {
 				auto var = reflect_cast<AstVar>(v->aux);
-				
+
 			}
 			break;
 			default: {
