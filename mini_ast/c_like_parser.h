@@ -9,108 +9,6 @@
 #include "../string.h"
 #include "../panic.h"
 
-struct ProgramTextRegion {
-	s64 start  = 0;
-	s64 end    = 0;
-
-	REFLECT(ProgramTextRegion) {
-		MEMBER(start);
-		MEMBER(end);
-	}
-};
-
-struct AstNode {
-	Type*                       type;
-	Optional<ProgramTextRegion> text_region;
-
-	REFLECT(AstNode) {
-		MEMBER(type);
-			TAG(RealTypeMember{});
-		MEMBER(text_region);
-	}
-};
-
-template <typename T>
-T* make_ast_node(Allocator allocator, Optional<ProgramTextRegion> text_region) {
-	auto x = make<T>(allocator);
-	x->type = reflect_type_of<T>();
-	x->text_region = text_region;
-	return x;
-}
-
-struct AstSymbol: AstNode {
-	UnicodeString name;
-	bool          is_global = false;
-
-	REFLECT(AstSymbol) {
-		BASE_TYPE(AstNode);
-		MEMBER(name);
-		MEMBER(is_global);
-	}
-};
-
-struct AstType: AstSymbol {
-	u64 size = 0;
-
-	REFLECT(AstType) {
-		BASE_TYPE(AstSymbol);
-		MEMBER(size);
-	}
-};
-
-struct CTypeAlias: AstType {
-	Type* c_type;
-	
-	REFLECT(CTypeAlias) {
-		BASE_TYPE(AstType);
-		MEMBER(c_type);
-	}
-};
-
-struct AstExpr: AstNode {
-	AstType* expr_type = NULL;
-	bool     is_lvalue = false;
-
-	REFLECT(AstExpr) {
-		BASE_TYPE(AstNode);
-		MEMBER(expr_type);
-		MEMBER(is_lvalue);
-	}
-};
-
-constexpr bool AST_EXPR_LVALUE = true;
-constexpr bool AST_EXPR_RVALUE = false;
-
-template <typename T>
-T* make_ast_expr(Allocator allocator, AstType* expr_type, bool is_lvalue, Optional<ProgramTextRegion> text_region) {
-	auto x = make_ast_node<T>(allocator, text_region);
-	if (!expr_type) {
-		panic("expr_type must be non-null");
-	}
-	x->expr_type = expr_type;
-	x->is_lvalue = is_lvalue;
-	return x;
-}
-
-struct AstBlock: AstNode {
-	Array<AstNode*> statements;
-
-	REFLECT(AstBlock) {
-		BASE_TYPE(AstNode);
-		MEMBER(statements);
-	}
-};
-
-
-struct CLikeProgram: AstNode {
-	Array<AstNode*> globals;
-
-	REFLECT(CLikeProgram) {
-		BASE_TYPE(AstNode);
-		MEMBER(globals);
-	}
-};
-
 
 enum AstOperatorFlags {
 	AST_OP_FLAG_LEFT_ASSOC = 1 << 0,
@@ -190,11 +88,25 @@ enum CTokenFlags {
 	CTOKEN_FLAG_INTEGER = 1 << 1,
 };
 
+struct ProgramTextRegion {
+	s64 start  = 0;
+	s64 end    = 0;
+
+	REFLECT(ProgramTextRegion) {
+		MEMBER(start);
+		MEMBER(end);
+	}
+};
+
 struct Token {
 	UnicodeString     str;
 	ProgramTextRegion reg;
 	u32               flags = 0;
 };
+
+struct CLikeProgram;
+struct AstNode;
+struct AstPrimitiveType;
 
 struct CLikeParser {
 	Allocator            allocator;
@@ -204,6 +116,113 @@ struct CLikeParser {
 	s64                  cursor = 0;
 	Token                current_token;
 	Array<UnicodeString> op_tokens_sorted;
+
+	AstPrimitiveType*    void_tp = NULL;
+	AstPrimitiveType*    bool_tp = NULL;
+	AstPrimitiveType*    s8_tp = NULL;
+	AstPrimitiveType*    u8_tp = NULL;
+	AstPrimitiveType*    s16_tp = NULL;
+	AstPrimitiveType*    u16_tp = NULL;
+	AstPrimitiveType*    s32_tp = NULL;
+	AstPrimitiveType*    u32_tp = NULL;
+	AstPrimitiveType*    s64_tp = NULL;
+	AstPrimitiveType*    u64_tp = NULL;
+	AstPrimitiveType*    f32_tp = NULL;
+	AstPrimitiveType*    f64_tp = NULL;
+};
+
+struct AstNode {
+	Type*                       type;
+	CLikeParser*                p = NULL;
+	Optional<ProgramTextRegion> text_region;
+
+	REFLECT(AstNode) {
+		MEMBER(p);
+		MEMBER(type);
+			TAG(RealTypeMember{});
+		MEMBER(text_region);
+	}
+};
+
+template <typename T>
+T* make_ast_node(CLikeParser* p, Optional<ProgramTextRegion> text_region) {
+	auto x = make<T>(p->allocator);
+	x->type = reflect_type_of<T>();
+	x->p = p;
+	x->text_region = text_region;
+	return x;
+}
+
+struct AstSymbol: AstNode {
+	UnicodeString name;
+	bool          is_global = false;
+
+	REFLECT(AstSymbol) {
+		BASE_TYPE(AstNode);
+		MEMBER(name);
+		MEMBER(is_global);
+	}
+};
+
+struct AstType: AstSymbol {
+	u64 size = 0;
+	u64 alignment = 0;
+
+	REFLECT(AstType) {
+		BASE_TYPE(AstSymbol);
+		MEMBER(size);
+		MEMBER(alignment);
+	}
+};
+
+struct AstExpr: AstNode {
+	AstType* expr_type = NULL;
+	bool     is_lvalue = false;
+
+	REFLECT(AstExpr) {
+		BASE_TYPE(AstNode);
+		MEMBER(expr_type);
+		MEMBER(is_lvalue);
+	}
+};
+
+constexpr bool AST_EXPR_LVALUE = true;
+constexpr bool AST_EXPR_RVALUE = false;
+
+template <typename T>
+T* make_ast_expr(Allocator allocator, AstType* expr_type, bool is_lvalue, Optional<ProgramTextRegion> text_region) {
+	auto x = make_ast_node<T>(allocator, text_region);
+	if (!expr_type) {
+		panic("expr_type must be non-null");
+	}
+	x->expr_type = expr_type;
+	x->is_lvalue = is_lvalue;
+	return x;
+}
+
+struct AstBlock: AstNode {
+	Array<AstNode*> statements;
+
+	REFLECT(AstBlock) {
+		BASE_TYPE(AstNode);
+		MEMBER(statements);
+	}
+};
+
+
+struct CLikeProgram: AstNode {
+	Array<AstNode*> globals;
+
+	REFLECT(CLikeProgram) {
+		BASE_TYPE(AstNode);
+		MEMBER(globals);
+	}
+};
+
+
+struct AstPrimitiveType: AstType {
+	PrimitiveType* c_tp = NULL;
+	bool           is_signed = false;
 };
 
 
@@ -257,7 +276,7 @@ struct AstFunction: AstSymbol {
 
 template <typename T>
 T* make_ast_symbol(CLikeParser* p, bool is_global, UnicodeString name, Optional<ProgramTextRegion> text_region) {
-	auto node = make_ast_node<T>(p->allocator, text_region);
+	auto node = make_ast_node<T>(p, text_region);
 	node->name = name;
 	node->is_global = is_global;
 	return node;
@@ -269,13 +288,6 @@ struct ShaderIntrinFunc: AstFunction {
 		BASE_TYPE(AstFunction);
 	}
 };
-
-void add_c_type_alias(CLikeParser* p, Type* type, UnicodeString name) {
-	// @TODO: check for duplicates
-	auto node = make_ast_symbol<CTypeAlias>(p, true, name, {});
-	node->c_type = type;
-	add(&p->program->globals, node);
-}
 
 void add_shader_intrinsic_var(CLikeParser* p, UnicodeString name, AstType* type) {
 	// @TODO: check for duplicates
@@ -294,7 +306,7 @@ void add_shader_intrinsic_func(CLikeParser* p, UnicodeString name, AstType* retu
 	node->return_type = return_type;
 	s64 i = 0;
 	for (auto arg: args) {
-		auto arg_node = make_ast_node<AstFunctionArg>(p->allocator, {});
+		auto arg_node = make_ast_node<AstFunctionArg>(p, {});
 		arg_node->arg_type = arg;
 		arg_node->name = sprint_unicode(p->allocator, U"arg_%"_b, i);
 		add(&node->args, arg_node);
@@ -802,8 +814,14 @@ AstNode* lookup_symbol(CLikeParser* p, UnicodeString name) {
 }
 
 AstType* find_type(CLikeParser* p, UnicodeString name) {
-	if (name == "f32") {
-		name = U"float"_b;
+	if (name == "float") {
+		name = U"f32"_b;
+	}
+	if (name == "double") {
+		name = U"f64"_b;
+	}
+	if (name == "int") {
+		name = U"s32"_b;
 	}
 
 	auto symbol = lookup_symbol(p, name);
@@ -845,7 +863,7 @@ Tuple<AstNode*, Error*> parse_var_decl(CLikeParser* p, AstType* type, Token type
 
 	auto current_ident = ident_tok;
 	while (true) {
-		auto node = make_ast_node<AstVarDecl>(p->allocator, {});
+		auto node = make_ast_node<AstVarDecl>(p, {});
 		node->var_type = type;
 		node->name = current_ident.str;
 		node->is_global = is_global;
@@ -886,7 +904,7 @@ Tuple<AstNode*, Error*> parse_var_decl(CLikeParser* p, AstType* type, Token type
 	}
 
 	if (len(var_decls) > 1) {
-		auto node = make_ast_node<AstVarDeclGroup>(p->allocator, text_region);
+		auto node = make_ast_node<AstVarDeclGroup>(p, text_region);
 		node->var_decls = var_decls;
 		var_decls = {};
 		return { node, NULL };
@@ -990,35 +1008,38 @@ struct AstIf: AstNode {
 	}
 };
 
-AstType* resolve_ast_type_alias(AstType* type) {
+AstType* resolve_type_alias(AstType* type) {
 	// @TODO: implement.
 	return type;
 }
 
 bool is_floating_point(AstType* type) {
-	type = resolve_ast_type_alias(type);
-	if (auto c_alias = reflect_cast<CTypeAlias>(type)) {
-		if (c_alias->c_type == reflect_type_of<float>() ||
-			c_alias->c_type == reflect_type_of<double>()) {
-			return true;
-		}
+	type = resolve_type_alias(type);
+	if (type == type->p->f32_tp || type == type->p->f64_tp) {
+		return true;
 	}
 	return false;
 }
 
 bool is_integer(AstType* type) {
-	type = resolve_ast_type_alias(type);
-	if (auto c_alias = reflect_cast<CTypeAlias>(type)) {
-		if (c_alias->c_type == reflect_type_of<s32>() ||
-			c_alias->c_type == reflect_type_of<s64>())
-		{			
-			return true;
-		}
+	type = resolve_type_alias(type);
+	if (
+		type == type->p->s8_tp ||
+		type == type->p->u8_tp ||
+		type == type->p->s16_tp ||
+		type == type->p->u16_tp ||
+		type == type->p->s32_tp ||
+		type == type->p->u32_tp ||
+		type == type->p->s64_tp ||
+		type == type->p->u64_tp
+	) {
+		return true;
 	}
 	return false;
 }
 
 bool is_numeric(AstType* type) {
+	type = resolve_type_alias(type);
 	return is_floating_point(type) || is_integer(type);
 }
 
@@ -1032,7 +1053,7 @@ struct AstPointerType: AstType {
 };
 
 bool is_pointer(AstType* type) {
-	type = resolve_ast_type_alias(type);
+	type = resolve_type_alias(type);
 	if (auto ptr = reflect_cast<AstPointerType>(type)) {
 		return true;
 	}
@@ -1061,54 +1082,13 @@ struct AstVariableAccess: AstExpr {
 };
 
 bool is_struct(AstType* type) {
-	type = resolve_ast_type_alias(type);
-	if (auto c_alias = reflect_cast<CTypeAlias>(type)) {
-		auto c_type = c_alias->c_type;
-		if (c_type->as<StructType>()) {
-			return true;
-		}
-	}
-	return false;
+	type = resolve_type_alias(type);
+	return reflect_cast<AstStructType>(type) != NULL;
 }
 
 bool is_bool(AstType* type) {
-	type = resolve_ast_type_alias(type);
-	if (auto c_alias = reflect_cast<CTypeAlias>(type)) {
-		auto c_type = c_alias->c_type;
-		if (auto primitive_type = c_type->as<PrimitiveType>()) {
-			return primitive_type->primitive_kind == PrimitiveKind::P_bool;
-		}
-	}
-	return false;
-}
-
-s64 get_type_size(AstType* type) {
-	type = resolve_ast_type_alias(type);
-	if (auto c_alias = reflect_cast<CTypeAlias>(type)) {
-		auto c_type = c_alias->c_type;
-		if (auto primitive_type = c_type->as<PrimitiveType>()) {
-			return primitive_type->size;
-		}
-	}
-	// @TODO: implement.
-	return 0;
-}
-
-s64 get_members_count(AstType* type) {
-	if (auto c_alias = reflect_cast<CTypeAlias>(type)) {
-		auto c_type = c_alias->c_type;
-		if (auto casted = c_type->as<StructType>()) {
-			if (casted == reflect_type_of<Vector2_f32>()) {
-				return 2;
-			} else if (casted == reflect_type_of<Vector3_f32>()) {
-				return 3;
-			} else if (casted == reflect_type_of<Vector4_f32>()) {
-				return 4;
-			}
-			return casted->members.count;
-		}
-	}
-	return -1;
+	type = resolve_type_alias(type);
+	return type == type->p->bool_tp;
 }
 
 AstStructMember* find_struct_member(CLikeParser* p, AstStructType* type, UnicodeString name) {
@@ -1264,7 +1244,7 @@ struct AstStructInitializer: AstExpr {
 };
 
 bool is_vector_type(AstType* type) {
-	type = resolve_ast_type_alias(type);
+	type = resolve_type_alias(type);
 	if (auto c_alias = reflect_cast<CTypeAlias>(type)) {
 		auto c_type = c_alias->c_type;
 		if (c_type == reflect_type_of<Vector2_f32>() ||
@@ -2222,10 +2202,82 @@ Tuple<AstNode*, Error*> parse_top_level(CLikeParser* p) {
 	}
 }
 
+template <typename T>
+AstPrimitiveType* push_prim_type(CLikeParser* p, UnicodeString name, u64 size, u64 alignment, bool is_signed) {
+	auto tp = make_ast_symbol<AstPrimitiveType>(p, true, name, {});
+	tp->size = size;
+	tp->alignment = alignment;
+	tp->is_signed = is_signed;
+	add(&p->program->globals, tp);
+	return tp;
+}
+
+u64 calc_struct_size(AstStructType* tp) {
+	u64 end = 0;
+	u64 max_member_align = 1;
+	for (auto it: tp->members) {
+		u64 m_end = it->member_type->size + it->offset;
+		if (m_end > end) {
+			end = m_end;
+		}
+		if (it->member_type->alignment > max_member_align) {
+			max_member_align = it->member_type->alignment;
+		}
+	}
+	u64 size = align(end, max_member_align);
+	return size;
+}
+
+void push_member(AstStructType* tp, UnicodeString name, AstType* type) {
+	auto m = make_ast_node<AstStructMember>(p->allocator, {});
+	m->struct_type = tp;
+	m->member_type = type;
+	m->name = name;
+	auto sz = calc_struct_size(tp);
+	m->offset = align(sz, type->alignment);
+	add(&tp->members, m);
+}
+
+void push_base_types(CLikeParser* p) {
+	p->void_tp = push_prim_type<void>(p, U"void"_b, 0, 1, false);
+	p->bool_tp = push_prim_type<bool>(p, U"bool"_b, 1, 1, false);
+	p->s8_tp  = push_prim_type<s8>(p, U"s8"_b, 1, 1, true);
+	p->s16_tp = push_prim_type<s16>(p, U"s16"_b, 2, 2, true);
+	p->s32_tp = push_prim_type<s32>(p, U"s32"_b, 4, 4, true);
+	p->s64_tp = push_prim_type<s64>(p, U"s64"_b, 8, 8, true);
+	p->u8_tp  = push_prim_type<u8>(p, U"u8"_b, 1, 1, false);
+	p->u16_tp = push_prim_type<u16>(p, U"u16"_b, 2, 2, false);
+	p->u32_tp = push_prim_type<u32>(p, U"u32"_b, 4, 4, false);
+	p->u64_tp = push_prim_type<u64>(p, U"u64"_b, 8, 8, false);
+	p->f32_tp = push_prim_type<f32>(p, U"f32"_b, 4, 4, true);
+	p->f64_tp = push_prim_type<f64>(p, U"f64"_b, 8, 8, true);
+
+	auto float2_tp = make_ast_symbol<AstStructType>(p, true, U"float2"_b, {});
+	push_member(float2_tp, U"x"_b, p->f32_tp);
+	push_member(float2_tp, U"y"_b, p->f32_tp);
+	float2_tp->alignment = 8;
+	float2_tp->size = 8;
+
+	auto tp = make_ast_symbol<AstStructType>(p, true, U"float3"_b, {});
+	push_member(tp, U"x"_b, p->f32_tp);
+	push_member(tp, U"y"_b, p->f32_tp);
+	push_member(tp, U"z"_b, p->f32_tp);
+	tp->alignment = 16;
+	tp->size = 16;
+
+	tp = make_ast_symbol<AstStructType>(p, true, U"float4"_b, {});
+	push_member(tp, U"x"_b, p->f32_tp);
+	push_member(tp, U"y"_b, p->f32_tp);
+	push_member(tp, U"z"_b, p->f32_tp);
+	push_member(tp, U"w"_b, p->f32_tp);
+	tp->alignment = 16;
+	tp->size = 16;
+}
+
 Tuple<CLikeProgram*, Error*> parse_c_like(UnicodeString str) {
 	CLikeParser p;
 	p.allocator = make_arena_allocator();
-	p.program = make_ast_node<CLikeProgram>(p.allocator, {});
+	p.program = make_ast_node<CLikeProgram>(&p, {});
 	p.program->globals.allocator = p.allocator;
 	p.str = str;
 	add(&p.scope, p.program);
@@ -2242,16 +2294,7 @@ Tuple<CLikeProgram*, Error*> parse_c_like(UnicodeString str) {
 	add(&p.op_tokens_sorted, U"]]"_b);
 	sort(p.op_tokens_sorted, lambda(len($0[$1]) > len($0[$2]))); 
 
-	add_c_type_alias(&p, reflect_type_of<s64>(), U"int"_b);
-	add_c_type_alias(&p, reflect_type_of<double>(), U"double"_b);
-	add_c_type_alias(&p, reflect_type_of<float>(), U"float"_b);
-	add_c_type_alias(&p, reflect_type_of<void>(), U"void"_b);
-	add_c_type_alias(&p, reflect_type_of<bool>(), U"bool"_b);
-	add_c_type_alias(&p, reflect_type_of<Vector2_f32>(), U"vec2"_b);
-	add_c_type_alias(&p, reflect_type_of<Vector3_f32>(), U"vec3"_b);
-	add_c_type_alias(&p, reflect_type_of<Vector4_f32>(), U"vec4"_b);
-
-	auto float_type = find_type(&p, U"float"_b);
+	push_base_types(&p);
 
 	add_shader_intrinsic_var(&p, U"FC"_b, find_type(&p, U"vec4"_b)); // frag coord
 	add_shader_intrinsic_var(&p, U"r"_b, find_type(&p, U"vec2"_b)); // resolution
