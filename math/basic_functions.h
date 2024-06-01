@@ -54,3 +54,20 @@ ALIAS_MATH_TEMPLATE_FUNCTION(name, f64)
 ALIAS_MATH_TEMPLATE_FUNCTION_WITH_DEFAULT_TYPES(clamp);
 ALIAS_MATH_TEMPLATE_FUNCTION_WITH_DEFAULT_TYPES(min);
 ALIAS_MATH_TEMPLATE_FUNCTION_WITH_DEFAULT_TYPES(max);
+
+
+bool is_aligned(u64 number, u64 alignment) {
+	return (number % alignment) == 0;
+}
+
+bool is_aligned(auto* ptr, u64 alignment) {
+	return (u64(ptr) % alignment) == 0;
+}
+
+template <typename T>
+T align(T number, u64 alignment) {
+	if (is_aligned(number, alignment)) {
+		return number;
+	}
+	return number + (alignment - (number % alignment));
+}
