@@ -86,7 +86,7 @@ Tuple<s64, Error*> os_read_file(File* file, void* buf, s64 size) {
 #elif IS_POSIX
 
 Tuple<File, Error*> open_file(UnicodeString path, OpenFileFlag flags = FILE_READ, u32 unix_perm = 0777) {
-	String utf8_path = encode_utf8(path);
+	AllocatedString utf8_path = encode_utf8(path);
 	defer { utf8_path.free(); };
 
 	int o_flag;

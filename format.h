@@ -1015,11 +1015,11 @@ Array<T> sprint(auto... args) {
 	return sprint(c_allocator, args...);
 }
 
-UnicodeString sprint_unicode(Allocator allocator, auto... args) {
+AllocatedUnicodeString sprint_unicode(Allocator allocator, auto... args) {
 	return sprint<char32_t>(allocator, args...);
 }
 
-UnicodeString sprint_unicode(auto... args) {
+AllocatedUnicodeString sprint_unicode(auto... args) {
 	return sprint<char32_t>(c_allocator, args...);
 }
 
