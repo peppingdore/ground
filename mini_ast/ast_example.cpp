@@ -70,7 +70,7 @@ int main() {
 		} else {
 			print(e->text);
 		}
-		print("Generated at %", e->loc);
+		println("Generated at %", e->loc);
 		return -1;
 	}
 	// println(print_ast_node(program));
