@@ -15,84 +15,84 @@ template <typename A>
 struct Tuple<A> {
 	constexpr static u32 size = 1;
 
-	A _0;
+	A _0 = {};
 };
 
 template <typename A, typename B>
 struct Tuple<A, B> {
 	constexpr static u32 size = 2;
 
-	A _0;
-	B _1;
+	A _0 = {};
+	B _1 = {};
 };
 
 template <typename A, typename B, typename C>
 struct Tuple<A, B, C> {
 	constexpr static u32 size = 3;
 
-	A _0;
-	B _1;
-	C _2;
+	A _0 = {};
+	B _1 = {};
+	C _2 = {};
 };
 
 template <typename A, typename B, typename C, typename D>
 struct Tuple<A, B, C, D> {
 	constexpr static u32 size = 4;
 
-    A _0;
-    B _1;
-    C _2;
-    D _3;
+    A _0 = {};
+    B _1 = {};
+    C _2 = {};
+    D _3 = {};
 };
 
 template <typename A, typename B, typename C, typename D, typename E>
 struct Tuple<A, B, C, D, E> {
 	constexpr static u32 size = 5;
 
-    A _0;
-    B _1;
-    C _2;
-    D _3;
-    E _4;
+    A _0 = {};
+    B _1 = {};
+    C _2 = {};
+    D _3 = {};
+    E _4 = {};
 };
 
 template <typename A, typename B, typename C, typename D, typename E, typename F>
 struct Tuple<A, B, C, D, E, F> {
 	constexpr static u32 size = 6;
 
-    A _0;
-    B _1;
-    C _2;
-    D _3;
-    E _4;
-    F _5;
+    A _0 = {};
+    B _1 = {};
+    C _2 = {};
+    D _3 = {};
+    E _4 = {};
+    F _5 = {};
 };
 
 template <typename A, typename B, typename C, typename D, typename E, typename F, typename G>
 struct Tuple<A, B, C, D, E, F, G> {
 	constexpr static u32 size = 7;
 
-    A _0;
-    B _1;
-    C _2;
-    D _3;
-    E _4;
-    F _5;
-    G _6;
+    A _0 = {};
+    B _1 = {};
+    C _2 = {};
+    D _3 = {};
+    E _4 = {};
+    F _5 = {};
+    G _6 = {};
 };
 
 template <typename A, typename B, typename C, typename D, typename E, typename F, typename G, typename H>
 struct Tuple<A, B, C, D, E, F, G, H> {
 	constexpr static u32 size = 8;
 
-    A _0;
-    B _1;
-    C _2;
-    D _3;
-    E _4;
-    F _5;
-    G _6;
-    H _7;
+    A _0 = {};
+    B _1 = {};
+    C _2 = {};
+    D _3 = {};
+    E _4 = {};
+    F _5 = {};
+    G _6 = {};
+    H _7 = {};
 };
 
 template <int N>
