@@ -63,6 +63,7 @@ inline void panic(const char* file_name, int line_number, auto... args) {
 	char buf[32];
 	snprintf(buf, sizeof(buf), "%d", line_number);
 	fwrite(buf, strlen(buf), 1, stderr);
+	panic_write_string("\n");
 	DebugBreak();
 	exit(-1);
 }
