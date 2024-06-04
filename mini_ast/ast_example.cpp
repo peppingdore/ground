@@ -19,24 +19,27 @@
 
 #if 1
 UnicodeString PROGRAM = UR"TAG(
-float PI = 3.14;
+[[const]] float PI = 3.14;
 
 struct VertexOutput {
 	float4 position [[position]];
 };
 
-fragment float4 main(
-	constant float* t,
-	constant float* r,
-	constant float* FC,
-	VertexOutput in [[stage_in]],
+[[fragment]] float4 main(
+	float* t [[mtl_constant]] [[vk_uniform]],
+	float2* r [[mtl_constant]] [[vk_uniform]],
+	float4* target_size [[mtl_constant]] [[vk_uniform]],
+	VertexOutput in [[stage_in]]
 ) {
+	float4 FC = in.position / *target_size;
 	float i,e,R,s,z;
-	vec3 m,q,p,d=FC.rgb/r.y-.5;
-	q=hsv(t/6.0f/PI,2.0f,.4f);
-	for(q.z--;i++<1e2f;q-=d*e*R*.4,o+=log(++R+sin(vec4(1f,2f,3f,0f)+z*z/2e4f))/2e2f,p=vec3(log(R=length(q))-t/2.f,e=-q.z/R,atan(q.x,q.y)),z=s,i>60.f?d/=d,e+=1e-4f:e)
+	float3 m,q,p,d=FC.rgb/r.y-.5;
+	q=hsv(*t/6.0f/PI,2.0f,.4f);
+	float4 o = float4(0f, 0f, 0f, 0f);
+	for(q.z--;i++<1e2f;q-=d*e*R*.4,o+=log(++R+sin(float4(1f,2f,3f,0f)+z*z/2e4f))/2e2f,p=float3(log(R=length(q))-*t/2.f,e=-q.z/R,atan(q.x,q.y)),z=s,i>60.f?d/=d,e+=1e-4f:e)
 		for(s=2.f;s<1e3f;s/=-.5f)
 			e-=abs(cos(dot_vec3(m=cos(p*s),q/q)))/s,z-=m.y;
+	return o;
 }
 )TAG"_b;
 
@@ -86,13 +89,14 @@ int main() {
 				println(e);
 				return -1;
 			}
+			print_ssa(ssa.entry);
 
 			auto [file, e1] = open_file(U"xxx.spv"_b, FILE_WRITE | FILE_CREATE_NEW);
 			if (e1) {
 				println(e1);
 				return -1;
 			}
-			auto emitter = make_spirv_emitter(c_allocator);
+			auto emitter = make_spirv_emitter(f->p, c_allocator);
 			e = emit_spirv_function(&emitter, &ssa);
 			if (e) {
 				println(e);

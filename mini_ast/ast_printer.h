@@ -149,7 +149,7 @@ void print_function(AllocatedUnicodeString* sb, AstFunction* function) {
 	append(sb, "(");
 	for (auto i: range(len(function->args))) {
 		auto arg = function->args[i];
-		append(sb, arg->arg_type->name);
+		append(sb, arg->var_type->name);
 		append(sb, " ");
 		append(sb, arg->name);
 		if (i < len(function->args) - 1) {
