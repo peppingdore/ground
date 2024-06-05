@@ -29,21 +29,24 @@ struct Hash128 {
 	}
 };
 
-template<typename T>
-concept Hash_Type = std::is_same_v<T, Hash64> || std::is_same_v<T, Hash128>;
-
 template <typename T>
-concept Hash_Primitive = !std::is_class_v<T> && !std::is_union_v<T> && !does_type_have_padding<T>();
+concept HashPrimitive = !std::is_class_v<T> && !std::is_union_v<T> && !does_type_have_padding<T>();
 
 struct Hasher;
 
 template <typename T>
-concept Custom_Hashable = requires(T a) {
+concept MemberHashable = requires(T a) {
+	a.hash(std::declval<Hasher*>());
+};
+
+template <typename T>
+concept GlobalHashable = requires(T a) {
 	type_hash(std::declval<Hasher*>(), a);
 };
 
 template <typename T>
-concept Pod_Hashable = Hash_Primitive<T> && !Custom_Hashable<T>;
+concept PodHashable =
+	HashPrimitive<T> && !MemberHashable<T> && !GlobalHashable<T>;
 
 struct Hasher {
 	spookyhash_context ctx;
@@ -62,12 +65,17 @@ struct Hasher {
 		return get_hash128().lower;
 	}
 
-	template <Custom_Hashable T>
+	template <GlobalHashable T>
 	void hash(T thing) {
 		type_hash(this, thing);
 	}
 
-	template <Pod_Hashable T>
+	template <MemberHashable T>
+	void hash(T thing) {
+		thing.hash(this);
+	}
+
+	template <PodHashable T>
 	void hash(T thing) {
 		hash(&thing, sizeof(T));
 	}
@@ -94,13 +102,19 @@ Hash64 hash64(void* data, u64 size) {
 	return hash128(data, size).lower;
 }
 
-Hash128 hash128(Custom_Hashable auto x) {
+Hash128 hash128(GlobalHashable auto x) {
 	Hasher hasher = make_hasher();
 	type_hash(&hasher, x);
 	return hasher.get_hash128();
 }
 
-Hash128 hash128(Pod_Hashable auto x) {
+Hash128 hash128(MemberHashable auto x) {
+	Hasher hasher = make_hasher();
+	x.hash(&hasher);
+	return hasher.get_hash128();
+}
+
+Hash128 hash128(PodHashable auto x) {
 	return hash128(&x, sizeof(x));
 }
 
