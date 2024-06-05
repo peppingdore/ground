@@ -1112,33 +1112,104 @@ Error* emit_spirv_block(SpirvEmitter* m, SsaBasicBlock* block) {
 	return NULL;
 }
 
-Error* emit_spirv_function(SpirvEmitter* emitter, Ssa* ssa) {
-	auto f = ssa->function;
-	auto [return_type_id, e] = get_type_id(emitter, f->return_type);
-	if (e) {
-		return e;
-	}
-	spv_opcode(emitter, SpvOpTypeFunction, 1 + 1 + len(f->args));
-	u32 function_type_id = alloc_id(emitter);
-	spv_word(emitter, function_type_id);
-	spv_word(emitter, return_type_id);
-	for (auto arg: f->args) {
-		auto [id, e] = decl_pointer_type(emitter, arg->var_type, SpvStorageClassFunction);
-		if (e) {
-			return e;
+Tuple<s64, Error*> eval_const_int(AstExpr* expr) {
+	auto p = expr->p;
+	if (auto i = reflect_cast<AstLiteralExpr>(expr)) {
+		if (i->lit_type == reflect_type_of<s64>()) {
+			return { i->lit_value.s64_value, NULL };
+		} else if (i->lit_type == reflect_type_of<s32>()) {
+			return { i->lit_value.s32_value, NULL };
+		} else {
+			return { 0, simple_parser_error(p, current_loc(), expr->text_region, "Expected s32 or s64 literal, got '%*'", i->lit_type->name) };
 		}
-		spv_word(emitter, id);
+	} else {
+		return { 0, simple_parser_error(p, current_loc(), expr->text_region, "Expected literal, got '%*'", expr->type->name) };
 	}
-	u32 function_id = alloc_id(emitter);
-	spv_opcode(emitter, SpvOpFunction, 4);
-	spv_word(emitter, return_type_id);
-	spv_word(emitter, function_id);
-	spv_word(emitter, SpvFunctionControlMaskNone);
-	spv_word(emitter, function_type_id);
-	e = emit_spirv_block(emitter, ssa->entry);
+}
+
+Tuple<AstType*, Error*> strip_pointer_type(AstFunctionArg* arg) {
+	if (auto ptr = reflect_cast<AstPointerType>(arg->var_type)) {
+		return { ptr->pointee, NULL };
+	} else {
+		return { NULL, simple_parser_error(arg->p, current_loc(), arg->text_region, "Expected pointer type, got '%*'", arg->var_type->name) };
+	}
+}
+
+Error* emit_spirv_function(SpirvEmitter* m, Ssa* ssa) {
+	auto f = ssa->function;
+	auto [return_type_id, e] = get_type_id(m, f->return_type);
 	if (e) {
 		return e;
 	}
-	spv_opcode(emitter, SpvOpFunctionEnd, 0);
+	spv_opcode(m, SpvOpTypeFunction, 1 + 1 + len(f->args));
+	u32 function_type_id = alloc_id(m);
+	spv_word(m, function_type_id);
+	spv_word(m, return_type_id);
+	if (false) {
+		// Regular function args.
+		for (auto arg: f->args) {
+			auto [id, e] = decl_pointer_type(m, arg->var_type, SpvStorageClassFunction);
+			if (e) {
+				return e;
+			}
+			spv_word(m, id);
+		}
+	} else {
+		for (auto arg: f->args) {
+			for (auto attr: arg->attrs) {
+				if (attr->name == "vk_uniform") {
+					s64 set = 0;
+					s64 binding = 0;
+					if (len(attr->args) == 1) {
+						set = 0;
+						auto [i, e] = eval_const_int(attr->args[0]);
+						if (e) {
+							return e;
+						}
+						binding = i;
+					} else if (len(attr->args) == 2) {
+						auto [i, e] = eval_const_int(attr->args[0]);
+						if (e) {
+							return e;
+						}
+						set = i;
+						auto [j, e2] = eval_const_int(attr->args[1]);
+						if (e2) {
+							return e2;
+						}
+						binding = j;
+					} else {
+						// expect (set, binding) or (set).
+						auto reg = ProgramTextRegion { 0, 0 };
+						if (attr->text_region.has_value) {
+							reg = attr->text_region.value;
+						}
+						return simple_parser_error(f->p, current_loc(), reg, "Expected (set, binding) or (set).");
+					}
+					auto var_id = alloc_id(m);
+					auto [tp, e] = strip_pointer_type(arg);
+					if (e) {
+						return e;
+					}
+					auto [tp_id, e2] = get_type_id(m, tp);
+					if (e2) {
+						return e2;
+					}
+					spv_op(m, SpvOpVariable, { tp_id, var_id, SpvStorageClassUniform });
+				}
+			}
+		}
+	}
+	u32 function_id = alloc_id(m);
+	spv_opcode(m, SpvOpFunction, 4);
+	spv_word(m, return_type_id);
+	spv_word(m, function_id);
+	spv_word(m, SpvFunctionControlMaskNone);
+	spv_word(m, function_type_id);
+	e = emit_spirv_block(m, ssa->entry);
+	if (e) {
+		return e;
+	}
+	spv_opcode(m, SpvOpFunctionEnd, 0);
 	return NULL;
 }

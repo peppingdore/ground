@@ -256,10 +256,14 @@ struct ShaderIntrinVar: AstVar {
 	}
 };
 
+struct AstAttr;
+
 struct AstFunctionArg: AstVar {
+	Array<AstAttr*> attrs;
 
 	REFLECT(AstFunctionArg) {
 		BASE_TYPE(AstVar);
+		MEMBER(attrs);
 	}
 };
 
@@ -590,9 +594,9 @@ void print_parser_error(CLikeParserError* e) {
 	}
 }
 
-CLikeParserError* simple_parser_error(CLikeParser* p, CodeLocation loc, ProgramTextRegion reg, auto... args) {
+CLikeParserError* simple_parser_error(CLikeParser* p, CodeLocation loc, Optional<ProgramTextRegion> reg, auto... args) {
 	auto error = make_parser_error(p, loc, args...);
-	if (reg.end > reg.start) {
+	if (reg.has_value && reg.value.end > reg.value.start) {
 		add_site(p, error, CParserErrorToken {
 			.reg = reg,
 			.color = CPARSER_ERROR_TOKEN_COLOR_REGULAR_RED,
@@ -1819,14 +1823,18 @@ Tuple<Array<AstAttr*>, Error*> parse_attrs(CLikeParser* p) {
 					next(p);
 					break;
 				}
-				auto [expr, e] = parse_expr(p, 0);
+				if (len(args) > 0) {
+					if (tok.str != ",") {
+						return { {}, simple_parser_error(p, current_loc(), tok.reg, U"Expected ','"_b) };
+					}
+					next(p);
+				}
+				auto op = find_binary_operator(p, U","_b);
+				auto [expr, e] = parse_expr(p, op->prec + 1);
 				if (e) {
 					return { {}, e };
 				}
 				add(&args, expr);
-				if (peek(p).str != ",") {
-					next(p);
-				}
 			}
 		}
 		auto end_tok = peek(p);
@@ -2137,6 +2145,7 @@ Tuple<AstSymbol*, Error*> parse_function(CLikeParser* p, AstType* return_type, A
 		}
 		auto arg_node = make_ast_symbol<AstFunctionArg>(p, arg_name.str, text_region);
 		arg_node->var_type = type;
+		arg_node->attrs = attrs;
 		add(&args, arg_node);
 	}
 

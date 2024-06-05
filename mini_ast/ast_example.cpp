@@ -26,9 +26,9 @@ struct VertexOutput {
 };
 
 [[fragment]] float4 main(
-	float* t [[mtl_constant]] [[vk_uniform]],
-	float2* r [[mtl_constant]] [[vk_uniform]],
-	float4* target_size [[mtl_constant]] [[vk_uniform]],
+	float* t [[mtl_constant(0)]] [[vk_uniform(0)]],
+	float2* r [[mtl_constant(1)]] [[vk_uniform(1)]],
+	float4* target_size [[mtl_constant(2)]] [[vk_uniform(0, 2)]],
 	VertexOutput in [[stage_in]]
 ) {
 	float4 FC = in.position / *target_size;
@@ -64,16 +64,19 @@ void main() {
 
 #endif
 
+void print_error(Error* e) {
+	if (auto error = reflect_cast<CLikeParserError>(e)) {
+		print_parser_error(error);
+	} else {
+		println(e->text);
+	}
+	println("Generated at %", e->loc);
+}
 
 int main() {
 	auto [program, e] = parse_c_like(PROGRAM);
 	if (e) {
-		if (auto error = reflect_cast<CLikeParserError>(e)) {
-			print_parser_error(error);
-		} else {
-			print(e->text);
-		}
-		println("Generated at %", e->loc);
+		print_error(e);
 		return -1;
 	}
 	// println(print_ast_node(program));
@@ -86,25 +89,25 @@ int main() {
 
 			auto [ssa, e] = emit_function_ssa(c_allocator, f);
 			if (e) {
-				println(e);
+				print_error(e);
 				return -1;
 			}
 			print_ssa(ssa.entry);
 
 			auto [file, e1] = open_file(U"xxx.spv"_b, FILE_WRITE | FILE_CREATE_NEW);
 			if (e1) {
-				println(e1);
+				print_error(e1);
 				return -1;
 			}
 			auto emitter = make_spirv_emitter(f->p, c_allocator);
 			e = emit_spirv_function(&emitter, &ssa);
 			if (e) {
-				println(e);
+				print_error(e);
 				return -1;
 			}
 			e = write_file(&file, emitter.spv.data, len(emitter.spv) * sizeof(u32));
 			if (e) {
-				println(e);
+				print_error(e);
 				return -1;
 			}
 			println("Emitted ssa");
