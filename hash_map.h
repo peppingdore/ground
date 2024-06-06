@@ -36,6 +36,15 @@ struct HashMap {
 		}
 		*this = {};
 	}
+
+	Generator<Entry*> iterate() {
+		for (auto i: range(capacity)) {
+			auto* e = &data[i];
+			if (e->is_occupied()) {
+				co_yield e;
+			}
+		}
+	}
 };
 
 template <typename K, typename V>
@@ -249,8 +258,8 @@ V* get(HashMap<K, V>* map, std::type_identity_t<K> key) {
 }
 
 template <typename K, typename V>
-s64 len(HashMap<K, V>* map) {
-	return map->count;
+s64 len(HashMap<K, V> map) {
+	return map.count;
 }
 
 struct HashMapType: MapType {
@@ -281,7 +290,7 @@ HashMapType* reflect_type(HashMap<K, V>* x, HashMapType* type) {
 
 	type->get_count = [](void* map) {
 		auto casted = (HashMap<int, int>*) map;
-		return len(casted);
+		return len(*casted);
 	};
 
 	type->get_capacity = [](void* map) {
@@ -296,7 +305,7 @@ HashMapType* reflect_type(HashMap<K, V>* x, HashMapType* type) {
 
 		for (auto i: range(casted_map->capacity)) {
 			auto* entry = (Entry*) ptr_add(casted_map->data, i * sizeof(Entry));
-			if (entry->normalized_hash >= HASH_MAP_SLOT_HASH_FIRST_OCCUPIED) {
+			if (entry->is_occupied()) {
 				item.key   = &entry->key;
 				item.value = &entry->value;
 				item.hash  = &entry->normalized_hash;
