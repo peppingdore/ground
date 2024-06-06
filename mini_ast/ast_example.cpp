@@ -99,13 +99,19 @@ int main() {
 				print_error(e1);
 				return -1;
 			}
-			auto emitter = make_spirv_emitter(f->p, c_allocator);
-			e = emit_spirv_function(&emitter, &ssa);
+			auto m = make_spirv_emitter(f->p, c_allocator);
+			e = emit_spirv_function(&m, &ssa);
 			if (e) {
 				print_error(e);
 				return -1;
 			}
-			e = write_file(&file, emitter.spv.data, len(emitter.spv) * sizeof(u32));
+			e = finalize_spirv(&m);
+			if (e) {
+				print_error(e);
+				return -1;
+			}
+
+			e = write_file(&file, m.spv.data, len(m.spv) * sizeof(u32));
 			if (e) {
 				print_error(e);
 				return -1;

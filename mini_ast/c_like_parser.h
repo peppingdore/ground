@@ -272,19 +272,26 @@ enum class AstFunctionKind {
 	Vertex = 2,
 	Fragment = 3,
 };
+REFLECT(AstFunctionKind) {
+	ENUM_VALUE(Plain);
+	ENUM_VALUE(Vertex);
+	ENUM_VALUE(Fragment);
+}
 
 struct AstFunction: AstSymbol {
 	AstType*               return_type = NULL;
 	Array<AstFunctionArg*> args;
-	AstBlock*              block = NULL;
+	Array<AstAttr*>        attrs;
 	AstFunctionKind        kind = AstFunctionKind::Plain;
+	AstBlock*              block = NULL;
 
 	REFLECT(AstFunction) {
 		BASE_TYPE(AstSymbol);
 		MEMBER(return_type);
 		MEMBER(args);
-		MEMBER(block);
+		MEMBER(attrs);
 		MEMBER(kind);
+		MEMBER(block);
 	}
 };
 
@@ -2105,11 +2112,26 @@ Tuple<AstBlock*, Error*> parse_block(CLikeParser* p) {
 	return { block, NULL };
 }
 
-Tuple<AstSymbol*, Error*> parse_function(CLikeParser* p, AstType* return_type, AstFunctionKind kind, Token start_tok, Token ident) {
+Tuple<AstSymbol*, Error*> parse_function(CLikeParser* p, AstType* return_type,  Array<AstAttr*> attrs, Token start_tok, Token ident) {
 	Array<AstFunctionArg*> args = { .allocator = p->allocator };
 	defer { args.free(); };
 
 	next(p);
+
+	AstFunctionKind kind = AstFunctionKind::Plain;
+	for (auto attr: attrs) {
+		if (attr->name == "vertex") {
+			if (kind != AstFunctionKind::Plain) {
+				return { NULL, simple_parser_error(p, current_loc(), attr->text_region, "Function kind already defined") };
+			}
+			kind = AstFunctionKind::Vertex;
+		} else if (attr->name == "fragment") {
+			if (kind != AstFunctionKind::Plain) {
+				return { NULL, simple_parser_error(p, current_loc(), attr->text_region, "Function kind already defined") };
+			}
+			kind = AstFunctionKind::Fragment;
+		}
+	}
 
 	while (true) {
 		auto tok = peek(p);
@@ -2155,6 +2177,7 @@ Tuple<AstSymbol*, Error*> parse_function(CLikeParser* p, AstType* return_type, A
 	f->return_type = return_type;
 	f->name = ident.str;
 	f->args = args;
+	f->attrs = attrs;
 	f->kind = kind;
 
 	auto tok = peek(p);
@@ -2292,7 +2315,7 @@ Error* parse_top_level(CLikeParser* p) {
 	}
 	auto tok = peek(p);
 	if (tok.str == U"("_b) {
-		auto [f, e] = parse_function(p, type, AstFunctionKind::Plain, start_tok, ident);
+		auto [f, e] = parse_function(p, type, attrs, start_tok, ident);
 		if (e) {
 			return e;
 		}

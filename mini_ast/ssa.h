@@ -130,6 +130,7 @@ struct Ssa {
 	s64                         construct_id_counter = 0;
 	HashMap<AstVar*, SsaValue*> non_ssa_vars;
 	AstFunction*                function = NULL;
+	Array<SsaBasicBlock*>       blocks;
 
 	void free() {
 		free_allocator(allocator);
@@ -157,6 +158,7 @@ SsaBasicBlock* make_ssa_basic_block(Ssa* ssa, String name = ""_b, s64 construct_
 	block->pred = { .allocator = ssa->allocator };
 	block->successors = { .allocator = ssa->allocator };
 	block->ssa_vars = { .allocator = ssa->allocator };
+	add(&ssa->blocks, block);
 	return block;
 }
 
@@ -881,6 +883,8 @@ void print_ssa_value(SsaValue* inst) {
 			print(" %* ", block->name);
 		} else if (auto cj = reflect_cast<SsaCondJump>(inst->aux)) {
 			print(" %*, %* ", cj->t_block->name, cj->f_block->name);
+		} else if (auto arg = reflect_cast<AstFunctionArg>(inst->aux)) {
+			print(" '%*' ", arg->var_type->name);
 		}
 	}
 	print("     used by ");
@@ -934,6 +938,7 @@ Tuple<Ssa, Error*> emit_function_ssa(Allocator allocator, AstFunction* f) {
 	seal_block(entry_block);
 	for (auto arg: f->args) {
 		auto v = make_ssa_val(ssa.current_block, SsaOp::FunctionArg);
+		v->aux = make_any(arg);
 		write_var(ssa.current_block, arg, v);
 	}
 	auto e = emit_block(&ssa, f->block);
@@ -946,33 +951,75 @@ Tuple<Ssa, Error*> emit_function_ssa(Allocator allocator, AstFunction* f) {
 	return { ssa, NULL };
 }
 
-#include "../third_party/spirv.h"
+#include "../third_party/spirv_reflect.h"
 
-struct SpirvEmitter {
-	CLikeParser*           p = NULL;
-	Array<u32>             spv;
-	HashMap<AstType*, u32> type_ids;
-	HashMap<Type*, u32>    c_type_ids;
-	u32                    id_counter = 0;
-	HashMap<SsaId, u32>    id_map;
+struct SpirvEntryPoint {
+	AstFunction* f;
+	Array<u32>   interf;
+	u32          function_id;
 };
 
-u32 alloc_id(SpirvEmitter* emitter) {
-	return ++emitter->id_counter;
+struct SpirvEmitter {
+	Allocator               allocator;
+	CLikeParser*            p = NULL;
+	Array<u32>              spv;
+	s64                     spv_cursor = 0;
+	HashMap<AstType*, u32>  type_ids;
+	HashMap<Tuple<AstType*, u32>, u32> ptr_type_ids;
+	u32                     id_counter = 0;
+	HashMap<SsaId, u32>     id_map;
+	Array<SpirvEntryPoint*> entry_points;
+	SpirvEntryPoint*        ep = NULL;
+};
+
+u32 alloc_id(SpirvEmitter* m) {
+	return ++m->id_counter;
 }
 
-void spv_word(SpirvEmitter* emitter, u32 word) {
-	add(&emitter->spv, word);
+void spv_word(SpirvEmitter* m, u32 word) {
+	add(&m->spv, word, m->spv_cursor);
+	m->spv_cursor += 1;
 }
 
-void spv_opcode(SpirvEmitter* emitter, SpvOp op, u32 word_count) {
-	spv_word(emitter, u32(op) | ((word_count + 1) << 16));
+void spv_opcode(SpirvEmitter* m, SpvOp op, u32 word_count) {
+	spv_word(m, u32(op) | ((word_count + 1) << 16));
 }
 
-void spv_op(SpirvEmitter* emitter, SpvOp op, std::initializer_list<u32> words) {
-	spv_opcode(emitter, op, u32(words.size()));
+struct SpvOpOperand {
+	u32       op = 0;
+	Span<u32> span = {};
+	bool      is_span = false;
+
+	SpvOpOperand(u32 x) {
+		op = x;
+		is_span = false;
+	}
+
+	SpvOpOperand(Span<u32> x) {
+		span = x;
+		is_span = true;
+	}
+};
+
+void spv_op(SpirvEmitter* m, SpvOp op, std::initializer_list<SpvOpOperand> words) {
+	s64 words_count = 0;
 	for (auto word: words) {
-		spv_word(emitter, word); 
+		if (word.is_span) {
+			words_count += len(word.span);
+		} else {
+			words_count += 1;
+		}
+	}
+	
+	spv_opcode(m, op, u32(words_count));
+	for (auto word: words) {
+		if (word.is_span) {
+			for (auto w: word.span) {
+				spv_word(m, w);
+			}
+		} else {
+			spv_word(m, word.op); 
+		}
 	}
 }
 
@@ -1027,28 +1074,28 @@ Tuple<u32, Error*> get_type_id(SpirvEmitter* m, AstType* type) {
 	return { id, NULL };
 }
 
-Tuple<u32, Error*> decl_pointer_type(SpirvEmitter* emitter, AstType* type, u32 storage_class) {
-	auto [id, e] = get_type_id(emitter, type);
+Tuple<u32, Error*> decl_pointer_type(SpirvEmitter* m, AstType* type, u32 storage_class) {
+	Tuple<AstType*, u32> key = { type, storage_class };
+	auto found = get(&m->ptr_type_ids, key);
+	if (found) {
+		return { *found, NULL };
+	}
+	auto [id, e] = get_type_id(m, type);
 	if (e) {
 		return { 0, e };
 	}
-	auto res = alloc_id(emitter);
-	spv_op(emitter, SpvOpTypePointer, { res, storage_class, id });
+	auto res = alloc_id(m);
+	spv_op(m, SpvOpTypePointer, { res, storage_class, id });
+	put(&m->ptr_type_ids, key, res);
 	return { res, NULL };
 }
 
 SpirvEmitter make_spirv_emitter(CLikeParser* p, Allocator allocator) {
-	SpirvEmitter emitter;
-	emitter.p = p;
-	emitter.spv.allocator = allocator;
-	spv_word(&emitter, 0x07230203); // magic
-	spv_word(&emitter, 0x00010000); // version
-	spv_word(&emitter, 0x00000000); // generator magic
-	spv_word(&emitter, 65536); // id bound // @TODO: patch it later.
-	spv_word(&emitter, 0); // reserved
-	spv_op(&emitter, SpvOpCapability, { SpvCapabilityShader });
-	spv_op(&emitter, SpvOpMemoryModel, { SpvAddressingModelLogical, SpvMemoryModelGLSL450 });
-	return emitter;
+	SpirvEmitter m;
+	m.allocator = allocator;
+	m.p = p;
+	m.spv.allocator = allocator;
+	return m;
 }
 
 void spv_map_id(SpirvEmitter* emitter, SsaId id, u32 value) {
@@ -1100,7 +1147,14 @@ Error* emit_spirv_block(SpirvEmitter* m, SsaBasicBlock* block) {
 			}
 			break;
 			case SsaOp::GlobalVar: {
-				auto var = reflect_cast<AstVar>(v->aux);
+				return format_error("Global variables are not supported");
+			}
+			break;
+			case SsaOp::FunctionArg: {
+				// nop
+			}
+			break;
+			case SsaOp::Load: {
 
 			}
 			break;
@@ -1135,17 +1189,139 @@ Tuple<AstType*, Error*> strip_pointer_type(AstFunctionArg* arg) {
 	}
 }
 
-Error* emit_spirv_function(SpirvEmitter* m, Ssa* ssa) {
-	auto f = ssa->function;
-	auto [return_type_id, e] = get_type_id(m, f->return_type);
-	if (e) {
-		return e;
+AstAttr* find_attr(Span<AstAttr*> attrs, UnicodeString name) {
+	for (auto attr: attrs) {
+		if (attr->name == name) {
+			return attr;
+		}
 	}
-	spv_opcode(m, SpvOpTypeFunction, 1 + 1 + len(f->args));
+	return NULL;
+}
+
+Error* emit_entry_point_arg(SpirvEmitter* m, AstFunction* f, AstFunctionArg* arg) {
+	auto p = f->p;
+	for (auto attr: arg->attrs) {
+		if (attr->name == "vk_uniform") {
+			s64 set = 0;
+			s64 binding = 0;
+			if (len(attr->args) == 1) {
+				set = 0;
+				auto [i, e] = eval_const_int(attr->args[0]);
+				if (e) {
+					return e;
+				}
+				binding = i;
+			} else if (len(attr->args) == 2) {
+				auto [i, e] = eval_const_int(attr->args[0]);
+				if (e) {
+					return e;
+				}
+				set = i;
+				auto [j, e2] = eval_const_int(attr->args[1]);
+				if (e2) {
+					return e2;
+				}
+				binding = j;
+			} else {
+				// expect (set, binding) or (set).
+				auto reg = ProgramTextRegion { 0, 0 };
+				if (attr->text_region.has_value) {
+					reg = attr->text_region.value;
+				}
+				return simple_parser_error(f->p, current_loc(), reg, "Expected (set, binding) or (set).");
+			}
+			auto var_id = alloc_id(m);
+			auto [tp, e] = strip_pointer_type(arg);
+			if (e) {
+				return e;
+			}
+			auto [tp_id, e2] = decl_pointer_type(m, tp, SpvStorageClassUniform);
+			if (e2) {
+				return e2;
+			}
+			spv_op(m, SpvOpVariable, { tp_id, var_id, SpvStorageClassUniform });
+		} else if (attr->name == "stage_in") {
+			auto tp = reflect_cast<AstStructType>(arg->var_type);
+			if (!tp) {
+				return simple_parser_error(f->p, current_loc(), attr->text_region, "Expected struct type");
+			}
+			if (f->kind == AstFunctionKind::Vertex) {
+				// @TODO
+			} else if (f->kind == AstFunctionKind::Fragment) {
+				s64 idx = 0;
+				for (auto member: tp->members) {
+					if (find_attr(member->attrs, U"position"_b)) {
+						continue;
+					}
+					auto [tp_id, e] = decl_pointer_type(m, member->member_type, SpvStorageClassInput);
+					if (e) {
+						return e;
+					}
+					auto id = alloc_id(m);
+					spv_op(m, SpvOpVariable, { tp_id, id, SpvStorageClassInput });
+					add(&m->ep->interf, id);
+					idx += 1;
+				}
+			} else {
+				return simple_parser_error(f->p, current_loc(), attr->text_region, "Expected vertex or fragment function");
+			}
+		}
+	}
+	return NULL;
+}
+
+Error* emit_entry_point_header(SpirvEmitter* m, AstFunction* f) {
+	for (auto arg: f->args) {
+		auto e = emit_entry_point_arg(m, f, arg);
+		if (e) {
+			return e;
+		}
+	}
+	return NULL;
+}
+
+void perform_spirv_rewrites(SpirvEmitter* m, Ssa* ssa) {
+	for (auto block: ssa->blocks) {
+		for (auto v: block->values) {
+			if (v->op == SsaOp::Addr) {
+				auto load = v->args[0];
+				if (load->op == SsaOp::Load) {
+					auto arg = load->args[0];
+					if (arg->op == SsaOp::FunctionArg) {
+						
+					}
+				}
+			}
+		}
+	}
+}
+
+Error* emit_spirv_function(SpirvEmitter* m, Ssa* ssa) {
+	perform_spirv_rewrites(m, ssa);
+
+	auto f = ssa->function;
+	u32 function_id = alloc_id(m);
 	u32 function_type_id = alloc_id(m);
-	spv_word(m, function_type_id);
-	spv_word(m, return_type_id);
-	if (false) {
+	u32 return_type_id = 0;
+
+	if (f->kind == AstFunctionKind::Vertex || f->kind == AstFunctionKind::Fragment) {
+		m->ep = make<SpirvEntryPoint>(m->allocator);
+		m->ep->f = f;
+		m->ep->function_id = function_id;
+		m->ep->interf.allocator = m->allocator;
+		add(&m->entry_points, m->ep);
+	}
+
+	if (f->kind == AstFunctionKind::Plain) {
+		auto [ret_type_id, e] = get_type_id(m, f->return_type);
+		if (e) {
+			return e;
+		}
+		return_type_id = ret_type_id;
+		spv_opcode(m, SpvOpTypeFunction, 1 + 1 + len(f->args));
+		spv_word(m, function_type_id);
+		spv_word(m, ret_type_id);
+
 		// Regular function args.
 		for (auto arg: f->args) {
 			auto [id, e] = decl_pointer_type(m, arg->var_type, SpvStorageClassFunction);
@@ -1155,61 +1331,65 @@ Error* emit_spirv_function(SpirvEmitter* m, Ssa* ssa) {
 			spv_word(m, id);
 		}
 	} else {
-		for (auto arg: f->args) {
-			for (auto attr: arg->attrs) {
-				if (attr->name == "vk_uniform") {
-					s64 set = 0;
-					s64 binding = 0;
-					if (len(attr->args) == 1) {
-						set = 0;
-						auto [i, e] = eval_const_int(attr->args[0]);
-						if (e) {
-							return e;
-						}
-						binding = i;
-					} else if (len(attr->args) == 2) {
-						auto [i, e] = eval_const_int(attr->args[0]);
-						if (e) {
-							return e;
-						}
-						set = i;
-						auto [j, e2] = eval_const_int(attr->args[1]);
-						if (e2) {
-							return e2;
-						}
-						binding = j;
-					} else {
-						// expect (set, binding) or (set).
-						auto reg = ProgramTextRegion { 0, 0 };
-						if (attr->text_region.has_value) {
-							reg = attr->text_region.value;
-						}
-						return simple_parser_error(f->p, current_loc(), reg, "Expected (set, binding) or (set).");
-					}
-					auto var_id = alloc_id(m);
-					auto [tp, e] = strip_pointer_type(arg);
-					if (e) {
-						return e;
-					}
-					auto [tp_id, e2] = get_type_id(m, tp);
-					if (e2) {
-						return e2;
-					}
-					spv_op(m, SpvOpVariable, { tp_id, var_id, SpvStorageClassUniform });
-				}
-			}
+		auto [ret_tp_id, e] = get_type_id(m, f->p->void_tp);
+		if (e) {
+			return e;
+		}
+		return_type_id = ret_tp_id;
+		spv_op(m, SpvOpTypeFunction, { function_type_id, ret_tp_id });
+		e = emit_entry_point_header(m, f);
+		if (e) {
+			return e;
 		}
 	}
-	u32 function_id = alloc_id(m);
+	assert(return_type_id != 0);
 	spv_opcode(m, SpvOpFunction, 4);
 	spv_word(m, return_type_id);
 	spv_word(m, function_id);
 	spv_word(m, SpvFunctionControlMaskNone);
 	spv_word(m, function_type_id);
-	e = emit_spirv_block(m, ssa->entry);
+	auto e = emit_spirv_block(m, ssa->entry);
 	if (e) {
 		return e;
 	}
 	spv_opcode(m, SpvOpFunctionEnd, 0);
+	return NULL;
+}
+
+Error* finalize_spirv(SpirvEmitter* m) {
+	m->spv_cursor = 0;
+	spv_word(m, 0x07230203); // magic
+	spv_word(m, 0x00010000); // version
+	spv_word(m, 0x00000000); // generator magic
+	spv_word(m, 65536); // id bound // @TODO: patch it later.
+	spv_word(m, 0); // reserved
+	spv_op(m, SpvOpCapability, { SpvCapabilityShader });
+	spv_op(m, SpvOpMemoryModel, { SpvAddressingModelLogical, SpvMemoryModelGLSL450 });
+	for (auto ep: m->entry_points) {
+		u32 exec_mode = 0;
+		if (ep->f->kind == AstFunctionKind::Vertex) {
+			exec_mode = SpvExecutionModelVertex;
+		} else if (ep->f->kind == AstFunctionKind::Fragment) {
+			exec_mode = SpvExecutionModelFragment;
+		} else {
+			return simple_parser_error(m->p, current_loc(), ep->f->text_region, "Unsupported entry point kind: %", ep->f->kind);
+		}
+
+		auto str = encode_utf8(m->allocator, ep->f->name);
+		defer { str.free(); };
+		s64 pad = align(len(str), 4) - len(str);
+		for (auto i: range(pad)) {
+			add(&str, 0);
+		}
+		add(&str, 0);
+		add(&str, 0);
+		add(&str, 0);
+		add(&str, 0);
+
+		auto casted_str = *(Span<u32>*) &str;
+		casted_str.count /= 4;
+
+		spv_op(m, SpvOpEntryPoint, { exec_mode, ep->function_id, casted_str, ep->interf });
+	}
 	return NULL;
 }
