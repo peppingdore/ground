@@ -88,6 +88,18 @@ struct Generator {
 		}
 	};
 
+	void operator++() {
+		handle.resume();
+	}
+
+	T operator*() {
+		return handle.promise().stored_value;
+	}
+
+	bool operator!=(int rhs /*ignored*/) {
+		return !handle.done();
+	}
+
 	auto begin() {
 		return Range{ .gen = this };
 	}
