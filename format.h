@@ -261,7 +261,7 @@ void format_parser(
 				}
 
 				if (closing_index != -1) {
-					auto str = fmt[i + 2, closing_index - 1]; 
+					auto str = fmt[i + 2, closing_index]; 
 					format_spec = str;
 					i = closing_index;
 				}
