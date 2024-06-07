@@ -18,6 +18,10 @@ struct SsaId {
 	bool operator==(SsaId other) const {
 		return v == other.v;
 	}
+
+	REFLECT(SsaId) {
+		MEMBER(v);
+	}
 };
 
 Hash64 hash_key(SsaId id) {
@@ -49,7 +53,7 @@ enum class SsaOp {
 	GetElement,
 	UnaryNeg,
 	UnaryNot,
-	SsaLvalue,
+	Lvalue,
 	ZeroInit,
 	Addr,
 	FunctionArg,
@@ -79,7 +83,7 @@ REFLECT(SsaOp) {
 	ENUM_VALUE(GetElement);
 	ENUM_VALUE(UnaryNeg);
 	ENUM_VALUE(UnaryNot);
-	ENUM_VALUE(SsaLvalue);
+	ENUM_VALUE(Lvalue);
 	ENUM_VALUE(ZeroInit);
 	ENUM_VALUE(Addr);
 	ENUM_VALUE(FunctionArg);
@@ -96,6 +100,8 @@ struct SsaValue {
 	Array<SsaValue*> args;
 	Array<SsaValue*> uses;
 	Any              aux;
+	AstType*         v_type = NULL;
+	bool             is_removed = false; // @TODO: only for debugging. remove later.
 };
 
 struct SsaBasicBlock {
@@ -166,7 +172,13 @@ bool can_ssa(AstVar* var) {
 	if (var->is_global) {
 		return false;
 	}
-	return reflect_cast<AstPrimitiveType>(var->var_type) != NULL;
+	if (reflect_cast<AstPrimitiveType>(var->var_type)) {
+		return true;
+	}
+	if (reflect_cast<AstFunctionArg>(var)) {
+		return true;
+	}
+	return false;
 }
 
 void write_var(SsaBasicBlock* block, AstVar* var, SsaValue* v) {
@@ -184,6 +196,9 @@ SsaValue* make_ssa_val(SsaBasicBlock* block, SsaOp op) {
 	v->block = block;
 	v->op = op;
 	v->id = alloc_id(block->ssa);
+	if (v->id.v == 222) {
+		int k = 43;
+	}
 	if (block->ending) {
 		add(&block->values, v, len(block->values) - 1);
 	} else {
@@ -203,7 +218,93 @@ void add_arg(SsaValue* v, SsaValue* arg) {
 	add(&v->args, arg);
 }
 
-void add_phi_args(SsaValue* phi) {
+void replace_by(SsaValue* v, SsaValue* by, Span<SsaValue*> uses) {
+	for (auto entry: v->block->ssa_vars) {
+		if (entry->value == v) {
+			entry->value = by;
+		}
+	}
+	for (auto use: uses) {
+		println("Replacing use of $%* by $%* in $%*", v->id.v, by->id.v, use->id.v);
+		bool did_find = false;
+		for (auto i: range(len(use->args))) {
+			if (use->args[i] == v) {
+				use->args[i] = by;
+				add(&by->uses, use);
+				did_find = true;
+				break;
+			}
+		}
+		assert(did_find);
+	}
+	for (auto use: v->uses) {
+		println("Remaining use $%* in $%*", use->id.v, v->id.v);
+	}
+	clear(&v->uses);
+}
+
+void remove_value(SsaValue* v) {
+	v->is_removed = true;
+	assert(len(v->uses) == 0);
+	for (auto arg: v->args) {
+		for (s64 i = 0; i < len(arg->uses); i++) {
+			if (arg->uses[i] == v) {
+				remove_at_index(&arg->uses, i);
+				i -= 1;
+				break;
+			}
+		}
+	}
+	for (auto i: range(len(v->block->values))) {
+		if (v->block->values[i] == v) {
+			remove_at_index(&v->block->values, i);
+			break;
+		}
+	}
+}
+
+SsaValue* try_remove_trivial_phi(SsaValue* phi) {
+	assert(phi->op == SsaOp::Phi);
+	SsaValue* same = NULL;
+	for (auto arg: phi->args) {
+		if (arg == same || arg == phi) {
+			continue;
+		}
+		if (same) {
+			println("Phi merges 2 values: $%*", phi->id.v);
+			return phi;
+		}
+		same = arg;
+	}
+	println("Need to remove trivial phi: $%*, %*", phi->id.v, reflect_cast<AstVar>(phi->aux)->name);
+	if (phi->id.v == 247) {
+		int k = 43;
+	}
+	assert(same);
+	Array<SsaValue*> uses;
+	println("  len(Uses): %", len(phi->uses));
+	for (auto use: phi->uses) {
+		if (use == phi) {
+			continue;
+		}
+		if (!contains(uses, use)) {
+			println("  Used by $%*", use->id.v);
+			add(&uses, use);
+		}
+	}
+	
+	replace_by(phi, same, uses);
+	remove_value(phi);
+
+	for (auto use: uses) {
+		if (use->op == SsaOp::Phi) {
+			try_remove_trivial_phi(use);
+		}
+	}
+	return same;
+}
+
+SsaValue* add_phi_args(SsaValue* phi) {
 	assert(phi->block->is_sealed);
 	assert(len(phi->args) == 0);
 	auto var = reflect_cast<AstVar>(phi->aux);
@@ -215,13 +316,16 @@ void add_phi_args(SsaValue* phi) {
 		assert(v);
 		add_arg(phi, v);
 	}
+	return try_remove_trivial_phi(phi);
 }
 
 SsaValue* read_var_recursive(SsaBasicBlock* block, AstVar* var) {
 	SsaValue* v = NULL;
 	if (!block->is_sealed) {
 		auto phi = make_ssa_val(block, SsaOp::Phi);
+		println("Add incomplete phi for %* in %* id $%*", var->name, block->name, phi->id.v);
 		phi->aux = make_any(var);
+		phi->v_type = var->var_type;
 		add(&block->incomplete_phis, phi);
 		v = phi;
 	} else if (len(block->pred) == 1) {
@@ -229,10 +333,11 @@ SsaValue* read_var_recursive(SsaBasicBlock* block, AstVar* var) {
 		v = read_var(block->pred[0], var);
 	} else {
 		auto phi = make_ssa_val(block, SsaOp::Phi);
+		println("Add phi for %* in %* id $%*", var->name, block->name, phi->id.v);
 		phi->aux = make_any(var);
+		phi->v_type = var->var_type;
 		write_var(block, var, phi);
-		add_phi_args(phi);
-		v = phi;
+		v = add_phi_args(phi);
 	}
 	assert(v != NULL);
 	write_var(block, var, v);
@@ -305,8 +410,10 @@ void end_block_cond_jump(SsaBasicBlock* block, SsaValue* cond, SsaBasicBlock* t_
 
 SsaValue* read_var(SsaBasicBlock* block, AstVar* var) {
 	if (can_ssa(var)) {
+		println("Reading var: % in %", var->name, block->name);
 		auto found = get(&block->ssa_vars, var);
 		if (found) {
+			assert(!(*found)->is_removed);
 			return *found;
 		} else {
 			return read_var_recursive(block, var);
@@ -340,7 +447,7 @@ Tuple<SsaValue*, Error*> get_lvalue_root(Ssa* ssa, SsaValue* lvalue) {
 	} else if (lvalue->op == SsaOp::Swizzle) {
 		auto lhs = lvalue->args[0];
 		return get_lvalue_root(ssa, lhs);
-	} else if (lvalue->op == SsaOp::SsaLvalue) {
+	} else if (lvalue->op == SsaOp::Lvalue) {
 		return { lvalue, NULL };
 	} else if (lvalue->op == SsaOp::Alloca) {
 		return { lvalue, NULL };
@@ -367,11 +474,13 @@ Tuple<SsaValue*, Error*> lvalue(Ssa* ssa, AstExpr* expr) {
 		}
 		auto v = make_ssa_val(ssa->current_block, SsaOp::MemberAccess);
 		add_arg(v, lhs);
+		v->v_type = var_access->member->member_type;
 		v->aux = make_any(var_access->member);
 		return { v, NULL };
 	} else if (auto var_access = reflect_cast<AstVariableAccess>(expr)) {
 		if (var_access->var->is_global) {
 			auto v = make_ssa_val(ssa->current_block, SsaOp::GlobalVar);
+			v->v_type = var_access->var->var_type;
 			v->aux = make_any(var_access->var);
 			return { v, NULL };
 		} else {
@@ -380,9 +489,11 @@ Tuple<SsaValue*, Error*> lvalue(Ssa* ssa, AstExpr* expr) {
 				if (!v) {
 					return { NULL, format_error("Unknown variable: %*", var_access->var->type->name) };
 				}
-				auto lv = make_ssa_val(ssa->current_block, SsaOp::SsaLvalue);
-				add_arg(lv, v);
+				auto lv = make_ssa_val(ssa->current_block, SsaOp::Lvalue);
+				assert(var_access->var->var_type);
 				lv->aux = make_any(var_access->var);
+				lv->v_type = var_access->var->var_type;
+				add_arg(lv, v);
 				return { lv, NULL };
 			} else {
 				SsaValue* v = read_var(ssa->current_block, var_access->var);
@@ -413,21 +524,20 @@ Tuple<SsaValue*, Error*> lvalue(Ssa* ssa, AstExpr* expr) {
 		}
 		auto v = make_ssa_val(ssa->current_block, SsaOp::Addr);
 		add_arg(v, addr);
+		v->v_type = deref->lhs->expr_type;
 		return { v, NULL };
 	}
 	return { NULL, format_error("Unsupported lvalue: %*", expr->type->name) };
 }
 
-Tuple<SsaValue*, Error*> load(Ssa* ssa, SsaValue* lhs) {
+Tuple<SsaValue*, Error*> load(Ssa* ssa, SsaValue* lhs, AstType* type) {
 	auto [root, e] = get_lvalue_root(ssa, lhs);
 	if (e) {
 		return { NULL, e };
 	}
-	if (root->op == SsaOp::SsaLvalue) {
-		return { root->args[0], NULL };
-	}
 	auto v = make_ssa_val(ssa->current_block, SsaOp::Load);
 	add_arg(v, lhs);
+	v->v_type = type;
 	return { v, NULL };
 }
 
@@ -436,7 +546,7 @@ Error* store(Ssa* ssa, SsaValue* lhs, SsaValue* rhs) {
 	if (e) {
 		return e;
 	}
-	if (root->op == SsaOp::SsaLvalue) {
+	if (root->op == SsaOp::Lvalue) {
 		auto var = reflect_cast<AstVar>(root->aux);
 		if (!var) {
 			return format_error("Expected var");
@@ -512,14 +622,14 @@ Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr) {
 		}
 		return { v, NULL };
 	} else if (auto binary_expr = reflect_cast<AstBinaryExpr>(expr)) {
-		auto [rhs, e0] = emit_expr(ssa, binary_expr->rhs);
-		if (e0) {
-			return { NULL, e0 };
-		}
 		if (binary_expr->op->op == "=") {
 			auto [lhs, e1] = lvalue(ssa, binary_expr->lhs);
 			if (e1) {
 				return { NULL, e1 };
+			}
+			auto [rhs, e0] = emit_expr(ssa, binary_expr->rhs);
+			if (e0) {
+				return { NULL, e0 };
 			}
 			auto e = store(ssa, lhs, rhs);
 			if (e) {
@@ -531,9 +641,13 @@ Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr) {
 			if (e1) {
 				return { NULL, e1 };
 			}
-			auto [loaded, e2] = load(ssa, lhs);
+			auto [loaded, e2] = load(ssa, lhs, binary_expr->lhs->expr_type);
 			if (e2) {
 				return { NULL, e2 };
+			}
+			auto [rhs, e0] = emit_expr(ssa, binary_expr->rhs);
+			if (e0) {
+				return { NULL, e0 };
 			}
 			auto [oped, e3] = emit_binary_op(ssa, binary_expr->pure_op->op, loaded, rhs);
 			if (e3) {
@@ -545,9 +659,14 @@ Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr) {
 			}
 			return { oped, NULL };
 		} else {
+			assert(binary_expr->op->flags & AST_OP_FLAG_LEFT_ASSOC);
 			auto [lhs, e] = emit_expr(ssa, binary_expr->lhs);
 			if (e) {
 				return { NULL, e };
+			}
+			auto [rhs, e0] = emit_expr(ssa, binary_expr->rhs);
+			if (e0) {
+				return { NULL, e0 };
 			}
 			auto [oped, e2] = emit_binary_op(ssa, binary_expr->op->op, lhs, rhs);
 			if (e2) {
@@ -560,7 +679,7 @@ Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr) {
 		if (e) {
 			return { NULL, e };
 		}
-		auto [loaded, e2] = load(ssa, lv);
+		auto [loaded, e2] = load(ssa, lv, var_access->var->var_type);
 		if (e2) {
 			return { NULL, e2 };
 		}
@@ -605,8 +724,10 @@ Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr) {
 		end_block_jump(else_block, ssa->current_block);
 
 		auto phi = make_ssa_val(ssa->current_block, SsaOp::Phi);
+		println(" Make ternary phi: $%*", phi->id.v);
 		add_arg(phi, then_expr);
 		add_arg(phi, else_expr);
+		phi->v_type = ternary->then->expr_type;
 		return { phi, NULL };
 	} else if (auto init = reflect_cast<AstStructInitializer>(expr)) {
 		auto slot = ssa_alloca(ssa, init->struct_type);
@@ -628,7 +749,7 @@ Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr) {
 			if (e) {
 				return { NULL, e };
 			}
-			auto [loaded, e2] = load(ssa, lv);
+			auto [loaded, e2] = load(ssa, lv, unary->expr->expr_type);
 			if (e2) {
 				return { NULL, e2 };
 			}
@@ -658,7 +779,7 @@ Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr) {
 	} else {
 		auto [lv, e] = lvalue(ssa, expr);
 		if (e == NULL) {
-			auto [loaded, e2] = load(ssa, lv);
+			auto [loaded, e2] = load(ssa, lv, expr->expr_type);
 			if (e2) {
 				return { NULL, e2 };
 			}
@@ -870,6 +991,9 @@ Error* emit_block(Ssa* ssa, AstBlock* block) {
 void print_ssa_value(SsaValue* inst) { 
 	print("$% = ", inst->id.v);
 	print("% ", inst->op);
+	if (inst->v_type) {
+		print(" {%*} ", inst->v_type->name);
+	}
 	for (auto arg: inst->args) {
 		print("$% ", arg->id.v);
 	}
@@ -939,6 +1063,7 @@ Tuple<Ssa, Error*> emit_function_ssa(Allocator allocator, AstFunction* f) {
 	for (auto arg: f->args) {
 		auto v = make_ssa_val(ssa.current_block, SsaOp::FunctionArg);
 		v->aux = make_any(arg);
+		v->v_type = arg->var_type;
 		write_var(ssa.current_block, arg, v);
 	}
 	auto e = emit_block(&ssa, f->block);
@@ -955,6 +1080,8 @@ Tuple<Ssa, Error*> emit_function_ssa(Allocator allocator, AstFunction* f) {
 
 struct SpirvEntryPoint {
 	AstFunction* f;
+	HashMap<AstFunctionArg*, u32> uniforms;
+	HashMap<AstStructMember*, u32> inputs;
 	Array<u32>   interf;
 	u32          function_id;
 };
@@ -1020,6 +1147,20 @@ void spv_op(SpirvEmitter* m, SpvOp op, std::initializer_list<SpvOpOperand> words
 		} else {
 			spv_word(m, word.op); 
 		}
+	}
+
+	if (false) {
+		println("%", op);
+		for (auto word: words) {
+			if (word.is_span) {
+				for (auto w: word.span) {
+					print(" % ", w);
+				}
+			} else {
+				print(" % ", word.op);
+			}
+		}
+		println();
 	}
 }
 
@@ -1102,6 +1243,28 @@ void spv_map_id(SpirvEmitter* emitter, SsaId id, u32 value) {
 	put(&emitter->id_map, id, value);
 }
 
+Tuple<u32, Error*> get_pointer_id(SpirvEmitter* m, SsaValue* v) {
+	if (v->op == SsaOp::Load) {
+		return get_pointer_id(m, v->args[0]);
+	} else if (v->op == SsaOp::Lvalue) {
+		return get_pointer_id(m, v->args[0]);
+	} else if (v->op == SsaOp::FunctionArg) {
+		auto arg = reflect_cast<AstFunctionArg>(v->aux);
+		if (!arg) {
+			return { 0, format_error("Expected function arg") };
+		}
+		for (auto entry: m->ep->uniforms) {
+			if (entry->key == arg) {
+				return { entry->value, NULL };
+			}
+		}
+		return { 0, format_error("Unknown function arg: %*", arg->name) };
+	} else {
+		return { 0, format_error("Unsupported op: %", v->op) };
+	}
+}
+
+#if 0
 Error* emit_spirv_block(SpirvEmitter* m, SsaBasicBlock* block) {
 	for (auto v: block->values) {
 		switch (v->op) {
@@ -1155,6 +1318,123 @@ Error* emit_spirv_block(SpirvEmitter* m, SsaBasicBlock* block) {
 			}
 			break;
 			case SsaOp::Load: {
+				auto [root, e1] = get_lvalue_root(v->block->ssa, v->args[0]);
+				if (e1) {
+					return e1;
+				}
+				if (root->op == SsaOp::Lvalue) {
+					continue;
+				}
+				auto found = get(&m->id_map, v->args[0]->id);
+				if (!found) {
+					return format_error("Unknown variable: %*", v->args[0]->id);
+				}
+				auto id = alloc_id(m);
+				assert(v->v_type);
+				auto [tp, e] = get_type_id(m, v->v_type);
+				if (e) {
+					return e;
+				}
+				spv_op(m, SpvOpLoad, { tp, id, *found });
+			}
+			break;
+			case SsaOp::Addr: {
+				auto id = alloc_id(m);
+				auto [ptr_id, e] = get_pointer_id(m, v->args[0]);
+				if (e) {
+					return e;
+				}
+				spv_op(m, SpvOpAccessChain, { id, ptr_id });
+				spv_map_id(m, v->id, id);
+			}
+			break;
+			case SsaOp::Lvalue: {
+				if (v->args[0]->op == SsaOp::FunctionArg) {
+					auto arg = reflect_cast<AstFunctionArg>(v->args[0]->aux);
+					if (!arg) {
+						return format_error("Expected function arg");
+					}
+					bool handled = false;
+					for (auto attr: arg->attrs) {
+						if (attr->name == "stage_in") {
+							handled = true;
+							break;
+						}
+					}
+					if (handled) {
+						continue;
+					}
+					for (auto entry: m->ep->uniforms) {
+						if (entry->key == arg) {
+							put(&m->id_map, v->id, entry->value);
+							handled = true;
+							break;
+						}
+					}
+					if (!handled) {
+						return format_error("Unknown function arg: %*", arg->name);
+					}
+				}
+			}
+			break;
+			case SsaOp::MemberAccess: {
+				auto member = reflect_cast<AstStructMember>(v->aux);
+				if (!member) {
+					return format_error("Expected struct member in aux");
+				}
+				bool handled = false;
+				for (auto attr: member->attrs) {
+					if (attr->name == "position") {
+						auto id = alloc_id(m);
+						auto [tp_id, e] = get_type_id(m, m->p->float4_tp);
+						if (e) {
+							return e;
+						}
+						spv_op(m, SpvOpVariable, { id, tp_id, SpvStorageClassInput });
+						auto ac_id = alloc_id(m);
+						spv_op(m, SpvOpAccessChain, { ac_id, id });
+						spv_map_id(m, v->id, ac_id);
+						handled = true;
+						break;
+					}
+				}
+				if (handled) {
+					break;
+				}
+				println("member: %*", member->name);
+				auto found_input = get(&m->ep->inputs, member);
+				println("found_input: %", found_input);
+				if (found_input) {
+					auto id = alloc_id(m);
+					spv_op(m, SpvOpAccessChain, { id, *found_input });
+					spv_map_id(m, v->id, id);
+					break;
+				}
+				auto [ptr_id, e] = get_pointer_id(m, v->args[0]);
+				if (e) {
+					return e;
+				}
+				auto id = alloc_id(m);
+				s64 idx = 0;
+				for (auto x: member->struct_type->members) {
+					if (x == member) {
+						break;
+					}
+					idx += 1;
+				}
+				spv_op(m, SpvOpAccessChain, { id, ptr_id, idx });
+				spv_map_id(m, v->id, id);
+			}
+			break;
+			case SsaOp::Div: {
+				auto lhs = get(&m->id_map, v->args[0]->id);
+				if (!lhs) {
+					return format_error("Expected lhs");
+				}
+				auto rhs = get(&m->id_map, v->args[1]->id);
+				if (!rhs) {
+					return format_error("Expected rhs");
+				}
 
 			}
 			break;
@@ -1165,6 +1445,7 @@ Error* emit_spirv_block(SpirvEmitter* m, SsaBasicBlock* block) {
 	}
 	return NULL;
 }
+#endif
 
 Tuple<s64, Error*> eval_const_int(AstExpr* expr) {
 	auto p = expr->p;
@@ -1239,6 +1520,7 @@ Error* emit_entry_point_arg(SpirvEmitter* m, AstFunction* f, AstFunctionArg* arg
 			if (e2) {
 				return e2;
 			}
+			put(&m->ep->uniforms, arg, var_id);
 			spv_op(m, SpvOpVariable, { tp_id, var_id, SpvStorageClassUniform });
 		} else if (attr->name == "stage_in") {
 			auto tp = reflect_cast<AstStructType>(arg->var_type);
@@ -1260,6 +1542,7 @@ Error* emit_entry_point_arg(SpirvEmitter* m, AstFunction* f, AstFunctionArg* arg
 					auto id = alloc_id(m);
 					spv_op(m, SpvOpVariable, { tp_id, id, SpvStorageClassInput });
 					add(&m->ep->interf, id);
+					put(&m->ep->inputs, member, id);
 					idx += 1;
 				}
 			} else {
@@ -1280,24 +1563,76 @@ Error* emit_entry_point_header(SpirvEmitter* m, AstFunction* f) {
 	return NULL;
 }
 
+void collect_phis(Array<SsaValue*>* phis, SsaValue* v) {
+	assert(v->op == SsaOp::Phi);
+	for (auto arg: v->args) {
+		if (arg->op == SsaOp::Phi) {
+			if (contains(*phis, arg)) {
+				continue;
+			}
+			add(phis, arg);
+			collect_phis(phis, arg);
+		}
+	}
+}
+
+#if 0
+void remove_redundant_phis(SsaValue* v) {
+	assert(v->op == SsaOp::Phi);
+	Array<SsaValue*> phis;
+	defer { phis.free(); };
+	collect_phis(&phis, v);
+
+	SsaValue* outer = NULL;
+	bool      have_more_outer = false;
+	for (auto phi: phis) {
+		for (auto arg: phi->args) {
+			if (!contains(phis, arg)) {
+				if (outer) {
+					have_more_outer = true;
+				}
+				outer = arg;
+				break;
+			}
+		}
+	}
+
+	if (outer && !have_more_outer) {
+		for (auto phi: phis) {
+			for (auto use: phi->uses) {
+				bool did_find_use = false;
+				for (auto i: range(len(use->args))) {
+					if (use->args[i] == phi) {
+						use->args[i] = outer;
+						did_find_use = true;
+						break;
+					}
+				}
+				assert(did_find_use);
+			}
+		}
+	}
+}
+#endif
+
 void perform_spirv_rewrites(SpirvEmitter* m, Ssa* ssa) {
 	for (auto block: ssa->blocks) {
 		for (auto v: block->values) {
-			if (v->op == SsaOp::Addr) {
-				auto load = v->args[0];
-				if (load->op == SsaOp::Load) {
-					auto arg = load->args[0];
-					if (arg->op == SsaOp::FunctionArg) {
-						
-					}
-				}
-			}
+			
 		}
 	}
 }
 
 Error* emit_spirv_function(SpirvEmitter* m, Ssa* ssa) {
-	perform_spirv_rewrites(m, ssa);
+	// perform_spirv_rewrites(m, ssa);
+
+	for (auto block: ssa->blocks) {
+		for (auto v: block->values) {
+			if (v->op == SsaOp::Phi) {
+				// remove_redundant_phis(v);
+			}
+		}
+	}
 
 	auto f = ssa->function;
 	u32 function_id = alloc_id(m);
@@ -1348,10 +1683,10 @@ Error* emit_spirv_function(SpirvEmitter* m, Ssa* ssa) {
 	spv_word(m, function_id);
 	spv_word(m, SpvFunctionControlMaskNone);
 	spv_word(m, function_type_id);
-	auto e = emit_spirv_block(m, ssa->entry);
-	if (e) {
-		return e;
-	}
+	// auto e = emit_spirv_block(m, ssa->entry);
+	// if (e) {
+	// 	return e;
+	// }
 	spv_opcode(m, SpvOpFunctionEnd, 0);
 	return NULL;
 }

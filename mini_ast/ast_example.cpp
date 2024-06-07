@@ -43,22 +43,21 @@ struct VertexOutput {
 }
 )TAG"_b;
 
-#elif 0
+#elif 1
 
 UnicodeString PROGRAM = UR"TAG(
-void main() {
-	int k = 43;
-	int a = 16;
-	if (k == 15) {
-		a = a + 1;
-	} else if (k == 16) {
-		a = a + 2;
-	} else if (k == 17) {
-		a = a + 3;
-	} else {
-		a = a + 4;
-	}
-	int b = a;
+struct VertexOutput {
+	float4 position [[position]];
+};
+
+[[fragment]] float4 main(
+	float* t [[mtl_constant(0)]] [[vk_uniform(0)]],
+	float2* r [[mtl_constant(1)]] [[vk_uniform(1)]],
+	float4* target_size [[mtl_constant(2)]] [[vk_uniform(0, 2)]],
+	VertexOutput in [[stage_in]]
+) {
+	float4 FC = in.position / *target_size;
+	return FC;
 }
 )TAG"_b;
 
