@@ -196,10 +196,9 @@ SsaValue* make_ssa_val(SsaBasicBlock* block, SsaOp op) {
 	v->block = block;
 	v->op = op;
 	v->id = alloc_id(block->ssa);
-	if (v->id.v == 222) {
-		int k = 43;
-	}
-	if (block->ending) {
+	if (op == SsaOp::Phi) {
+		add(&block->values, v, 0);
+	} else if (block->ending) {
 		add(&block->values, v, len(block->values) - 1);
 	} else {
 		add(&block->values, v);
@@ -225,7 +224,6 @@ void replace_by(SsaValue* v, SsaValue* by, Span<SsaValue*> uses) {
 		}
 	}
 	for (auto use: uses) {
-		println("Replacing use of $%* by $%* in $%*", v->id.v, by->id.v, use->id.v);
 		bool did_find = false;
 		for (auto i: range(len(use->args))) {
 			if (use->args[i] == v) {
@@ -236,9 +234,6 @@ void replace_by(SsaValue* v, SsaValue* by, Span<SsaValue*> uses) {
 			}
 		}
 		assert(did_find);
-	}
-	for (auto use: v->uses) {
-		println("Remaining use $%* in $%*", use->id.v, v->id.v);
 	}
 	clear(&v->uses);
 }
@@ -271,24 +266,17 @@ SsaValue* try_remove_trivial_phi(SsaValue* phi) {
 			continue;
 		}
 		if (same) {
-			println("Phi merges 2 values: $%*", phi->id.v);
 			return phi;
 		}
 		same = arg;
 	}
-	println("Need to remove trivial phi: $%*, %*", phi->id.v, reflect_cast<AstVar>(phi->aux)->name);
-	if (phi->id.v == 247) {
-		int k = 43;
-	}
 	assert(same);
 	Array<SsaValue*> uses;
-	println("  len(Uses): %", len(phi->uses));
 	for (auto use: phi->uses) {
 		if (use == phi) {
 			continue;
 		}
 		if (!contains(uses, use)) {
-			println("  Used by $%*", use->id.v);
 			add(&uses, use);
 		}
 	}
@@ -323,7 +311,6 @@ SsaValue* read_var_recursive(SsaBasicBlock* block, AstVar* var) {
 	SsaValue* v = NULL;
 	if (!block->is_sealed) {
 		auto phi = make_ssa_val(block, SsaOp::Phi);
-		println("Add incomplete phi for %* in %* id $%*", var->name, block->name, phi->id.v);
 		phi->aux = make_any(var);
 		phi->v_type = var->var_type;
 		add(&block->incomplete_phis, phi);
@@ -333,7 +320,6 @@ SsaValue* read_var_recursive(SsaBasicBlock* block, AstVar* var) {
 		v = read_var(block->pred[0], var);
 	} else {
 		auto phi = make_ssa_val(block, SsaOp::Phi);
-		println("Add phi for %* in %* id $%*", var->name, block->name, phi->id.v);
 		phi->aux = make_any(var);
 		phi->v_type = var->var_type;
 		write_var(block, var, phi);
@@ -410,7 +396,6 @@ void end_block_cond_jump(SsaBasicBlock* block, SsaValue* cond, SsaBasicBlock* t_
 
 SsaValue* read_var(SsaBasicBlock* block, AstVar* var) {
 	if (can_ssa(var)) {
-		println("Reading var: % in %", var->name, block->name);
 		auto found = get(&block->ssa_vars, var);
 		if (found) {
 			assert(!(*found)->is_removed);
@@ -563,6 +548,7 @@ Error* store(Ssa* ssa, SsaValue* lhs, SsaValue* rhs) {
 SsaValue* ssa_alloca(Ssa* ssa, AstType* type) {
 	auto v = make_ssa_val(ssa->current_block, SsaOp::Alloca);
 	v->aux = make_any(type);
+	v->v_type = type;
 	return v;
 }
 
@@ -613,6 +599,7 @@ Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr) {
 	if (auto call = reflect_cast<AstFunctionCall>(expr)) {
 		auto v = make_ssa_val(ssa->current_block, SsaOp::Call);
 		v->aux = make_any(call->f);
+		v->v_type = call->expr_type;
 		for (auto arg: call->args) {
 			auto [arg_v, e] = emit_expr(ssa, arg);
 			if (e) {
@@ -724,7 +711,6 @@ Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr) {
 		end_block_jump(else_block, ssa->current_block);
 
 		auto phi = make_ssa_val(ssa->current_block, SsaOp::Phi);
-		println(" Make ternary phi: $%*", phi->id.v);
 		add_arg(phi, then_expr);
 		add_arg(phi, else_expr);
 		phi->v_type = ternary->then->expr_type;
@@ -1575,45 +1561,6 @@ void collect_phis(Array<SsaValue*>* phis, SsaValue* v) {
 		}
 	}
 }
-
-#if 0
-void remove_redundant_phis(SsaValue* v) {
-	assert(v->op == SsaOp::Phi);
-	Array<SsaValue*> phis;
-	defer { phis.free(); };
-	collect_phis(&phis, v);
-
-	SsaValue* outer = NULL;
-	bool      have_more_outer = false;
-	for (auto phi: phis) {
-		for (auto arg: phi->args) {
-			if (!contains(phis, arg)) {
-				if (outer) {
-					have_more_outer = true;
-				}
-				outer = arg;
-				break;
-			}
-		}
-	}
-
-	if (outer && !have_more_outer) {
-		for (auto phi: phis) {
-			for (auto use: phi->uses) {
-				bool did_find_use = false;
-				for (auto i: range(len(use->args))) {
-					if (use->args[i] == phi) {
-						use->args[i] = outer;
-						did_find_use = true;
-						break;
-					}
-				}
-				assert(did_find_use);
-			}
-		}
-	}
-}
-#endif
 
 void perform_spirv_rewrites(SpirvEmitter* m, Ssa* ssa) {
 	for (auto block: ssa->blocks) {
