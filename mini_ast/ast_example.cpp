@@ -91,19 +91,20 @@ int main() {
 				print_error(e);
 				return -1;
 			}
-			print_ssa(ssa.entry);
 
 			auto [file, e1] = open_file(U"xxx.spv"_b, FILE_WRITE | FILE_CREATE_NEW);
 			if (e1) {
 				print_error(e1);
 				return -1;
 			}
-			auto m = make_spirv_emitter(f->p, c_allocator);
-			e = emit_spirv_function(&m, &ssa);
+			auto m = make_spirv_emitter(f->p, c_allocator);			
+			e = emit_spirv_function(&m, ssa);
 			if (e) {
 				print_error(e);
 				return -1;
 			}
+			print_ssa(ssa->entry);
+
 			e = finalize_spirv(&m);
 			if (e) {
 				print_error(e);

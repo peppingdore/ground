@@ -57,6 +57,7 @@ enum class SsaOp {
 	ZeroInit,
 	Addr,
 	FunctionArg,
+	SpvUniform,
 };
 REFLECT(SsaOp) {
 	ENUM_VALUE(Nop);
@@ -87,6 +88,7 @@ REFLECT(SsaOp) {
 	ENUM_VALUE(ZeroInit);
 	ENUM_VALUE(Addr);
 	ENUM_VALUE(FunctionArg);
+	ENUM_VALUE(SpvUniform);
 }
 
 struct SsaBasicBlock;
@@ -137,6 +139,7 @@ struct Ssa {
 	HashMap<AstVar*, SsaValue*> non_ssa_vars;
 	AstFunction*                function = NULL;
 	Array<SsaBasicBlock*>       blocks;
+	bool                        is_rewriting = false;
 
 	void free() {
 		free_allocator(allocator);
@@ -191,11 +194,19 @@ void write_var(SsaBasicBlock* block, AstVar* var, SsaValue* v) {
 
 SsaValue* read_var(SsaBasicBlock* block, AstVar* var);
 
-SsaValue* make_ssa_val(SsaBasicBlock* block, SsaOp op) {
+SsaValue* init_ssa_val(SsaBasicBlock* block, SsaOp op) {
 	auto v = make<SsaValue>(block->ssa->allocator);
 	v->block = block;
 	v->op = op;
 	v->id = alloc_id(block->ssa);
+	v->args.allocator = block->ssa->allocator;
+	v->uses.allocator = block->ssa->allocator;
+	return v;
+}
+
+SsaValue* make_ssa_val(SsaBasicBlock* block, SsaOp op) {
+	assert(!block->ssa->is_rewriting);
+	auto v = init_ssa_val(block, op);
 	if (op == SsaOp::Phi) {
 		add(&block->values, v, 0);
 	} else if (block->ending) {
@@ -203,8 +214,6 @@ SsaValue* make_ssa_val(SsaBasicBlock* block, SsaOp op) {
 	} else {
 		add(&block->values, v);
 	}
-	v->args.allocator = block->ssa->allocator;
-	v->uses.allocator = block->ssa->allocator;
 	return v;
 }
 
@@ -217,45 +226,96 @@ void add_arg(SsaValue* v, SsaValue* arg) {
 	add(&v->args, arg);
 }
 
-void replace_by(SsaValue* v, SsaValue* by, Span<SsaValue*> uses) {
+
+struct SsaRewriteAddValue {
+	SsaValue* v = NULL;
+	SsaValue* before = NULL;
+};
+
+struct SsaRewriter {
+	Ssa*                      ssa = NULL;
+	Array<SsaRewriteAddValue> add_values;
+	Array<SsaValue*>          to_remove;
+};
+
+SsaRewriter start_rewrite(Ssa* ssa) {
+	assert(!ssa->is_rewriting);
+	SsaRewriter r;
+	r.ssa = ssa;
+	ssa->is_rewriting = true;
+	return r;
+}
+
+void finish_rewrite(SsaRewriter* r) {
+	for (auto it: r->add_values) {
+		for (auto i: range(len(it.v->block->values))) {
+			if (it.v->block->values[i] == it.before) {
+				println("add: %* op % idx: %", it.v->id.v, it.v->op, i);
+				println("block name: %*", it.v->block->name);
+				println("before: %* op %", it.before->id.v, it.before->op);
+				add(&it.v->block->values, it.v, i);
+				break;
+			}
+		}
+	}
+	for (auto v: r->to_remove) {
+		assert(len(v->uses) == 0);
+		println("remove: %* op %", v->id.v, v->op);
+		for (auto arg: v->args) {
+			for (s64 i = 0; i < len(arg->uses); i++) {
+				if (arg->uses[i] == v) {
+					remove_at_index(&arg->uses, i);
+					i -= 1;
+				}
+			}
+		}
+		for (auto i: range(len(v->block->values))) {
+			if (v->block->values[i] == v) {
+				remove_at_index(&v->block->values, i);
+				break;
+			}
+		}
+	}
+	r->ssa->is_rewriting = false;
+}
+
+SsaValue* make_rewrite_ssa_val_before(SsaRewriter* r, SsaBasicBlock* block, SsaOp op, SsaValue* before) {
+	auto v = init_ssa_val(block, op);
+	SsaRewriteAddValue x;
+	x.v = v;
+	x.before = before;
+	add(&r->add_values, x);
+	return v;
+}
+
+void replace_by(SsaRewriter* r, SsaValue* v, SsaValue* by) {
 	for (auto entry: v->block->ssa_vars) {
 		if (entry->value == v) {
 			entry->value = by;
 		}
 	}
-	for (auto use: uses) {
+	for (auto use: v->uses) {
+		if (use == v) {
+			continue;
+		}
 		bool did_find = false;
 		for (auto i: range(len(use->args))) {
 			if (use->args[i] == v) {
 				use->args[i] = by;
 				add(&by->uses, use);
 				did_find = true;
-				break;
+				// arg may be used more than one time in the same value,
+				//  so we don't break here.
 			}
 		}
-		assert(did_find);
+		// assert(did_find);
 	}
 	clear(&v->uses);
 }
 
-void remove_value(SsaValue* v) {
+void remove_value(SsaRewriter* r, SsaValue* v) {
 	v->is_removed = true;
-	assert(len(v->uses) == 0);
-	for (auto arg: v->args) {
-		for (s64 i = 0; i < len(arg->uses); i++) {
-			if (arg->uses[i] == v) {
-				remove_at_index(&arg->uses, i);
-				i -= 1;
-				break;
-			}
-		}
-	}
-	for (auto i: range(len(v->block->values))) {
-		if (v->block->values[i] == v) {
-			remove_at_index(&v->block->values, i);
-			break;
-		}
-	}
+	add(&r->to_remove, v);
 }
 
 SsaValue* try_remove_trivial_phi(SsaValue* phi) {
@@ -271,24 +331,33 @@ SsaValue* try_remove_trivial_phi(SsaValue* phi) {
 		same = arg;
 	}
 	assert(same);
-	Array<SsaValue*> uses;
+	// Array<SsaValue*> uses;
+	// for (auto use: phi->uses) {
+	// 	if (use == phi) {
+	// 		continue;
+	// 	}
+	// 	if (!contains(uses, use)) {
+	// 		add(&uses, use);
+	// 	}
+	// }
+	
+	auto rw = start_rewrite(phi->block->ssa);
+	replace_by(&rw, phi, same);
+	finish_rewrite(&rw);
+
 	for (auto use: phi->uses) {
 		if (use == phi) {
 			continue;
 		}
-		if (!contains(uses, use)) {
-			add(&uses, use);
-		}
-	}
-	
-	replace_by(phi, same, uses);
-	remove_value(phi);
-
-	for (auto use: uses) {
 		if (use->op == SsaOp::Phi) {
 			try_remove_trivial_phi(use);
 		}
 	}
+
+	rw = start_rewrite(phi->block->ssa);
+	remove_value(&rw, phi);
+	finish_rewrite(&rw);
+
 	return same;
 }
 
@@ -532,6 +601,7 @@ Error* store(Ssa* ssa, SsaValue* lhs, SsaValue* rhs) {
 		return e;
 	}
 	if (root->op == SsaOp::Lvalue) {
+		// @TODO: this is wrong!.
 		auto var = reflect_cast<AstVar>(root->aux);
 		if (!var) {
 			return format_error("Expected var");
@@ -981,7 +1051,7 @@ void print_ssa_value(SsaValue* inst) {
 		print(" {%*} ", inst->v_type->name);
 	}
 	for (auto arg: inst->args) {
-		print("$% ", arg->id.v);
+		print("$%\\(%) ", arg->id.v, arg->op);
 	}
 	if (inst->aux.ptr) {
 		print(" %* ", inst->aux.type->name);
@@ -999,7 +1069,7 @@ void print_ssa_value(SsaValue* inst) {
 	}
 	print("     used by ");
 	for (auto use: inst->uses) {
-		print("$% ", use->id.v);
+		print("$%\\(%) ", use->id.v, use->op);
 	}
 }
 
@@ -1034,30 +1104,31 @@ void print_ssa(SsaBasicBlock* entry) {
 	printed_blocks.free();
 }
 
-Tuple<Ssa, Error*> emit_function_ssa(Allocator allocator, AstFunction* f) {
-	Ssa ssa;
-	ssa.function = f;
-	ssa.allocator = make_arena_allocator(allocator, 1024 * 1024);
+Tuple<Ssa*, Error*> emit_function_ssa(Allocator allocator, AstFunction* f) {
+	auto arena = make_arena_allocator(allocator, 1024 * 1024);
+	Ssa* ssa = make<Ssa>(arena);
+	ssa->function = f;
+	ssa->allocator = arena;
 	if (!f->block) {
 		return { {}, format_error("Function % has no body", f->name) };
 	}
-	auto entry_block = make_ssa_basic_block(&ssa);
-	ssa.entry = entry_block;
-	ssa.current_block = entry_block;
-	ssa.non_ssa_vars.allocator = ssa.allocator;
+	auto entry_block = make_ssa_basic_block(ssa);
+	ssa->entry = entry_block;
+	ssa->current_block = entry_block;
+	ssa->non_ssa_vars.allocator = ssa->allocator;
 	seal_block(entry_block);
 	for (auto arg: f->args) {
-		auto v = make_ssa_val(ssa.current_block, SsaOp::FunctionArg);
+		auto v = make_ssa_val(ssa->current_block, SsaOp::FunctionArg);
 		v->aux = make_any(arg);
 		v->v_type = arg->var_type;
-		write_var(ssa.current_block, arg, v);
+		write_var(ssa->current_block, arg, v);
 	}
-	auto e = emit_block(&ssa, f->block);
+	auto e = emit_block(ssa, f->block);
 	if (e) {
 		return { {}, e };
 	}
-	if (ssa.current_block->ending == NULL) {
-		end_block_ret_void(ssa.current_block);
+	if (ssa->current_block->ending == NULL) {
+		end_block_ret_void(ssa->current_block);
 	}
 	return { ssa, NULL };
 }
@@ -1562,25 +1633,40 @@ void collect_phis(Array<SsaValue*>* phis, SsaValue* v) {
 	}
 }
 
-void perform_spirv_rewrites(SpirvEmitter* m, Ssa* ssa) {
+Error* perform_spirv_rewrites(SpirvEmitter* m, Ssa* ssa) {
+	auto rw = start_rewrite(ssa);
+
 	for (auto block: ssa->blocks) {
-		for (auto v: block->values) {
-			
+		while (true) {
+			for (auto v: block->values) {
+				if (v->op == SsaOp::FunctionArg) {
+					auto arg = reflect_cast<AstFunctionArg>(v->aux);
+					assert(arg);
+
+					auto new_v = make_rewrite_ssa_val_before(&rw, block, SsaOp::SpvUniform, v);
+
+					for (auto use: v->uses) {
+						println("use: %* op %", use->id.v, use->op);
+						if (use->op == SsaOp::Lvalue) {
+							replace_by(&rw, use, new_v);
+							remove_value(&rw, use);
+						} else {
+							assert(arg);
+							return simple_parser_error(v->block->ssa->function->p, current_loc(), arg->text_region, "FunctionArg is expected to be used only by Lvalue");
+						}
+					}
+					remove_value(&rw, v);
+				}
+			}
+			break;
+			next: int kl = 43;
 		}
 	}
+	finish_rewrite(&rw);
+	return NULL;
 }
 
 Error* emit_spirv_function(SpirvEmitter* m, Ssa* ssa) {
-	// perform_spirv_rewrites(m, ssa);
-
-	for (auto block: ssa->blocks) {
-		for (auto v: block->values) {
-			if (v->op == SsaOp::Phi) {
-				// remove_redundant_phis(v);
-			}
-		}
-	}
-
 	auto f = ssa->function;
 	u32 function_id = alloc_id(m);
 	u32 function_type_id = alloc_id(m);
@@ -1593,6 +1679,12 @@ Error* emit_spirv_function(SpirvEmitter* m, Ssa* ssa) {
 		m->ep->interf.allocator = m->allocator;
 		add(&m->entry_points, m->ep);
 	}
+
+	auto e = perform_spirv_rewrites(m, ssa);
+	if (e) {
+		return e;
+	}
+
 
 	if (f->kind == AstFunctionKind::Plain) {
 		auto [ret_type_id, e] = get_type_id(m, f->return_type);
