@@ -36,7 +36,6 @@ struct SsaValue {
 	SsaId            id;
 	SsaOp            op = SsaOp::Nop;
 	SsaBasicBlock*   block = NULL;
-	AstType*         type = NULL;
 	Array<SsaValue*> args;
 	Array<SsaValue*> uses;
 	Any              aux;
@@ -434,8 +433,7 @@ Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr);
 
 enum SsaLVKind {
 	SsaLVKindSsa,
-	SsaLVKindLocalPtr,
-	SsaLVKindGlobalPtr,
+	SsaLVKindPtr,
 };
 
 struct SsaLV {
@@ -445,95 +443,101 @@ struct SsaLV {
 	SsaValue*        value = NULL;
 };
 
-Tuple<SsaLV, Error*> fill_lvalue(Ssa* ssa, AstExpr* expr) {
+Tuple<SsaLV, SsaLVKind, Error*> fill_lvalue(Ssa* ssa, AstExpr* expr) {
 	if (!expr->is_lvalue) {
-		return { {}, format_error("Expected lvalue, got %*", expr->type->name) };
+		return { {}, {}, format_error("Expected lvalue, got %*", expr->type->name) };
 	}
 
 	if (auto var_access = reflect_cast<AstVarMemberAccess>(expr)) {
-		auto [v, e] = fill_lvalue(ssa, var_access->lhs);
+		auto [v, kind, e] = fill_lvalue(ssa, var_access->lhs);
 		if (e) {
-			return { {}, e };
+			return { {}, {}, e };
+		}
+		if (reflect_cast<AstPointerType>(var_access->lhs->expr_type)) {
+			kind = SsaLVKindPtr;
 		}
 		auto access = make_ssa_val(ssa->current_block, SsaOp::MemberAccess);
 		access->aux = make_any(var_access->member);
 		access->v_type = var_access->member->member_type;
 		add(&v.args, access);
-		return { v, NULL };
+		return { v, kind, NULL };
 	} else if (auto var_access = reflect_cast<AstVariableAccess>(expr)) {
 		if (var_access->var->is_global) {
 			SsaLV lv;
 			lv.var = var_access->var;
-			lv.kind = SsaLVKindGlobalPtr;
 			lv.value = make_ssa_val(ssa->current_block, SsaOp::GlobalVar);
 			lv.value->aux = make_any(var_access->var);
 			lv.args.allocator = ssa->allocator;
-			return { lv, NULL };
+			return { lv, SsaLVKindPtr, NULL };
 		} else {
 			if (can_ssa(var_access->var)) {
 				SsaValue* var = read_var(ssa->current_block, var_access->var);
 				if (!var) {
-					return { {}, format_error("Unknown variable: %*", var_access->var->type->name) };
+					return { {}, {}, format_error("Unknown variable: %*", var_access->var->type->name) };
 				}
 				SsaLV lv;
-				lv.kind = SsaLVKindSsa;
 				lv.var = var_access->var;
 				lv.value = var;
 				lv.args.allocator = ssa->allocator;
-				if (reflect_cast<AstPointerType>(var_access->var->var_type)) {
-					lv.kind = SsaLVKindLocalPtr;
-				}
-				return { lv, NULL };
+				return { lv, SsaLVKindSsa, NULL };
 			} else {
 				SsaValue* var = read_var(ssa->current_block, var_access->var);
 				if (!var) {
-					return { {}, format_error("Unknown variable: %*", var_access->var->type->name) };
+					return { {}, {}, format_error("Unknown variable: %*", var_access->var->type->name) };
 				}
 				SsaLV lv;
-				lv.kind = SsaLVKindLocalPtr;
 				lv.var = var_access->var;
 				lv.value = var;
 				lv.args.allocator = ssa->allocator;
-				return { lv, NULL };
+				return { lv, SsaLVKindPtr, NULL };
 			}
 		}
 	} else if (auto sw = reflect_cast<AstSwizzleExpr>(expr)) {
-		auto [v, e] = fill_lvalue(ssa, sw->lhs);
+		auto [v, kind, e] = fill_lvalue(ssa, sw->lhs);
 		if (e) {
-			return { {}, e };
+			return { {}, {}, e };
 		}
 		auto swz = make_ssa_val(ssa->current_block, SsaOp::Swizzle);
 		swz->aux = make_any(sw);
 		swz->v_type = sw->expr_type;
 		add(&v.args, swz);
-		return { v, NULL };
+		return { v, kind, NULL };
 	} else if (auto deref = reflect_cast<AstDerefExpr>(expr)) {
 		auto [addr, e] = emit_expr(ssa, deref->lhs);
 		if (e) {
-			return { {}, e };
+			return { {}, {}, e };
 		}
 		SsaLV lv;
-		lv.kind = SsaLVKindLocalPtr;
 		lv.args.allocator = ssa->allocator;
 		lv.value = addr;
-		return { lv, NULL };
+		return { lv, SsaLVKindPtr, NULL };
 	} else {
-		return { {}, format_error("Unsupported lvalue: %*", expr->type->name) };
+		return { {}, {}, format_error("Unsupported lvalue: %*", expr->type->name) };
 	}
 }
 
 Tuple<SsaLV, Error*> lvalue(Ssa* ssa, AstExpr* expr) {
-	auto [lv, e] = fill_lvalue(ssa, expr);
+	auto [lv, kind, e] = fill_lvalue(ssa, expr);
 	if (e) {
 		return { {}, e };
 	}
+	lv.kind = kind;
 	if (lv.kind != SsaLVKindSsa) {
 		// @TODO: this can happen in the fill_lvalue() itself.
 		if (len(lv.args) == 0) {
 			return { lv, NULL };
 		}
+		SsaValue* zero_idx = NULL;
+		if (lv.args[0]->op != SsaOp::Index) {
+			zero_idx = make_ssa_val(ssa->current_block, SsaOp::Index);
+			auto v = make<s64>(ssa->allocator);
+			zero_idx->aux = make_any(v);
+		}
 		auto v = make_ssa_val(ssa->current_block, SsaOp::GetElementPtr);
 		add_arg(v, lv.value);
+		if (zero_idx) {
+			add_arg(v, zero_idx);
+		}
 		for (auto arg: lv.args) {
 			add_arg(v, arg);
 		}
@@ -764,15 +768,13 @@ Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr) {
 			auto member = make_ssa_val(ssa->current_block, SsaOp::MemberAccess);
 			member->aux = make_any(m.member);
 			member->v_type = m.member->member_type;
-			auto lv = SsaLV { .kind = SsaLVKindLocalPtr, .value = slot };
+			auto lv = SsaLV { .kind = SsaLVKindPtr, .value = slot };
 			lv.value = make_ssa_val(ssa->current_block, SsaOp::GetElementPtr);
 			add_arg(lv.value, slot);
 			add_arg(lv.value, member);
 			store(ssa, lv, expr);
 		}
-		auto lv = SsaLV { .kind = SsaLVKindLocalPtr, .value = slot };
-		lv.value = make_ssa_val(ssa->current_block, SsaOp::GetElementPtr);
-		add_arg(lv.value, slot);
+		auto lv = SsaLV { .kind = SsaLVKindPtr, .value = slot };
 		auto [ld, e] = load(ssa, lv, init->struct_type);
 		if (e) {
 			return { NULL, e };
@@ -839,9 +841,7 @@ Error* decl_var(Ssa* ssa, AstVarDecl* var_decl, SsaValue* init) {
 		auto slot = ssa_alloca(ssa, var_decl->var_type);
 		write_var(ssa->current_block, var_decl, slot);
 		if (init) {
-			auto addr = make_ssa_val(ssa->current_block, SsaOp::GetElementPtr);
-			add_arg(addr, slot);
-			auto lv = SsaLV { .kind = SsaLVKindLocalPtr, .value = addr };
+			auto lv = SsaLV { .kind = SsaLVKindPtr, .value = slot };
 			auto e = store(ssa, lv, init);
 			if (e) {
 				return e;
@@ -1594,7 +1594,7 @@ void replace_arg(SsaValue* v, s64 arg, SsaValue* by) {
 	add(&by->uses, v);
 }
 
-#if 0
+#if 1
 Error* rewrite_spirv_function_arg(SpirvEmitter* m, Ssa* ssa, SsaRewriter* rw, SsaValue* v) {
 	auto arg = reflect_cast<AstFunctionArg>(v->aux);
 	assert(arg);
@@ -1637,16 +1637,6 @@ Error* rewrite_spirv_function_arg(SpirvEmitter* m, Ssa* ssa, SsaRewriter* rw, Ss
 			new_v->v_type = v->v_type;
 			new_v->aux = make_any(cp);
 
-			for (auto use: v->uses) {
-				if (use->op == SsaOp::NonSsaVarAccess) {
-					if (len(use->args) == 1) {
-						replace_by(rw, use, new_v);
-						remove_value(rw, use);
-					}
-				} else {
-					return simple_parser_error(v->block->ssa->function->p, current_loc(), arg->text_region, "FunctionArg is expected to be used only by NonSsaVarAccess, but got %*", use->op);
-				}
-			}
 			replace_by(rw, v, new_v);
 			remove_value(rw, v);
 			return NULL;
@@ -1657,17 +1647,12 @@ Error* rewrite_spirv_function_arg(SpirvEmitter* m, Ssa* ssa, SsaRewriter* rw, Ss
 			}
 			bool need_as_value = false;
 			for (auto use: v->uses) {
-				if (use->op == SsaOp::NonSsaVarAccess) {
-					if (len(use->args) == 1) {
-						need_as_value = true;
-					}
-				} else {
-					return simple_parser_error(v->block->ssa->function->p, current_loc(), arg->text_region, "FunctionArg is expected to be used only by NonSsaVarAccess, but got %*", use->op);
+				if (use->op != SsaOp::ExtractValue) {
+					need_as_value = true;
 				}
 			}
 
 			Array<SsaValue*> member_values;
-
 			for (auto member: tp->members) {
 				for (auto attr: member->attrs) {
 					if (attr->name == "position") {
@@ -1689,12 +1674,47 @@ Error* rewrite_spirv_function_arg(SpirvEmitter* m, Ssa* ssa, SsaRewriter* rw, Ss
 			}
 
 			for (auto use: v->uses) {
-				if (use->op == SsaOp::NonSsaVarAccess) {
-					if (len(use->args) == 1) {
-						
+				if (use->op == SsaOp::ExtractValue) {
+					auto arg = use->args[1];
+					if (arg->op != SsaOp::MemberAccess) {
+						panic("Expected member access");
+					}
+					auto member = reflect_cast<AstStructMember>(arg->aux);
+					if (!member) {
+						panic("Expected struct member");
+					}
+					SsaValue* member_value = NULL;
+					s64 idx = 0;
+					for (auto it: tp->members) {
+						if (it == member) {
+							member_value = member_values[idx];
+							break;
+						}
+						idx += 1;
+					}
+					assert(member_value);
+					if (len(use->args) == 2) {
+						s64 idx = 0;
+						replace_by(rw, use, member_value);
+						remove_value(rw, use);
+					} else if (len(use->args) > 2) {
+						auto new_v = make_rewrite_ssa_val_before(rw, v->block, SsaOp::ExtractValue, use);
+						add_arg(new_v, member_value);
+						for (auto it: use->args[2, {}]) {
+							add_arg(new_v, it);
+						}
+						replace_by(rw, use, new_v);
+						remove_value(rw, use);
+					} else {
+						panic("Unsupported number of args");
 					}
 				}
 			}
+			if (as_value) {
+				replace_by(rw, v, as_value);
+			}
+			remove_value(rw, v);
+			return NULL;
 		}
 	}
 	return NULL;
@@ -1703,13 +1723,11 @@ Error* rewrite_spirv_function_arg(SpirvEmitter* m, Ssa* ssa, SsaRewriter* rw, Ss
 Error* perform_spirv_rewrites(SpirvEmitter* m, Ssa* ssa) {
 	auto rw = start_rewrite(ssa);
 	for (auto block: ssa->blocks) {
-		while (true) {
-			for (auto v: block->values) {
-				if (v->op == SsaOp::FunctionArg) {
-					auto e = rewrite_spirv_function_arg(m, ssa, &rw, v);
-					if (e) {
-						return e;
-					}
+		for (auto v: block->values) {
+			if (v->op == SsaOp::FunctionArg) {
+				auto e = rewrite_spirv_function_arg(m, ssa, &rw, v);
+				if (e) {
+					return e;
 				}
 			}
 		}
@@ -1733,10 +1751,10 @@ Error* emit_spirv_function(SpirvEmitter* m, Ssa* ssa) {
 		add(&m->entry_points, m->ep);
 	}
 
-	// auto e = perform_spirv_rewrites(m, ssa);
-	// if (e) {
-	// 	return e;
-	// }
+	auto e = perform_spirv_rewrites(m, ssa);
+	if (e) {
+		return e;
+	}
 
 
 	if (f->kind == AstFunctionKind::Plain) {

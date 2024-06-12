@@ -31,6 +31,7 @@ struct VertexOutput {
 	float4* target_size [[mtl_constant(2)]] [[vk_uniform(0, 2)]],
 	VertexOutput in [[stage_in]]
 ) {
+	VertexOutput xx = in;
 	float4 FC = in.position / *target_size;
 	float i,e,R,s,z;
 	float3 m,q,p,d=FC.rgb/r.y-.5;
@@ -56,8 +57,7 @@ struct VertexOutput {
 	float4* target_size [[mtl_constant(2)]] [[vk_uniform(0, 2)]],
 	VertexOutput in [[stage_in]]
 ) {
-	float4 FC = in.position / *target_size;
-	return FC;
+	float i = r.y;
 }
 )TAG"_b;
 

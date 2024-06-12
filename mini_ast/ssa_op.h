@@ -16,6 +16,7 @@ enum class SsaOp {
 	Const,
 	Call,
 	MemberAccess,
+	Index,
 	Swizzle,
 	Store,
 	Load,
@@ -52,6 +53,7 @@ REFLECT(SsaOp) {
 	ENUM_VALUE(Const);
 	ENUM_VALUE(Call);
 	ENUM_VALUE(MemberAccess);
+	ENUM_VALUE(Index);
 	ENUM_VALUE(Swizzle);
 	ENUM_VALUE(Store);
 	ENUM_VALUE(Load);
