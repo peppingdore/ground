@@ -454,6 +454,11 @@ Tuple<SsaLV, SsaLVKind, Error*> fill_lvalue(Ssa* ssa, AstExpr* expr) {
 			return { {}, {}, e };
 		}
 		if (reflect_cast<AstPointerType>(var_access->lhs->expr_type)) {
+			auto idx = make_ssa_val(ssa->current_block, SsaOp::Const);
+			auto zero = make<s64>(ssa->allocator);
+			idx->aux = make_any(zero);
+			idx->v_type = ssa->function->p->s64_tp;
+			add(&v.args, idx);
 			kind = SsaLVKindPtr;
 		}
 		auto access = make_ssa_val(ssa->current_block, SsaOp::MemberAccess);
@@ -511,6 +516,20 @@ Tuple<SsaLV, SsaLVKind, Error*> fill_lvalue(Ssa* ssa, AstExpr* expr) {
 		lv.args.allocator = ssa->allocator;
 		lv.value = addr;
 		return { lv, SsaLVKindPtr, NULL };
+	} else if (auto array_access = reflect_cast<AstArrayAccess>(expr)) {
+		auto [v, kind, e] = fill_lvalue(ssa, array_access->lhs);
+		if (e) {
+			return { {}, {}, e };
+		}
+		if (reflect_cast<AstPointerType>(array_access->lhs->expr_type)) {
+			kind = SsaLVKindPtr;
+		}
+		auto [idx, e2] = emit_expr(ssa, array_access->index);
+		if (e2) {
+			return { {}, {}, e2 };
+		}
+		add(&v.args, idx);
+		return { v, kind, NULL };
 	} else {
 		return { {}, {}, format_error("Unsupported lvalue: %*", expr->type->name) };
 	}
@@ -527,17 +546,8 @@ Tuple<SsaLV, Error*> lvalue(Ssa* ssa, AstExpr* expr) {
 		if (len(lv.args) == 0) {
 			return { lv, NULL };
 		}
-		SsaValue* zero_idx = NULL;
-		if (lv.args[0]->op != SsaOp::Index) {
-			zero_idx = make_ssa_val(ssa->current_block, SsaOp::Index);
-			auto v = make<s64>(ssa->allocator);
-			zero_idx->aux = make_any(v);
-		}
 		auto v = make_ssa_val(ssa->current_block, SsaOp::GetElementPtr);
 		add_arg(v, lv.value);
-		if (zero_idx) {
-			add_arg(v, zero_idx);
-		}
 		for (auto arg: lv.args) {
 			add_arg(v, arg);
 		}
@@ -1751,43 +1761,43 @@ Error* emit_spirv_function(SpirvEmitter* m, Ssa* ssa) {
 		add(&m->entry_points, m->ep);
 	}
 
-	auto e = perform_spirv_rewrites(m, ssa);
-	if (e) {
-		return e;
-	}
+	// auto e = perform_spirv_rewrites(m, ssa);
+	// if (e) {
+	// 	return e;
+	// }
 
 
-	if (f->kind == AstFunctionKind::Plain) {
-		auto [ret_type_id, e] = get_type_id(m, f->return_type);
-		if (e) {
-			return e;
-		}
-		return_type_id = ret_type_id;
-		spv_opcode(m, SpvOpTypeFunction, 1 + 1 + len(f->args));
-		spv_word(m, function_type_id);
-		spv_word(m, ret_type_id);
+	// if (f->kind == AstFunctionKind::Plain) {
+	// 	auto [ret_type_id, e] = get_type_id(m, f->return_type);
+	// 	if (e) {
+	// 		return e;
+	// 	}
+	// 	return_type_id = ret_type_id;
+	// 	spv_opcode(m, SpvOpTypeFunction, 1 + 1 + len(f->args));
+	// 	spv_word(m, function_type_id);
+	// 	spv_word(m, ret_type_id);
 
-		// Regular function args.
-		for (auto arg: f->args) {
-			auto [id, e] = decl_pointer_type(m, arg->var_type, SpvStorageClassFunction);
-			if (e) {
-				return e;
-			}
-			spv_word(m, id);
-		}
-	} else {
-		auto [ret_tp_id, e] = get_type_id(m, f->p->void_tp);
-		if (e) {
-			return e;
-		}
-		return_type_id = ret_tp_id;
-		spv_op(m, SpvOpTypeFunction, { function_type_id, ret_tp_id });
-		e = emit_entry_point_header(m, f);
-		if (e) {
-			return e;
-		}
-	}
-	assert(return_type_id != 0);
+	// 	// Regular function args.
+	// 	for (auto arg: f->args) {
+	// 		auto [id, e] = decl_pointer_type(m, arg->var_type, SpvStorageClassFunction);
+	// 		if (e) {
+	// 			return e;
+	// 		}
+	// 		spv_word(m, id);
+	// 	}
+	// } else {
+	// 	auto [ret_tp_id, e] = get_type_id(m, f->p->void_tp);
+	// 	if (e) {
+	// 		return e;
+	// 	}
+	// 	return_type_id = ret_tp_id;
+	// 	spv_op(m, SpvOpTypeFunction, { function_type_id, ret_tp_id });
+	// 	e = emit_entry_point_header(m, f);
+	// 	if (e) {
+	// 		return e;
+	// 	}
+	// }
+	// assert(return_type_id != 0);
 	spv_opcode(m, SpvOpFunction, 4);
 	spv_word(m, return_type_id);
 	spv_word(m, function_id);

@@ -17,7 +17,7 @@
 //     for (s = 2.; s < 1e3; s /=- .5)
 //         e -= abs(cos(dot(m = cos(p * s), q / q))) / s, z -= m.y;
 
-#if 1
+#if 0
 UnicodeString PROGRAM = UR"TAG(
 [[const]] float PI = 3.14;
 
@@ -53,11 +53,12 @@ struct VertexOutput {
 
 [[fragment]] float4 main(
 	float* t [[mtl_constant(0)]] [[vk_uniform(0)]],
-	float2* r [[mtl_constant(1)]] [[vk_uniform(1)]],
+	float2**** r [[mtl_constant(1)]] [[vk_uniform(1)]],
 	float4* target_size [[mtl_constant(2)]] [[vk_uniform(0, 2)]],
 	VertexOutput in [[stage_in]]
 ) {
-	float i = r.y;
+	float i = r[0][0][0][0].y;
+	r[0][0][0] = r[0][0][0];
 }
 )TAG"_b;
 
