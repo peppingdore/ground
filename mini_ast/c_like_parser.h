@@ -744,7 +744,7 @@ Token next(CLikeParser* p) {
 			return set_current_token(p, int_end, CTOKEN_FLAG_INTEGER);
 		}
 
-		for (auto c: {',',';','/','.','-','=','(',')','?',':','+','*','-','<','>', '[', ']'}) {
+		for (auto c: {',',';','/','.','-','=','(',')','?',':','+','*','-','<','>', '[', ']', '&'}) {
 			if (p->str[i] == c) {
 				if (p->cursor < i) {
 					return set_current_token(p, i);
@@ -948,6 +948,9 @@ Tuple<AstVarDeclGroup*, Error*> parse_var_decl(CLikeParser* p, AstType* type, To
 		auto [expr, e] = parse_expr(p, 0);
 		if (e) {
 			return { NULL, e };
+		}
+		if (expr->expr_type != type) {
+			return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Initializer type mismatch, expected '%' but got '%'.", type->name, expr->expr_type->name) };
 		}
 		for (auto it: var_decls) {
 			it->init = (AstExpr*) expr;
@@ -1258,7 +1261,17 @@ Tuple<AstExpr*, Error*> try_parse_swizzle_expr(CLikeParser* p, AstExpr* lhs, Ast
 		return { expr, NULL };
 	}
 
-	auto expr = make_ast_expr<AstSwizzleExpr>(p, swizzle_type, lhs->is_lvalue, text_region);
+	bool is_unique = true;
+	int unique_check[static_array_count(swizzle_idx)] = {};
+	for (auto i: range(swizzle_len)) {
+		auto idx = swizzle_idx[i];
+		unique_check[idx]++;
+		if (unique_check[idx] > 1) {
+			is_unique = false;
+		}
+	}
+
+	auto expr = make_ast_expr<AstSwizzleExpr>(p, swizzle_type, lhs->is_lvalue && is_unique, text_region);
 	expr->lhs = lhs;
 	expr->swizzle[0] = swizzle_idx[0];
 	expr->swizzle[1] = swizzle_idx[1];
@@ -1323,7 +1336,7 @@ Tuple<AstExpr*, Error*> typecheck_binary_expr(CLikeParser* p, AstExpr* lhs, AstE
 			pure_op = find_binary_operator(p, op->op[0, len(op->op) - 1]);
 		}
 		if (!lhs->is_lvalue) {
-			return { NULL, simple_parser_error(p, current_loc(), op_tok.reg, U"Operator '%' can only be applied to lvalues.", op->op) };
+			return { NULL, simple_parser_error(p, current_loc(), op_tok.reg, U"Left side of '%' must be an lvalue.", op->op) };
 		}
 	}
 	if (lhs->expr_type == find_type(p, U"void"_b)) {
@@ -1496,6 +1509,14 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 		if (tok.str == "&") {
 			if (!expr->is_lvalue) {
 				return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Operator '&' can only be applied to lvalues.", op.str) };
+			}
+			if (reflect_cast<AstSwizzleExpr>(expr)) {
+				auto e = make_parser_error(p, current_loc(), U"Cannot take an address of a swizzle"_b, expr->expr_type->name);
+				add_site(p, e,
+					CParserErrorToken{ .reg = tok.reg, .color = CPARSER_ERROR_TOKEN_COLOR_REGULAR_RED },
+					CParserErrorToken{ .reg = expr->text_region, .color = CPARSER_ERROR_TOKEN_COLOR_REGULAR_GREEN }
+				);
+				return { NULL, e };
 			}
 		}
 		if (tok.str == "++" || tok.str == "--") {
@@ -2059,7 +2080,10 @@ Tuple<AstNode*, Error*, bool> parse_stmt(CLikeParser* p) {
 
 	auto type = find_type(p, type_tok.str);
 	if (type) {
-		next(p);
+		auto [type, e1] = parse_type(p);
+		if (e1) {
+			return { NULL, e1 };
+		}
 		auto [ident, e] = parse_ident(p);
 		if (e) {
 			return { NULL, e };

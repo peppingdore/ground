@@ -17,20 +17,24 @@
 //     for (s = 2.; s < 1e3; s /=- .5)
 //         e -= abs(cos(dot(m = cos(p * s), q / q))) / s, z -= m.y;
 
-#if 0
-UnicodeString PROGRAM = UR"TAG(
-[[const]] float PI = 3.14;
+#define PROGRAM_ID 0
+
+UnicodeString PROGRAM = 
+#if PROGRAM_ID == 0
+UR"TAG(
+[[const]] float PI = 3.14f;
 
 struct VertexOutput {
 	float4 position [[position]];
 };
 
 [[fragment]] float4 main(
-	float* t [[mtl_constant(0)]] [[vk_uniform(0)]],
+	[[mtl_constant]] [[vk_uniform]] float* t [[mtl_buffer(0)]] [[vk_binding(0)]],
 	float2* r [[mtl_constant(1)]] [[vk_uniform(1)]],
 	float4* target_size [[mtl_constant(2)]] [[vk_uniform(0, 2)]],
 	VertexOutput in [[stage_in]]
 ) {
+	r = r;
 	VertexOutput xx = in;
 	float4 FC = in.position / *target_size;
 	float i,e,R,s,z;
@@ -43,10 +47,8 @@ struct VertexOutput {
 	return o;
 }
 )TAG"_b;
-
-#elif 1
-
-UnicodeString PROGRAM = UR"TAG(
+#elif PROGRAM_ID == 1
+UR"TAG(
 struct VertexOutput {
 	float4 position [[position]];
 };
@@ -61,7 +63,13 @@ struct VertexOutput {
 	r[0][0][0] = r[0][0][0];
 }
 )TAG"_b;
-
+#elif PROGRAM_ID == 2
+UR"TAG(
+[[fragment]] float4 main(float4* buf) {
+	float4 pen;
+	pen.xyzw.ywzx.x = buf.yzwx.xxxx.x;
+}
+)TAG"_b;
 #endif
 
 void print_error(Error* e) {

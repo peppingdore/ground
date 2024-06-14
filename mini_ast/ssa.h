@@ -454,6 +454,7 @@ Tuple<SsaLV, SsaLVKind, Error*> fill_lvalue(Ssa* ssa, AstExpr* expr) {
 			return { {}, {}, e };
 		}
 		if (reflect_cast<AstPointerType>(var_access->lhs->expr_type)) {
+			// I think we might want to emit_expr(lhs) instead of fill_lvalue(lhs).
 			auto idx = make_ssa_val(ssa->current_block, SsaOp::Const);
 			auto zero = make<s64>(ssa->allocator);
 			idx->aux = make_any(zero);
@@ -502,7 +503,7 @@ Tuple<SsaLV, SsaLVKind, Error*> fill_lvalue(Ssa* ssa, AstExpr* expr) {
 		if (e) {
 			return { {}, {}, e };
 		}
-		auto swz = make_ssa_val(ssa->current_block, SsaOp::Swizzle);
+		auto swz = make_ssa_val(ssa->current_block, SsaOp::SwizzleIndices);
 		swz->aux = make_any(sw);
 		swz->v_type = sw->expr_type;
 		add(&v.args, swz);
@@ -823,6 +824,29 @@ Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr) {
 			}
 			return { oped, NULL };
 		}
+	} else if (auto swizzle = reflect_cast<AstSwizzleExpr>(expr)) {
+		auto [lhs, e] = emit_expr(ssa, swizzle->lhs);
+		if (e) {
+			return { NULL, e };
+		}
+		auto swz = make_ssa_val(ssa->current_block, SsaOp::SwizzleIndices);
+		swz->aux = make_any(swizzle);
+		swz->v_type = swizzle->expr_type;
+		auto v = make_ssa_val(ssa->current_block, SsaOp::SwizzleExpr);
+		add_arg(v, lhs);
+		add_arg(v, swz);
+		return { v, NULL };
+	} else if (auto access = reflect_cast<AstVarMemberAccess>(expr)) {
+		auto [lhs, e] = emit_expr(ssa, access->lhs);
+		if (e) {
+			return { NULL, e };
+		}
+		auto v = make_ssa_val(ssa->current_block, SsaOp::MemberAccess);
+		v->aux = make_any(access->member);
+		auto ext = make_ssa_val(ssa->current_block, SsaOp::ExtractValue);
+		add_arg(ext, lhs);
+		add_arg(ext, v);
+		return { ext, NULL };
 	} else {
 		auto [lv, e] = lvalue(ssa, expr);
 		if (e == NULL) {
@@ -832,6 +856,7 @@ Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr) {
 			}
 			return { loaded, NULL };
 		} else {
+			println(e);
 			e->free();
 		}
 	}
@@ -1761,10 +1786,10 @@ Error* emit_spirv_function(SpirvEmitter* m, Ssa* ssa) {
 		add(&m->entry_points, m->ep);
 	}
 
-	// auto e = perform_spirv_rewrites(m, ssa);
-	// if (e) {
-	// 	return e;
-	// }
+	auto e = perform_spirv_rewrites(m, ssa);
+	if (e) {
+		return e;
+	}
 
 
 	// if (f->kind == AstFunctionKind::Plain) {
