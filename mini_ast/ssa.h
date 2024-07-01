@@ -112,7 +112,7 @@ bool can_ssa(AstVar* var) {
 	if (var->is_global) {
 		return false;
 	}
-	if (reflect_cast<AstPrimitiveType>(var->var_type)) {
+	if (reflect_cast<AstPrimitiveType>(var->var_ts->tp)) {
 		return true;
 	}
 	if (reflect_cast<AstFunctionArg>(var)) {
@@ -318,7 +318,7 @@ SsaValue* read_var_recursive(SsaBasicBlock* block, AstVar* var) {
 	if (!block->is_sealed) {
 		auto phi = make_ssa_val(block, SsaOp::Phi);
 		phi->aux = make_any(var);
-		phi->v_type = var->var_type;
+		phi->v_type = var->var_ts->tp;
 		add(&block->incomplete_phis, phi);
 		v = phi;
 	} else if (len(block->pred) == 1) {
@@ -327,7 +327,7 @@ SsaValue* read_var_recursive(SsaBasicBlock* block, AstVar* var) {
 	} else {
 		auto phi = make_ssa_val(block, SsaOp::Phi);
 		phi->aux = make_any(var);
-		phi->v_type = var->var_type;
+		phi->v_type = var->var_ts->tp;
 		write_var(block, var, phi);
 		v = add_phi_args(phi);
 	}
@@ -464,7 +464,7 @@ Tuple<SsaLV, SsaLVKind, Error*> fill_lvalue(Ssa* ssa, AstExpr* expr) {
 		}
 		auto access = make_ssa_val(ssa->current_block, SsaOp::MemberAccess);
 		access->aux = make_any(var_access->member);
-		access->v_type = var_access->member->member_type;
+		access->v_type = var_access->member->member_ts->tp;
 		add(&v.args, access);
 		return { v, kind, NULL };
 	} else if (auto var_access = reflect_cast<AstVariableAccess>(expr)) {
@@ -720,7 +720,7 @@ Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr) {
 		if (e) {
 			return { NULL, e };
 		}
-		auto [loaded, e2] = load(ssa, lv, var_access->var->var_type);
+		auto [loaded, e2] = load(ssa, lv, var_access->var->var_ts->tp);
 		if (e2) {
 			return { NULL, e2 };
 		}
@@ -778,7 +778,7 @@ Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr) {
 			}
 			auto member = make_ssa_val(ssa->current_block, SsaOp::MemberAccess);
 			member->aux = make_any(m.member);
-			member->v_type = m.member->member_type;
+			member->v_type = m.member->member_ts->tp;
 			auto lv = SsaLV { .kind = SsaLVKindPtr, .value = slot };
 			lv.value = make_ssa_val(ssa->current_block, SsaOp::GetElementPtr);
 			add_arg(lv.value, slot);
@@ -869,11 +869,11 @@ Error* decl_var(Ssa* ssa, AstVarDecl* var_decl, SsaValue* init) {
 	if (can_ssa(var_decl)) {
 		if (init == NULL) {
 			init = make_ssa_val(ssa->current_block, SsaOp::ZeroInit);
-			init->aux = make_any(var_decl->var_type);
+			init->aux = make_any(var_decl->var_ts->tp);
 		}
 		write_var(ssa->current_block, var_decl, init);
 	} else {
-		auto slot = ssa_alloca(ssa, var_decl->var_type);
+		auto slot = ssa_alloca(ssa, var_decl->var_ts->tp);
 		write_var(ssa->current_block, var_decl, slot);
 		if (init) {
 			auto lv = SsaLV { .kind = SsaLVKindPtr, .value = slot };
@@ -1094,7 +1094,7 @@ void print_ssa_value(SsaValue* inst) {
 		} else if (auto cj = reflect_cast<SsaCondJump>(inst->aux)) {
 			print(" %*, %* ", cj->t_block->name, cj->f_block->name);
 		} else if (auto arg = reflect_cast<AstFunctionArg>(inst->aux)) {
-			print(" '%*' ", arg->var_type->name);
+			print(" '%*' ", arg->var_ts->tp->name);
 		} else if (auto spv = reflect_cast<SpvUniformSetBinding>(inst->aux)) {
 			print(" (%, %) ", spv->set, spv->binding);
 		}
@@ -1152,7 +1152,7 @@ Tuple<Ssa*, Error*> emit_function_ssa(Allocator allocator, AstFunction* f) {
 	for (auto arg: f->args) {
 		auto v = make_ssa_val(ssa->current_block, SsaOp::FunctionArg);
 		v->aux = make_any(arg);
-		v->v_type = arg->var_type;
+		v->v_type = arg->var_ts->tp;
 		write_var(ssa->current_block, arg, v);
 	}
 	auto e = emit_block(ssa, f->block);
@@ -1515,26 +1515,11 @@ Error* emit_spirv_block(SpirvEmitter* m, SsaBasicBlock* block) {
 }
 #endif
 
-Tuple<s64, Error*> eval_const_int(AstExpr* expr) {
-	auto p = expr->p;
-	if (auto i = reflect_cast<AstLiteralExpr>(expr)) {
-		if (i->lit_type == reflect_type_of<s64>()) {
-			return { i->lit_value.s64_value, NULL };
-		} else if (i->lit_type == reflect_type_of<s32>()) {
-			return { i->lit_value.s32_value, NULL };
-		} else {
-			return { 0, simple_parser_error(p, current_loc(), expr->text_region, "Expected s32 or s64 literal, got '%*'", i->lit_type->name) };
-		}
-	} else {
-		return { 0, simple_parser_error(p, current_loc(), expr->text_region, "Expected literal, got '%*'", expr->type->name) };
-	}
-}
-
 Tuple<AstType*, Error*> strip_pointer_type(AstFunctionArg* arg) {
-	if (auto ptr = reflect_cast<AstPointerType>(arg->var_type)) {
+	if (auto ptr = reflect_cast<AstPointerType>(arg->var_ts->tp)) {
 		return { ptr->pointee, NULL };
 	} else {
-		return { NULL, simple_parser_error(arg->p, current_loc(), arg->text_region, "Expected pointer type, got '%*'", arg->var_type->name) };
+		return { NULL, simple_parser_error(arg->p, current_loc(), arg->text_region, "Expected pointer type, got '%*'", arg->var_ts->tp->name) };
 	}
 }
 
@@ -1564,7 +1549,7 @@ Error* emit_entry_point_arg(SpirvEmitter* m, AstFunction* f, AstFunctionArg* arg
 			put(&m->ep->uniforms, arg, var_id);
 			spv_op(m, SpvOpVariable, { tp_id, var_id, SpvStorageClassUniform });
 		} else if (attr->name == "stage_in") {
-			auto tp = reflect_cast<AstStructType>(arg->var_type);
+			auto tp = reflect_cast<AstStructType>(arg->var_ts->tp);
 			if (!tp) {
 				return simple_parser_error(f->p, current_loc(), attr->text_region, "Expected struct type");
 			}
@@ -1576,7 +1561,7 @@ Error* emit_entry_point_arg(SpirvEmitter* m, AstFunction* f, AstFunctionArg* arg
 					if (find_attr(member->attrs, U"position"_b)) {
 						continue;
 					}
-					auto [tp_id, e] = decl_pointer_type(m, member->member_type, SpvStorageClassInput);
+					auto [tp_id, e] = decl_pointer_type(m, member->member_ts->tp, SpvStorageClassInput);
 					if (e) {
 						return e;
 					}
@@ -1676,7 +1661,7 @@ Error* rewrite_spirv_function_arg(SpirvEmitter* m, Ssa* ssa, SsaRewriter* rw, Ss
 			remove_value(rw, v);
 			return NULL;
 		} else if (attr->name == "stage_in") {
-			auto tp = reflect_cast<AstStructType>(arg->var_type);
+			auto tp = reflect_cast<AstStructType>(arg->var_ts->tp);
 			if (!tp) {
 				return simple_parser_error(f->p, current_loc(), arg->text_region, "Expected struct type for [[stage_in]]");
 			}

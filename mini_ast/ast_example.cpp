@@ -22,14 +22,14 @@
 UnicodeString PROGRAM = 
 #if PROGRAM_ID == 0
 UR"TAG(
-[[const]] float PI = 3.14f;
+float PI = 3.14f;
 
 struct VertexOutput {
 	float4 position [[position]];
 };
 
 [[fragment]] float4 main(
-	[[mtl_constant]] [[vk_uniform]] float* t [[mtl_buffer(0)]] [[vk_binding(0)]],
+	float* t [[mtl_buffer(0)]] [[vk_uniform(0)]],
 	float2* r [[mtl_constant(1)]] [[vk_uniform(1)]],
 	float4* target_size [[mtl_constant(2)]] [[vk_uniform(0, 2)]],
 	VertexOutput in [[stage_in]]

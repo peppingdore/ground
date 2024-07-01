@@ -104,7 +104,7 @@ void print_for(AllocatedUnicodeString* sb, AstFor* for_stmt) {
 void print_var_decl_group(AllocatedUnicodeString* sb, AstVarDeclGroup* group) {
 	assert(len(group->var_decls) > 0); 
 	auto first = group->var_decls[0];
-	add(sb, first->var_type->name);
+	add(sb, first->var_ts->tp->name);
 	append(sb, " ");
 	for (auto i: range(len(group->var_decls))) {
 		auto var_decl = group->var_decls[i];
@@ -143,13 +143,13 @@ void print_block(AllocatedUnicodeString* sb, AstBlock* block) {
 }
 
 void print_function(AllocatedUnicodeString* sb, AstFunction* function) {
-	append(sb, function->return_type->name);
+	append(sb, function->return_ts->tp->name);
 	append(sb, " ");
 	append(sb, function->name);
 	append(sb, "(");
 	for (auto i: range(len(function->args))) {
 		auto arg = function->args[i];
-		append(sb, arg->var_type->name);
+		append(sb, arg->var_ts->tp->name);
 		append(sb, " ");
 		append(sb, arg->name);
 		if (i < len(function->args) - 1) {
