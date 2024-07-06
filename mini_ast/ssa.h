@@ -1614,7 +1614,7 @@ void replace_arg(SsaValue* v, s64 arg, SsaValue* by) {
 	add(&by->uses, v);
 }
 
-#if 1
+#if 0
 Error* rewrite_spirv_function_arg(SpirvEmitter* m, Ssa* ssa, SsaRewriter* rw, SsaValue* v) {
 	auto arg = reflect_cast<AstFunctionArg>(v->aux);
 	assert(arg);
@@ -1771,10 +1771,10 @@ Error* emit_spirv_function(SpirvEmitter* m, Ssa* ssa) {
 		add(&m->entry_points, m->ep);
 	}
 
-	auto e = perform_spirv_rewrites(m, ssa);
-	if (e) {
-		return e;
-	}
+	// auto e = perform_spirv_rewrites(m, ssa);
+	// if (e) {
+	// 	return e;
+	// }
 
 
 	// if (f->kind == AstFunctionKind::Plain) {

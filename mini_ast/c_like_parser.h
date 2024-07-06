@@ -316,12 +316,18 @@ REFLECT(AstFunctionKind) {
 	ENUM_VALUE(Fragment);
 }
 
+struct MtlBufferIdxAttr;
+struct VkSetBindingAttr;
+
 struct AstFunction: AstSymbol {
 	AstTypeSite*           return_ts = NULL; 
 	Array<AstFunctionArg*> args;
 	Array<AstAttr*>        attrs;
 	AstFunctionKind        kind = AstFunctionKind::Plain;
 	AstBlock*              block = NULL;
+	AstFunctionArg*        stage_in_arg = NULL;
+	Array<MtlBufferIdxAttr*> mtl_buffers;
+	Array<VkSetBindingAttr*> vk_set_bindings;
 
 	REFLECT(AstFunction) {
 		BASE_TYPE(AstSymbol);
@@ -330,6 +336,9 @@ struct AstFunction: AstSymbol {
 		MEMBER(attrs);
 		MEMBER(kind);
 		MEMBER(block);
+		MEMBER(stage_in_arg);
+		MEMBER(mtl_buffers);
+		MEMBER(vk_set_bindings);
 	}
 };
 
@@ -453,11 +462,13 @@ struct AstLiteralExpr: AstExpr {
 struct AstAttr: AstNode {
 	UnicodeString   name;
 	Array<AstExpr*> args;
+	bool            is_used = false;
 
 	REFLECT(AstAttr) {
 		BASE_TYPE(AstNode);
 		MEMBER(name);
 		MEMBER(args);
+		MEMBER(is_used);
 	}
 };
 
@@ -1048,10 +1059,30 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p);
 Tuple<AstExpr*, Error*> parse_expr(CLikeParser* p, s32 min_prec);
 Tuple<Array<AstAttr*>, Error*> parse_attrs(CLikeParser* p);
 
+Error* check_if_attrs_used(CLikeParser* p, Array<AstAttr*> attrs, CodeLocation loc = caller_loc()) {
+	for (auto attr: attrs) {
+		if (!attr->is_used) {
+			auto e = simple_parser_error(p, loc, attr->text_region, "Attribute '%' is not used."_b, attr->name);
+			return e;
+		}
+	}
+	return NULL;
+}
+
 Tuple<AstVarDeclGroup*, Error*> parse_var_decl(CLikeParser* p, PreType pt, Token ident_tok, bool is_global) {
 	Array<AstVarDecl*> var_decls = { .allocator = p->allocator };
 	defer { var_decls.free(); };
 
+	auto val_decl_attrs = [&](auto* p, Array<AstAttr*> attrs) -> Error* {
+		for (auto attr: attrs) {
+			if (is_global) {
+				return simple_parser_error(p, current_loc(), attr->text_region, "Global variables cannot have attributes"_b);
+			} else {
+				return simple_parser_error(p, current_loc(), attr->text_region, "Local variables cannot have attributes"_b);
+			}
+		}
+		return NULL;
+	};
 	auto [attrs, e] = parse_attrs(p);
 	if (e) {
 		return { NULL, e };
@@ -1060,7 +1091,10 @@ Tuple<AstVarDeclGroup*, Error*> parse_var_decl(CLikeParser* p, PreType pt, Token
 	if (e2) {
 		return { NULL, e2 };
 	}
-
+	auto e3 = check_if_attrs_used(p, attrs);
+	if (e3) {
+		return { NULL, e3 };
+	}
 	auto current_ident = ident_tok;
 	while (true) {
 		auto node = make_ast_node<AstVarDecl>(p, {});
@@ -1956,7 +1990,7 @@ Tuple<AstBlock*, Error*> parse_block(CLikeParser* p);
 Tuple<AstNode*, Error*, bool> parse_stmt(CLikeParser* p);
 Tuple<AstBlock*, Error*> parse_block_or_one_stmt(CLikeParser* p);
 
-Tuple<s64, Error*> eval_const_int(AstExpr* expr) {
+Tuple<s64, Error*> eval_const_int_inner(AstExpr* expr) {
 	auto p = expr->p;
 	if (auto i = reflect_cast<AstLiteralExpr>(expr)) {
 		if (i->lit_type == reflect_type_of<s64>()) {
@@ -1966,22 +2000,73 @@ Tuple<s64, Error*> eval_const_int(AstExpr* expr) {
 		} else {
 			return { 0, simple_parser_error(p, current_loc(), expr->text_region, "Expected s32 or s64 literal, got '%*'", i->lit_type->name) };
 		}
+	} else if (auto i = reflect_cast<AstUnaryExpr>(expr)) {
+		if (i->op->op == "-"_b) {
+			auto [v, e] = eval_const_int_inner(i->expr);
+			if (e) {
+				return { 0, e };
+			}
+			return { -v, NULL };
+		} else {
+			return { 0, simple_parser_error(p, current_loc(), expr->text_region, "Unexpected unary operator '%*'", i->op->op) };
+		}
 	} else {
 		return { 0, simple_parser_error(p, current_loc(), expr->text_region, "Expected literal, got '%*'", expr->type->name) };
 	}
 }
 
+Tuple<s64, Error*> eval_const_int(AstExpr* expr, s64 min, s64 max_inclusive) {
+	auto [v, e] = eval_const_int_inner(expr);
+	if (e) {
+		return { 0, e };
+	}
+	if (v < min) {
+		return { 0, simple_parser_error(expr->p, current_loc(), expr->text_region, "Expected >= %, got %.", min, v) };
+	}
+	if (v > max_inclusive) {
+		return { 0, simple_parser_error(expr->p, current_loc(), expr->text_region, "Expected <= %, got %.", max_inclusive, v) };
+	}
+	return { v, NULL };
+}
 
-struct VkUniformAttr: AstAttr {
+struct MtlBufferIdxAttr: AstAttr {
+	s64 index = 0;
+
+	REFLECT(MtlBufferIdxAttr) {
+		BASE_TYPE(AstAttr);
+		MEMBER(index);
+	}
+};
+
+struct MtlBufferAttr: MtlBufferIdxAttr {
+	REFLECT(MtlBufferAttr) {
+		BASE_TYPE(MtlBufferIdxAttr);
+	}
+};
+
+struct MtlConstantAttr: MtlBufferIdxAttr {
+	REFLECT(MtlConstantAttr) {
+		BASE_TYPE(MtlBufferIdxAttr);
+	}
+};
+
+struct VkSetBindingAttr: AstAttr {
 	s64 set = 0;
 	s64 binding = 0;
 
-	REFLECT(VkUniformAttr) {
+	REFLECT(VkSetBindingAttr) {
 		BASE_TYPE(AstAttr);
 		MEMBER(set);
 		MEMBER(binding);
 	}
 };
+
+struct VkUniformAttr: VkSetBindingAttr {
+	REFLECT(VkUniformAttr) {
+		BASE_TYPE(VkSetBindingAttr);
+	}
+};
+
 
 struct PositionAttr: AstAttr {
 	REFLECT(PositionAttr) {
@@ -1989,38 +2074,104 @@ struct PositionAttr: AstAttr {
 	}
 };
 
+struct FragmentAttr: AstAttr {
+	REFLECT(FragmentAttr) {
+		BASE_TYPE(AstAttr);
+	}
+};
+
+struct VertexAttr: AstAttr {
+	REFLECT(VertexAttr) {
+		BASE_TYPE(AstAttr);
+	}
+};
+
+struct StageInAttr: AstAttr {
+	REFLECT(StageInAttr) {
+		BASE_TYPE(AstAttr);
+	}
+};
+
+template <typename T>
+T* make_ast_attr(CLikeParser* p, Token name, Array<AstExpr*> args, ProgramTextRegion reg) {
+	auto node = make_ast_node<T>(p, reg);
+	node->name = name.str;
+	node->args = args;
+	return node;
+}
+
 Tuple<AstAttr*, Error*> parse_attr(CLikeParser* p, Token name, Array<AstExpr*> args, ProgramTextRegion reg) {
 	if (name.str == "vk_uniform") {
-		auto node = make_ast_node<VkUniformAttr>(p, reg);
+		auto attr = make_ast_attr<VkUniformAttr>(p, name, args, reg);
 		if (len(args) == 0) {
 
 		} else if (len(args) == 1) {
-			auto [v, e] = eval_const_int(args[0]);
+			auto [v, e] = eval_const_int(args[0], 0, s64_max);
 			if (e) {
 				return { NULL, e };
 			}
-			node->binding = v;
+			attr->binding = v;
 		} else if (len(args) == 2) {
-			auto [v, e] = eval_const_int(args[0]);
+			auto [v, e] = eval_const_int(args[0], 0, s64_max);
 			if (e) {
 				return { NULL, e };
 			}
-			node->set = v;
-			auto [v2, e2] = eval_const_int(args[1]);
+			attr->set = v;
+			auto [v2, e2] = eval_const_int(args[1], 0, s64_max);
 			if (e2) {
 				return { NULL, e2 };
 			}
-			node->binding = v2;
+			attr->binding = v2;
 		} else {
 			return { NULL, simple_parser_error(p, current_loc(), reg, "Expected (set, binding) or (set).") };
 		}
-		return { node, NULL };
+		return { attr, NULL };
+	} else if (name.str == "mtl_buffer") {
+		auto attr = make_ast_attr<MtlBufferAttr>(p, name, args, reg);
+		if (len(args) == 0) {
+
+		} else if (len(args) == 1) {
+			auto [v, e] = eval_const_int(args[0], 0, s64_max);
+			if (e) {
+				return { NULL, e };
+			}
+			attr->index = v;
+		} else {
+			return { NULL, simple_parser_error(p, current_loc(), reg, "Expected (index).") };
+		}
+		return { attr, NULL };
+	} else if (name.str == "mtl_constant") {
+		auto attr = make_ast_attr<MtlConstantAttr>(p, name, args, reg);
+		if (len(args) == 0) {
+
+		} else if (len(args) == 1) {
+			auto [v, e] = eval_const_int(args[0], 0, s64_max);
+			if (e) {
+				return { NULL, e };
+			}
+			attr->index = v;
+		} else {
+			return { NULL, simple_parser_error(p, current_loc(), reg, "Expected (index).") };
+		}
+		return { attr, NULL };
 	} else if (name.str == "position") {
 		if (len(args) != 0) {
 			return { NULL, simple_parser_error(p, current_loc(), name.reg, "Expected 0 arguments for position attribute, got %"_b, len(args)) };
 		}
-		auto node = make_ast_node<PositionAttr>(p, reg);
-		return { node, NULL };
+		auto attr = make_ast_attr<PositionAttr>(p, name, args, reg);
+		return { attr, NULL };
+	} else if (name.str == "fragment") {
+		if (len(args) != 0) {
+			return { NULL, simple_parser_error(p, current_loc(), name.reg, "Expected 0 arguments for fragment attribute, got %"_b, len(args)) };
+		}
+		auto attr = make_ast_attr<FragmentAttr>(p, name, args, reg);
+		return { attr, NULL };
+	} else if (name.str == "stage_in") {
+		if (len(args) != 0) {
+			return { NULL, simple_parser_error(p, current_loc(), name.reg, "Expected 0 arguments for stage_in attribute, got %"_b, len(args)) };
+		}
+		auto attr = make_ast_attr<StageInAttr>(p, name, args, reg);
+		return { attr, NULL };
 	} else {
 		return { NULL, simple_parser_error(p, current_loc(), name.reg, "Unknown attribute") };
 	}
@@ -2335,26 +2486,148 @@ Tuple<AstBlock*, Error*> parse_block(CLikeParser* p) {
 	return { block, NULL };
 }
 
+Error* make_double_site_error(CLikeParser* p, Optional<ProgramTextRegion> reg, Optional<ProgramTextRegion> reg2, auto... args) {
+	auto error = make_parser_error(p, current_loc(), args...);
+	add_site(p, error,
+		CParserErrorToken{ .reg = reg, .color = CPARSER_ERROR_TOKEN_COLOR_REGULAR_GREEN },
+		CParserErrorToken{ .reg = reg2, .color = CPARSER_ERROR_TOKEN_COLOR_REGULAR_RED }
+	);
+	return error;
+}
+
+Tuple<AstFunctionKind, Error*> resolve_function_kind(CLikeParser* p, AstFunction* f) {
+	AstFunctionKind kind = AstFunctionKind::Plain;
+	AstAttr* kind_attr = NULL;
+	for (auto attr: f->attrs) {
+		AstFunctionKind new_kind = AstFunctionKind::Plain;
+		if (auto m = reflect_cast<FragmentAttr>(attr)) {
+			new_kind = AstFunctionKind::Fragment;
+		}
+		if (auto m = reflect_cast<VertexAttr>(attr)) {
+			new_kind = AstFunctionKind::Vertex;
+		}
+		if (new_kind != AstFunctionKind::Plain) {
+			if (kind != AstFunctionKind::Plain) {
+				return { {}, make_double_site_error(p, kind_attr->text_region, attr->text_region, "Function kind already defined."_b) };
+			}
+			kind = new_kind;
+		}
+	}
+	return { kind, NULL };
+}
+
+Error* handle_entry_point_arg(CLikeParser* p, AstFunction* f, s64 idx) {
+	auto arg = f->args[idx];
+
+	enum class EntryPointArgKind {
+		Undefined,
+		StageIn,
+		Buffer,
+	};
+	EntryPointArgKind kind = EntryPointArgKind::Undefined;
+
+	for (auto attr: arg->attrs) {
+		if (auto m = reflect_cast<StageInAttr>(attr)) {
+			m->is_used = true;
+			kind = EntryPointArgKind::StageIn;
+			break;
+		}
+		if (auto m = reflect_cast<MtlBufferAttr>(attr)) {
+			kind = EntryPointArgKind::Buffer;
+			break;
+		}
+		if (auto m = reflect_cast<MtlConstantAttr>(attr)) {
+			kind = EntryPointArgKind::Buffer;
+			break;
+		}
+		if (auto m = reflect_cast<VkUniformAttr>(attr)) {
+			kind = EntryPointArgKind::Buffer;
+			break;
+		}
+	}
+	if (kind == EntryPointArgKind::Undefined) {
+		return simple_parser_error(p, current_loc(), arg->text_region, "Unexpected entry point argument."_b);
+	}
+	if (kind == EntryPointArgKind::Buffer) {
+		if (!is_pointer(arg->var_ts->tp)) {
+			return simple_parser_error(p, current_loc(), arg->text_region, "Expected pointer type for a buffer."_b);
+		}
+		VkUniformAttr* vk_attr = NULL;
+		MtlBufferIdxAttr* mtl_attr = NULL;
+		for (auto attr: arg->attrs) {
+			if (auto m = reflect_cast<VkUniformAttr>(attr)) {
+				if (vk_attr) {
+					return make_double_site_error(p, vk_attr->text_region, attr->text_region, "Vk uniform attribute is already specified."_b);
+				}
+				vk_attr = m;
+			} else if (auto m = reflect_cast<MtlBufferAttr>(attr)) {
+				if (mtl_attr) {
+					return make_double_site_error(p, mtl_attr->text_region, attr->text_region, "Metal buffer attribute is already specified."_b);
+				}
+				mtl_attr = m;
+			} else if (auto m = reflect_cast<MtlConstantAttr>(attr)) {
+				if (mtl_attr) {
+					return make_double_site_error(p, mtl_attr->text_region, attr->text_region, "Metal constant attribute is already specified."_b);
+				}
+				mtl_attr = m;
+			} else {
+				return simple_parser_error(p, current_loc(), attr->text_region, "Unexpected attribute."_b);
+			}
+		}
+		if (!vk_attr) {
+			return simple_parser_error(p, current_loc(), arg->text_region, "Vk uniform attribute must be specified."_b);
+		}
+		if (!mtl_attr) {
+			return simple_parser_error(p, current_loc(), arg->text_region, "Metal buffer attribute must be specified."_b);
+		}
+		for (auto it: f->mtl_buffers) {
+			if (it->index == mtl_attr->index) {
+				return make_double_site_error(p, it->text_region, mtl_attr->text_region, "Metal buffer index (%) is already used."_b, mtl_attr->index);
+			}
+		}
+		for (auto it: f->vk_set_bindings) {
+			if (it->set == vk_attr->set && it->binding == vk_attr->binding) {
+				return make_double_site_error(p, it->text_region, vk_attr->text_region, "Vulkan set/binding (%, %) is already used."_b, vk_attr->set, vk_attr->binding);
+			}
+		}
+		mtl_attr->is_used = true;
+		vk_attr->is_used = true;
+		add(&f->mtl_buffers, mtl_attr);
+		add(&f->vk_set_bindings, vk_attr);
+	}
+	if (kind == EntryPointArgKind::StageIn) {
+		if (!is_struct(arg->var_ts->tp)) {
+			return simple_parser_error(p, current_loc(), arg->text_region, "Expected struct type for a stage_in argument."_b);
+		}
+		if (f->stage_in_arg) {
+			return make_double_site_error(p, f->stage_in_arg->text_region, arg->text_region, "Stage_in argument is already specified."_b);
+		}
+		f->stage_in_arg = arg;
+	}
+	return NULL;
+}
+
+Error* handle_entry_point_args(CLikeParser* p, AstFunction* f) {
+	for (auto i: range(len(f->args))) {
+		if (f->kind != AstFunctionKind::Plain) {
+			auto e = handle_entry_point_arg(p, f, i);
+			if (e) {
+				return e;
+			}
+		}
+		auto e = check_if_attrs_used(p, f->args[i]->attrs);
+		if (e) {
+			return e;
+		}
+	}
+	return NULL;
+}
+
 Tuple<AstSymbol*, Error*> parse_function(CLikeParser* p, PreType pre_type,  Array<AstAttr*> attrs, Token start_tok, Token ident) {
 	Array<AstFunctionArg*> args = { .allocator = p->allocator };
 	defer { args.free(); };
 
 	next(p);
-
-	AstFunctionKind kind = AstFunctionKind::Plain;
-	for (auto attr: attrs) {
-		if (attr->name == "vertex") {
-			if (kind != AstFunctionKind::Plain) {
-				return { NULL, simple_parser_error(p, current_loc(), attr->text_region, "Function kind already defined") };
-			}
-			kind = AstFunctionKind::Vertex;
-		} else if (attr->name == "fragment") {
-			if (kind != AstFunctionKind::Plain) {
-				return { NULL, simple_parser_error(p, current_loc(), attr->text_region, "Function kind already defined") };
-			}
-			kind = AstFunctionKind::Fragment;
-		}
-	}
 
 	AstTypeSite* return_ts = NULL;
 
@@ -2371,6 +2644,10 @@ Tuple<AstSymbol*, Error*> parse_function(CLikeParser* p, PreType pre_type,  Arra
 				return { NULL, e2 };
 			}
 			return_ts = ts;
+			auto e4 = check_if_attrs_used(p, attrs);
+			if (e4) {
+				return { NULL, e4 };
+			}
 			break;
 		}
 		if (len(args) > 0) {
@@ -2392,12 +2669,6 @@ Tuple<AstSymbol*, Error*> parse_function(CLikeParser* p, PreType pre_type,  Arra
 		auto [attrs, e3] = parse_attrs(p);
 		if (e3) {
 			return { NULL, e3 };
-		}
-		for (auto attr: attrs) {
-			if (attr->name != "vk_uniform" &&
-				attr->name != "mtl_constant") {
-				return { NULL, simple_parser_error(p, current_loc(), attr->text_region, "Attribute '%' not allowed here"_b, attr->name) };
-			}
 		}
 		auto [ts, e4] = finalize_type(p, pre_type, attrs);
 		if (e4) {
@@ -2423,7 +2694,25 @@ Tuple<AstSymbol*, Error*> parse_function(CLikeParser* p, PreType pre_type,  Arra
 	f->name = ident.str;
 	f->args = args;
 	f->attrs = attrs;
-	f->kind = kind;
+	f->mtl_buffers.allocator = p->allocator;
+	f->vk_set_bindings.allocator = p->allocator;
+
+	for (auto attr: attrs) {
+		if (reflect_cast<FragmentAttr>(attr)) {
+			f->kind = AstFunctionKind::Fragment;
+			attr->is_used = true;
+			break;
+		}
+	}
+
+	auto e = handle_entry_point_args(p, f);
+	if (e) {
+		return { NULL, e };
+	}
+	auto e2 = check_if_attrs_used(p, attrs);
+	if (e2) {
+		return { NULL, e2 };
+	}
 
 	auto tok = peek(p);
 	if (tok.str == ";") {
@@ -2467,6 +2756,8 @@ Tuple<AstStructType*, Error*> parse_struct(CLikeParser* p, Token start_tok) {
 	st_reg.start = start_tok.reg.start;
 	st_reg.end = start_tok.reg.end;
 
+	AstStructMember* pos_member = NULL;
+
 	while (true) {
 		auto tok = peek(p);
 		if (tok.str == U"}"_b) {
@@ -2496,7 +2787,6 @@ Tuple<AstStructType*, Error*> parse_struct(CLikeParser* p, Token start_tok) {
 		if (e3) {
 			return { NULL, e3 };
 		}
-
 		auto [ts, e4] = finalize_type(p, pre_type, attrs);
 		if (e4) {
 			return { NULL, e4 };
@@ -2523,6 +2813,23 @@ Tuple<AstStructType*, Error*> parse_struct(CLikeParser* p, Token start_tok) {
 		member->name = name.str;
 		member->attrs = attrs;
 		add(&members, member);
+
+		for (auto attr: attrs) {
+			if (auto x = reflect_cast<PositionAttr>(attr)) {
+				if (pos_member) {
+					return { NULL, simple_parser_error(p, current_loc(), attr->text_region, "Position attribute can only be specified once."_b) };
+				}
+				pos_member = member;
+				if (member->member_ts->tp != p->float4_tp) {
+					return { NULL, simple_parser_error(p, current_loc(), attr->text_region, "Position attribute can only be specified for float4 member."_b) };
+				}
+				x->is_used = true;
+			}
+		}
+		auto e5 = check_if_attrs_used(p, attrs);
+		if (e5) {
+			return { NULL, e5 };
+		}
 	}
 
 	auto st = make_ast_node<AstStructType>(p, st_reg);
@@ -2572,6 +2879,10 @@ Error* parse_top_level(CLikeParser* p) {
 		if (e) {
 			return e;
 		}
+		auto e2 = check_if_attrs_used(p, attrs);
+		if (e2) {
+			return e2;
+		}
 		return NULL;
 	} else if (tok.str == U","_b || tok.str == U";"_b || tok.str == U"="_b) {
 		auto [group, e] = parse_var_decl(p, pre_type, ident, true);
@@ -2581,6 +2892,10 @@ Error* parse_top_level(CLikeParser* p) {
 		e = add_global(p, group);
 		if (e) {
 			return e;
+		}
+		auto e2 = check_if_attrs_used(p, attrs);
+		if (e2) {
+			return e2;
 		}
 		return NULL;
 	} else {
