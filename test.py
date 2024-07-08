@@ -36,8 +36,11 @@ class Tester:
 		if ARGS.verbose:
 			self.msg_queue.put(msg)
 
-	def test_build_failed(self, test):
-		self.print(f"Failed to build {test.path}")
+	def test_build_failed(self, test, output=""):
+		if ARGS.verbose:
+			self.print(f"Failed to build {test.path}\n{output}")
+		else:
+			self.print(f"Failed to build {test.path}")
 
 	def test_run_failed(self, test, error=None):
 		if error and ARGS.verbose: self.print(f"Failed to run test {test.path} {error}")
@@ -240,12 +243,12 @@ class CppTest(Test):
 		self.tester.print(f'Building: {self.path}')
 		stdout = StringIO()
 		scope = { "test": self }
-		res = builder.build(self.path, stdout=stdout, scope=scope)
+		res = builder.build(self.path, stdout=stdout, scope=scope)	
 		if isinstance(res, builder.Runnable_Executable):
 			self.exec_path = res.path
 			self.build_ok = True
 		else:
-			self.tester.test_build_failed(self)
+			self.tester.test_build_failed(self, output=stdout.getvalue())
 
 def main():
 	global ARGS
