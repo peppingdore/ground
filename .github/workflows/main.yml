@@ -16,5 +16,7 @@ jobs:
         uses: egor-tensin/setup-clang@v1
         with:
           version: latest
+      - name: Install Windows SDK
+      - uses: GuillaumeFalourd/setup-windows10-sdk-action@v2
       - name: Run test
         run: py test.py --verbose --ci_debug
