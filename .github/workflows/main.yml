@@ -17,4 +17,4 @@ jobs:
         with:
           version: latest
       - name: Run test
-        run: py test.py
+        run: py test.py --verbose --ci_debug

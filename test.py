@@ -46,6 +46,8 @@ class Tester:
 	def collect_tests(self):
 		self.scan(self.path)
 		self.print(f"Collected {len(self.tests)} tests.")
+		if ARGS.ci_debug:
+			self.tests = list(filter(lambda it: it.path.endswith("base.h_test.cpp"), self.tests))
 		# chr(10) is newline. this way because f-string can't contain \n literal.
 		self.verbose(f"Tests: \n{chr(10).join(map(lambda it: it.path, self.tests))}")
 
@@ -251,7 +253,9 @@ def main():
 	parser.add_argument('--path', default=os.getcwd())
 	parser.add_argument('--verbose', action='store_true')
 	parser.add_argument('--blacklist', nargs='*', default=[])
+	parser.add_argument('--ci_debug', action='store_true') 
 	ARGS = parser.parse_args()
+	builder.VERBOSE = ARGS.verbose
 	tester = Tester(Path(__file__).parent, blacklist=ARGS.blacklist)
 	return tester.run()
 
