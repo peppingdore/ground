@@ -2,9 +2,9 @@ name: test
 jobs:
   run-test:
     runs-on: windows-latest
-      strategy:
-        matrix:
-          python-version: ["3.12"]
+    strategy:
+      matrix:
+        python-version: ["3.12"]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python ${{ matrix.python-version }}
