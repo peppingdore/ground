@@ -991,6 +991,7 @@ Tuple<PreType, Error*> parse_pre_type(CLikeParser* p) {
 
 AstPointerType* get_pointer_type(CLikeParser* p, AstType* tp, VulkanStorageClass st_class, MetalAddrSpace mtl_space) {
 	auto ptr = make_ast_node<AstPointerType>(p, tp->text_region);
+	ptr->name = sprint_unicode(p->allocator, U"%(*)*"_b, tp->name);
 	ptr->pointee = tp;
 	ptr->size = 8;
 	ptr->alignment = 8;
@@ -2092,6 +2093,15 @@ struct StageInAttr: AstAttr {
 	}
 };
 
+struct ColorAttr: AstAttr {
+	s64 idx = 0;
+
+	REFLECT(ColorAttr) {
+		BASE_TYPE(AstAttr);
+		MEMBER(idx);
+	}
+};
+
 template <typename T>
 T* make_ast_attr(CLikeParser* p, Token name, Array<AstExpr*> args, ProgramTextRegion reg) {
 	auto node = make_ast_node<T>(p, reg);
@@ -2171,6 +2181,17 @@ Tuple<AstAttr*, Error*> parse_attr(CLikeParser* p, Token name, Array<AstExpr*> a
 			return { NULL, simple_parser_error(p, current_loc(), name.reg, "Expected 0 arguments for stage_in attribute, got %"_b, len(args)) };
 		}
 		auto attr = make_ast_attr<StageInAttr>(p, name, args, reg);
+		return { attr, NULL };
+	} else if (name.str == "color") {
+		if (len(args) != 1) {
+			return { NULL, simple_parser_error(p, current_loc(), name.reg, "Expected 1 argument for color attribute, got %"_b, len(args)) };
+		}
+		auto [v, e] = eval_const_int(args[0], 0, s64_max);
+		if (e) {
+			return { NULL, e };
+		}
+		auto attr = make_ast_attr<ColorAttr>(p, name, args, reg);
+		attr->idx = v;
 		return { attr, NULL };
 	} else {
 		return { NULL, simple_parser_error(p, current_loc(), name.reg, "Unknown attribute") };
@@ -2418,6 +2439,9 @@ Tuple<AstNode*, Error*, bool> parse_stmt(CLikeParser* p) {
 				return { NULL, e };
 			}
 			rhs = expr;
+			if (f->return_ts->tp != rhs->expr_type) {
+				return { NULL, simple_parser_error(p, current_loc(), rhs->text_region, U"Expected return type '%' but got '%'"_b, f->return_ts->tp->name, rhs->expr_type->name) };
+			}
 		}
 		ProgramTextRegion reg = type_tok.reg;
 		if (rhs->text_region.has_value) {
@@ -2486,8 +2510,8 @@ Tuple<AstBlock*, Error*> parse_block(CLikeParser* p) {
 	return { block, NULL };
 }
 
-Error* make_double_site_error(CLikeParser* p, Optional<ProgramTextRegion> reg, Optional<ProgramTextRegion> reg2, auto... args) {
-	auto error = make_parser_error(p, current_loc(), args...);
+Error* make_double_site_error(CLikeParser* p, CodeLocation loc, Optional<ProgramTextRegion> reg, Optional<ProgramTextRegion> reg2, auto... args) {
+	auto error = make_parser_error(p, loc, args...);
 	add_site(p, error,
 		CParserErrorToken{ .reg = reg, .color = CPARSER_ERROR_TOKEN_COLOR_REGULAR_GREEN },
 		CParserErrorToken{ .reg = reg2, .color = CPARSER_ERROR_TOKEN_COLOR_REGULAR_RED }
@@ -2508,7 +2532,7 @@ Tuple<AstFunctionKind, Error*> resolve_function_kind(CLikeParser* p, AstFunction
 		}
 		if (new_kind != AstFunctionKind::Plain) {
 			if (kind != AstFunctionKind::Plain) {
-				return { {}, make_double_site_error(p, kind_attr->text_region, attr->text_region, "Function kind already defined."_b) };
+				return { {}, make_double_site_error(p, current_loc(), kind_attr->text_region, attr->text_region, "Function kind already defined."_b) };
 			}
 			kind = new_kind;
 		}
@@ -2557,17 +2581,17 @@ Error* handle_entry_point_arg(CLikeParser* p, AstFunction* f, s64 idx) {
 		for (auto attr: arg->attrs) {
 			if (auto m = reflect_cast<VkUniformAttr>(attr)) {
 				if (vk_attr) {
-					return make_double_site_error(p, vk_attr->text_region, attr->text_region, "Vk uniform attribute is already specified."_b);
+					return make_double_site_error(p, current_loc(), vk_attr->text_region, attr->text_region, "Vk uniform attribute is already specified."_b);
 				}
 				vk_attr = m;
 			} else if (auto m = reflect_cast<MtlBufferAttr>(attr)) {
 				if (mtl_attr) {
-					return make_double_site_error(p, mtl_attr->text_region, attr->text_region, "Metal buffer attribute is already specified."_b);
+					return make_double_site_error(p, current_loc(), mtl_attr->text_region, attr->text_region, "Metal buffer attribute is already specified."_b);
 				}
 				mtl_attr = m;
 			} else if (auto m = reflect_cast<MtlConstantAttr>(attr)) {
 				if (mtl_attr) {
-					return make_double_site_error(p, mtl_attr->text_region, attr->text_region, "Metal constant attribute is already specified."_b);
+					return make_double_site_error(p, current_loc(), mtl_attr->text_region, attr->text_region, "Metal constant attribute is already specified."_b);
 				}
 				mtl_attr = m;
 			} else {
@@ -2582,12 +2606,12 @@ Error* handle_entry_point_arg(CLikeParser* p, AstFunction* f, s64 idx) {
 		}
 		for (auto it: f->mtl_buffers) {
 			if (it->index == mtl_attr->index) {
-				return make_double_site_error(p, it->text_region, mtl_attr->text_region, "Metal buffer index (%) is already used."_b, mtl_attr->index);
+				return make_double_site_error(p, current_loc(), it->text_region, mtl_attr->text_region, "Metal buffer index (%) is already used."_b, mtl_attr->index);
 			}
 		}
 		for (auto it: f->vk_set_bindings) {
 			if (it->set == vk_attr->set && it->binding == vk_attr->binding) {
-				return make_double_site_error(p, it->text_region, vk_attr->text_region, "Vulkan set/binding (%, %) is already used."_b, vk_attr->set, vk_attr->binding);
+				return make_double_site_error(p, current_loc(), it->text_region, vk_attr->text_region, "Vulkan set/binding (%, %) is already used."_b, vk_attr->set, vk_attr->binding);
 			}
 		}
 		mtl_attr->is_used = true;
@@ -2600,7 +2624,7 @@ Error* handle_entry_point_arg(CLikeParser* p, AstFunction* f, s64 idx) {
 			return simple_parser_error(p, current_loc(), arg->text_region, "Expected struct type for a stage_in argument."_b);
 		}
 		if (f->stage_in_arg) {
-			return make_double_site_error(p, f->stage_in_arg->text_region, arg->text_region, "Stage_in argument is already specified."_b);
+			return make_double_site_error(p, current_loc(), f->stage_in_arg->text_region, arg->text_region, "Stage_in argument is already specified."_b);
 		}
 		f->stage_in_arg = arg;
 	}
@@ -2618,6 +2642,81 @@ Error* handle_entry_point_args(CLikeParser* p, AstFunction* f) {
 		auto e = check_if_attrs_used(p, f->args[i]->attrs);
 		if (e) {
 			return e;
+		}
+	}
+	return NULL;
+}
+
+Error* ensure_function_has_return(CLikeParser* p, AstFunction* f) {
+	if (f->return_ts->tp == p->void_tp) {
+		return NULL;
+	}
+	if (!f->block) {
+		return simple_parser_error(p, current_loc(), f->text_region, "Function % has no body", f->name);
+	}
+	if (len(f->block->statements) == 0) {
+		// Expected return statement.
+		return simple_parser_error(p, current_loc(), f->block->text_region, "Expected return statement");
+	}
+	auto last = f->block->statements[-1];
+	auto ret = reflect_cast<AstReturn>(last);
+	if (!ret) {
+		return simple_parser_error(p, current_loc(), f->block->text_region, "Expected return statement");
+	}
+	return NULL;
+}
+
+Error* validate_fragment_output_struct(CLikeParser* p, AstStructType* tp) {
+	s64 idx = 0;
+	for (auto it: tp->members) {
+		ColorAttr* c_attr = NULL;
+		for (auto attr: it->attrs) {
+			if (auto m = reflect_cast<ColorAttr>(attr)) {
+				if (c_attr) {
+					return make_double_site_error(p, current_loc(), c_attr->text_region, attr->text_region, "Color attribute is already specified."_b);
+				}
+				c_attr = m;
+			}
+		}
+		if (c_attr == NULL) {
+			return simple_parser_error(p, current_loc(), it->text_region, "Color attribute must be specified."_b);
+		}
+		for (auto i: range(idx)) {
+			auto prev_m = tp->members[i];
+			for (auto attr: prev_m->attrs) {
+				if (auto m = reflect_cast<ColorAttr>(attr)) {
+					if (m->idx == c_attr->idx) {
+						return make_double_site_error(p, current_loc(), m->text_region, c_attr->text_region, "Color index (%) is already used."_b, c_attr->idx);
+					}
+				}
+			}
+		}
+		idx += 1;
+	}
+	return NULL;
+}
+
+Error* typecheck_function_return_value(CLikeParser* p, AstFunction* f) {
+	if (f->kind == AstFunctionKind::Fragment) {
+		if (f->return_ts->tp == p->void_tp) {
+
+		} else if (f->return_ts->tp == p->float4_tp) {
+
+		} else if (is_struct(f->return_ts->tp)) {
+			auto stp = reflect_cast<AstStructType>(f->return_ts->tp);
+			if (!stp) {
+				return simple_parser_error(p, current_loc(), f->text_region, "Internal error: expected struct type.");
+			}
+			auto e = validate_fragment_output_struct(p, stp);
+			if (e) {
+				return e;
+			}
+		} else {
+			return simple_parser_error(p, current_loc(), f->text_region, "Fragment function must return void, float4, or struct."_b);
+		}
+	} else if (f->kind == AstFunctionKind::Vertex) {
+		if (f->return_ts->tp != p->void_tp) {
+			return simple_parser_error(p, current_loc(), f->text_region, "Vertex function must return void."_b);
 		}
 	}
 	return NULL;
@@ -2705,13 +2804,17 @@ Tuple<AstSymbol*, Error*> parse_function(CLikeParser* p, PreType pre_type,  Arra
 		}
 	}
 
-	auto e = handle_entry_point_args(p, f);
+	auto e = typecheck_function_return_value(p, f);
 	if (e) {
 		return { NULL, e };
 	}
-	auto e2 = check_if_attrs_used(p, attrs);
-	if (e2) {
-		return { NULL, e2 };
+	e = handle_entry_point_args(p, f);
+	if (e) {
+		return { NULL, e };
+	}
+	e = check_if_attrs_used(p, attrs);
+	if (e) {
+		return { NULL, e };
 	}
 
 	auto tok = peek(p);
@@ -2731,6 +2834,10 @@ Tuple<AstSymbol*, Error*> parse_function(CLikeParser* p, PreType pre_type,  Arra
 		f->block = (AstBlock*) block;
 		if (f->block->text_region.has_value) {
 			f->text_region.value.end = f->block->text_region.value.end;
+		}
+		auto e2 = ensure_function_has_return(p, f);
+		if (e2) {
+			return { NULL, e2 };
 		}
 		return { f, NULL };
 	}
