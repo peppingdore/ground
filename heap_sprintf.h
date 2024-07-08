@@ -4,6 +4,7 @@
 #include "math/basic_functions.h"
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 template <typename... Args>
 char* heap_sprintf(const char* format, Args... args) {
