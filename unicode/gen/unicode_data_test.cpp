@@ -98,6 +98,8 @@ Array<String> synth_codepoint_unicode_data(u32 codepoint) {
 }
 
 TEST(unicode_data) {
+	EXPECT(ends_with(U"<CJK Ideograph Extension A, First>"_b, "First>"_b));
+
 	auto [text, e] = read_text_at_path(U"../UnicodeData.txt"_b);
 	if (e) {
 		e->free();
@@ -143,12 +145,14 @@ TEST(unicode_data) {
 			}
 
 			for (auto i: range_from_to(codepoint, last_codepoint + 1)) {
-				auto synth = synth_codepoint_unicode_data(codepoint);
+				auto synth = synth_codepoint_unicode_data(i);
+				original[0] = codepoint_hex_padded(i);
 				if (synth != original) {
 					FAIL(sprint("Codepoint: %H diverges. \nOriginal-- %\nSynth   -- %", codepoint, original, synth).data);
 					return;
 				}
 			}
+			continue;
 		}
 
 		auto synth = synth_codepoint_unicode_data(codepoint);
