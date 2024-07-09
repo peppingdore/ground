@@ -59,7 +59,7 @@ Tuple<WindowsWindow*, Error*> os_create_window(WindowParams params) {
 	auto window = make<WindowsWindow>();
 	window->type = reflect_type_of<WindowsWindow>();
 	window->params = params;
-	window->utf16_title = (wchar_t*) encode_utf16(params.title)._0;
+	window->utf16_title = (wchar_t*) encode_utf16(params.title).data;
 	
 	WINDOWS_GETMINMAXINFO_WINDOW_POINTER = window;
 
@@ -224,7 +224,7 @@ void push_windows_window_event(WindowsWindow* window, WindowEvent* event, Option
 	// GetMessageTime() is like GetTickCount(), but casted to LONG instead of DWORD.
 	auto time = custom_time.has_value ? custom_time.value : bitcast<DWORD>(GetMessageTime());
 	event->time_from_system_start = get_windows_time_from_start(time);
-	window->events.add(event);
+	add(&window->events, event);
 }
 
 PointerButtonFlags wparam_to_pointer_buttons(WPARAM wParam) {

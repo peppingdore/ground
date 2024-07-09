@@ -7,7 +7,7 @@
 
 TEST(sort) {
 	Array<s64> arr;
-	arr.add({
+	add(&arr, {
 		4,
 		32,
 		8,

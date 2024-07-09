@@ -40,7 +40,7 @@ void sort(auto arr, auto less) {
 
 void sort(auto arr) {
 	auto less = [&] (auto _, s64 a, s64 b) {
-		return *arr[a] < *arr[b];
+		return arr[a] < arr[b];
 	};
 	sort(arr, less);
 }
@@ -60,7 +60,7 @@ bool is_sorted(auto arr, auto less) {
 
 bool is_sorted(auto arr) {
 	auto less = [&] (auto _, s64 a, s64 b) {
-		return *arr[a] < *arr[b];
+		return arr[a] < arr[b];
 	};
 	return is_sorted(arr, less);
 }

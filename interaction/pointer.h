@@ -88,7 +88,7 @@ struct OsPointerIdMapper {
 };
 
 u64 map_os_pointer_id(OsPointerIdMapper* mapper, u64 os_id) {
-	auto* found = mapper->map.get(os_id);
+	auto* found = get(&mapper->map, os_id);
 	if (found) {
 		return *found;
 	}
@@ -96,7 +96,7 @@ u64 map_os_pointer_id(OsPointerIdMapper* mapper, u64 os_id) {
 		mapper->next_pointer_id = 1;
 	}
 	auto result = mapper->next_pointer_id++;
-	mapper->map.put(os_id, result);
+	put(&mapper->map, os_id, result);
 	return result;
 }
 
