@@ -20,4 +20,4 @@ jobs:
       - name: Install Windows SDK
         uses: GuillaumeFalourd/setup-windows10-sdk-action@v2
       - name: Run test
-        run: py test.py --verbose
+        run: python3 test.py --verbose
