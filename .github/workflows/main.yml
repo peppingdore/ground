@@ -19,7 +19,9 @@ jobs:
           version: latest
       - name: Install Windows SDK
         uses: GuillaumeFalourd/setup-windows10-sdk-action@v2
-      - uses: maxim-lobanov/setup-xcode@v1
+      - name: Xcode
+        if: runner.os == 'macOS'
+        uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest
       - name: Run test
