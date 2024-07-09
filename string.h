@@ -164,7 +164,7 @@ bool ends_with(Span<T> str, Span<U> end) {
 	if (len(end) > len(str)) {
 		return false;
 	}
-	return str[-len(end), len(end)] == end;
+	return str[-len(end), {}] == end;
 }
 
 char32_t ascii_to_lower(char32_t c) {
