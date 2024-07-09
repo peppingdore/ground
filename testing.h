@@ -61,7 +61,7 @@ void tester_write_result_int(s64 num) {
 	if (!WRITE_TEST_RESULTS) {
 		return;
 	}
-	fprintf(stderr, "%lld\n", num);
+	fprintf(stderr, "%lli\n", num);
 }
 
 void tester_write_result_str(const char* str) {
