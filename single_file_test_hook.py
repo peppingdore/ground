@@ -20,7 +20,7 @@ to_build = []
 
 blacklist = ['.git', '.vscode', 'third_party', 'b_lib', 'testing.h']
 win_blacklist = ['posix_thread.h', 'posix_sync.h']
-non_win_blacklist = ['win_thread.h', 'win_sync.h', 'win_window.h']
+non_win_blacklist = ['win_thread.h', 'win_sync.h', 'win_window.h', 'win_key.h']
 
 def gen(dir, level=1):
 	for it in os.scandir(Path(__file__).parent / dir):
