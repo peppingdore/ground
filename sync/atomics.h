@@ -55,9 +55,9 @@ template <>      struct Atomic_Integral_Impl<2> { using Type = s16; };
 #endif
 template <>      struct Atomic_Integral_Impl<8> { using Type = s64; };
 #if COMPILER_MSVC
-	template <>  struct Atomic_Integral_Impl<16> { using Type = struct { s64 low; s64 high; }; };
+	template <>  struct alignas(16) Atomic_Integral_Impl<16> { using Type = struct { s64 low; s64 high; }; };
 #else
-	template <>  struct Atomic_Integral_Impl<16>{ using Type = __int128_t; };
+	template <>  struct alignas(16) Atomic_Integral_Impl<16>{ using Type = __int128_t; };
 #endif
 
 template <typename T>
