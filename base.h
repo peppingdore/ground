@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <float.h>
 #include <assert.h>
+#include <stddef.h> // size_t
 
 #ifdef _WIN32
 	#define OS_WINDOWS 1
