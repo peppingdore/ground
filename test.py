@@ -134,8 +134,9 @@ class Tester:
 				self.print("Success!" if exit_code == 0 else "Failed.")
 			finally:
 				self.msg_queue.put(None)
-		threading.Thread(target=runner_thread, daemon=True).start()
+		threading.Thread(target=runner_thread).start()
 		while it := self.msg_queue.get():
+			if it == None: break
 			print(it)
 		return exit_code
 		
@@ -244,7 +245,7 @@ class CppTest(Test):
 		stdout = StringIO()
 		scope = { "test": self }
 		res = builder.build(self.path, stdout=stdout, scope=scope)	
-		if isinstance(res, builder.Runnable_Executable):
+		if isinstance(res, builder.RunnableExecutable):
 			self.exec_path = res.path
 			self.build_ok = True
 		else:
