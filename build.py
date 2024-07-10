@@ -17,37 +17,39 @@ sys.excepthook = traceback.print_exception
 
 MODULE_ROOT = Path(__file__).parent
 
-class Compiler_Flag:
+class CompilerFlag:
 	def __init__(self, *, clang, msvc):
 		self.clang = clang
 		self.msvc = msvc
 	def __repr__(self):
 		return f'{{{self.clang}, {self.msvc}}}'
 	def __eq__(self, rhs):
-		return isinstance(rhs, Compiler_Flag) and (self.clang, self.msvc) == (rhs.clang, rhs.msvc)
+		return isinstance(rhs, CompilerFlag) and (self.clang, self.msvc) == (rhs.clang, rhs.msvc)
 
-DISABLE_LINKER = Compiler_Flag(clang='-c', msvc='/c')
-LATEST_CPP_VERSION = Compiler_Flag(clang='-std=c++2b', msvc='/std:c++latest')
-COLOR_OUTPUT=Compiler_Flag(clang=('passthrough_clang_cl:-fcolor-diagnostics', 'passthrough_clang_cl:-fansi-escape-codes'), msvc='')
-MISSING_RETURN_IS_ERROR=Compiler_Flag(clang='-Werror=return-type', msvc='')
-DEFINED_SIGNED_OVERFLOW=Compiler_Flag(clang=('-fno-strict-overflow', '-fwrapv'), msvc='/d2UndefIntOverflow-')
-ASSUME_ALIASING=Compiler_Flag(clang='-fno-strict-aliasing', msvc='')
-DEBUG_SYMBOLS=Compiler_Flag(clang='-g', msvc='/Zi')
-DISABLE_WARNINGS=Compiler_Flag(clang='-Wno-everything', msvc='')
-LIMIT_ERROR_SPAM=Compiler_Flag(clang='-ferror-limit=3', msvc='')
-WARNING_IS_ERROR=Compiler_Flag(clang='-Werror', msvc='/WX')
-ALLOW_UNUSED_CMDLINE_ARGUMENT=Compiler_Flag(clang='-Wno-unused-command-line-argument', msvc='')
-ALLOW_UNSAFE_CRT=Compiler_Flag(clang='-Wno-deprecated-declarations', msvc='')
-ALLOW_PRAGMA_ONCE_OUTSIDE_HEADER=Compiler_Flag(clang='-Wno-pragma-once-outside-header', msvc='')
-FILENAME_CASE_MISMATCH_WARNING=Compiler_Flag(clang='-Wnonportable-include-path', msvc='')
-ALLOW_DEPRECATED=Compiler_Flag(clang='-Wno-deprecated', msvc='')
-ALLOW_MICROSOFT_INCLUDE=Compiler_Flag(clang='-Wno-microsoft-include', msvc='')
+DISABLE_LINKER = CompilerFlag(clang='-c', msvc='/c')
+LATEST_CPP_VERSION = CompilerFlag(clang='-std=c++2b', msvc='/std:c++latest')
+COLOR_OUTPUT=CompilerFlag(clang=('passthrough_clang_cl:-fcolor-diagnostics', 'passthrough_clang_cl:-fansi-escape-codes'), msvc='')
+MISSING_RETURN_IS_ERROR=CompilerFlag(clang='-Werror=return-type', msvc='')
+DEFINED_SIGNED_OVERFLOW=CompilerFlag(clang=('-fno-strict-overflow', '-fwrapv'), msvc='/d2UndefIntOverflow-')
+ASSUME_ALIASING=CompilerFlag(clang='-fno-strict-aliasing', msvc='')
+DEBUG_SYMBOLS=CompilerFlag(clang='-g', msvc='/Zi')
+DISABLE_WARNINGS=CompilerFlag(clang='-Wno-everything', msvc='')
+LIMIT_ERROR_SPAM=CompilerFlag(clang='-ferror-limit=3', msvc='')
+WARNING_IS_ERROR=CompilerFlag(clang='-Werror', msvc='/WX')
+ALLOW_UNUSED_CMDLINE_ARGUMENT=CompilerFlag(clang='-Wno-unused-command-line-argument', msvc='')
+ALLOW_UNSAFE_CRT=CompilerFlag(clang='-Wno-deprecated-declarations', msvc='')
+ALLOW_PRAGMA_ONCE_OUTSIDE_HEADER=CompilerFlag(clang='-Wno-pragma-once-outside-header', msvc='')
+FILENAME_CASE_MISMATCH_WARNING=CompilerFlag(clang='-Wnonportable-include-path', msvc='')
+ALLOW_DEPRECATED=CompilerFlag(clang='-Wno-deprecated', msvc='')
+ALLOW_MICROSOFT_INCLUDE=CompilerFlag(clang='-Wno-microsoft-include', msvc='')
+ENABLE_WIDE_CMPXCHG=CompilerFlag(clang="-mcx16", msvc="")
 
 DEFAULT_COMPILER_FLAGS = [
 	DISABLE_LINKER, LATEST_CPP_VERSION, MISSING_RETURN_IS_ERROR,
 	DEFINED_SIGNED_OVERFLOW, ASSUME_ALIASING, DEBUG_SYMBOLS, LIMIT_ERROR_SPAM, WARNING_IS_ERROR,
 	ALLOW_UNUSED_CMDLINE_ARGUMENT, ALLOW_UNSAFE_CRT, ALLOW_PRAGMA_ONCE_OUTSIDE_HEADER,
-	ALLOW_DEPRECATED, FILENAME_CASE_MISMATCH_WARNING, COLOR_OUTPUT, ALLOW_MICROSOFT_INCLUDE ]
+	ALLOW_DEPRECATED, FILENAME_CASE_MISMATCH_WARNING, COLOR_OUTPUT, ALLOW_MICROSOFT_INCLUDE,
+	ENABLE_WIDE_CMPXCHG ]
 
 OS_WINDOWS = "windows"
 OS_LINUX   = "linux"
@@ -82,9 +84,10 @@ def native_target():
 
 def arch_to_compiler_arch(arch):
 	if arch == ARCH_ARM64:
-		return "arm64"
+		return "aarch64"
 	if arch == ARCH_X64:
 		return "x86_64"
+	raise Exception("Unknown arch")
 
 def make_target_triplet(target):
 	if target.os == OS_WINDOWS:
@@ -110,7 +113,7 @@ def is_posix(os):
 
 DEFAULT_COMPILER = 'clang-cl' if platform.system() == 'Windows' else 'clang++'
 
-class Compilation_Params:
+class CompilationParams:
 	def __init__(self, *,
 		compiler=DEFAULT_COMPILER,
 		target=native_target(),
@@ -153,7 +156,7 @@ def verbose(*args):
 	if VERBOSE:
 		print(*args)
 
-def build_compile_cmdline(unit, params, out_path):
+def build_compile_cmdline(unit, params, target, out_path):
 	args = []
 	args.append(params.compiler)
 	if VERBOSE:
@@ -177,10 +180,10 @@ def build_compile_cmdline(unit, params, out_path):
 			args.append(('/' if is_msvc_interface(params.compiler) else '-') + f'D{it}')
 	if is_msvc_interface(params.compiler):
 		args.append('/TP')
-	if is_darwin(params.target.os):
+	if is_darwin(target.os):
 		args.append('-x objective-c++')
 	if not is_msvc_interface(params.compiler):
-		args.append(f'--target={make_target_triplet(params.target)}')
+		args.append(f'--target={make_target_triplet(target)}')
 	if params.optimization_level < 0 or params.optimization_level > 3:
 		raise Exception("optimization_level must be in [0, 3] range")
 	if is_msvc_interface(params.compiler):
@@ -196,26 +199,27 @@ def build_compile_cmdline(unit, params, out_path):
 	verbose(args)
 	return ' '.join(map(str, args))
 
-class Compile_Result:
-	def __init__(self, unit, process, elapsed, out_path):
+class CompileResult:
+	def __init__(self, unit, process, elapsed, target, out_path):
 		self.unit = unit
 		self.process = process
 		self.elapsed = elapsed
+		self.target = target
 		self.out_path = out_path
 
-def compile_unit(unit, params, out_path=None):
+def compile_unit(unit, params, target, out_path=None):
 	if not out_path:
 		out_path = Path(unit).parent / "build_temp" / f'{Path(unit).stem}.obj' 
 	os.makedirs(os.path.dirname(out_path), exist_ok=True)
-	cmdline = build_compile_cmdline(unit, params, out_path)
+	cmdline = build_compile_cmdline(unit, params, target, out_path)
 	process, elapsed = run(cmdline)
-	return Compile_Result(unit, process, elapsed, out_path)
+	return CompileResult(unit, process, elapsed, target, out_path)
 
-def compile_units_parallel(units, params):
+def compile_units_parallel(units, params, target):
 	threads = []
 	results = []
 	def proc(unit):
-		res = compile_unit(unit, params)
+		res = compile_unit(unit, params, target)
 		results.append(res)
 	for it in units:
 		thread = threading.Thread(target=proc, args=[it])
@@ -270,7 +274,7 @@ def did_all_units_compile_successfully(results):
 # 		arr.extend(["UIKit"])
 # 	return arr
 
-class Link_Params:
+class LinkParams:
 	def __init__(self, *,
 		compiler=DEFAULT_COMPILER,
 		natvis_files=[],
@@ -292,13 +296,13 @@ class Link_Params:
 		self.flags = flags
 		self.use_windows_debug_crt = use_windows_debug_crt
 
-class Link_Result:
+class LinkResult:
 	def __init__(self, process, elapsed, output_path):
 		self.process = process
 		self.elapsed = elapsed
 		self.output_path = output_path
 
-def link(objects, params, output_path):
+def link(objects, params, target, output_path):
 	os.makedirs(Path(output_path).parent, exist_ok=True)
 	args = []
 	args.append(params.compiler)
@@ -306,10 +310,12 @@ def link(objects, params, output_path):
 		args.append('/clang:-v' if is_msvc_interface(params.compiler) else '-v')
 	for it in objects:
 		x = it
-		if isinstance(x, Compile_Result):
+		if isinstance(x, CompileResult):
 			x = x.out_path
 		args.append(x)
 	prefix = '/clang:' if is_msvc_interface(params.compiler) else ""
+	if params.compiler != 'cl':
+		args.append(f'{prefix}--target={make_target_triplet(target)}')
 	args.append(f'{prefix}--output="{output_path}"')
 	for it in params.lib_directories:
 		if not is_msvc_interface(params.compiler):
@@ -335,7 +341,7 @@ def link(objects, params, output_path):
 	verbose(args)
 	cmdline = ' '.join(str(it) for it in args)
 	process, elapsed = run(cmdline)
-	return Link_Result(process, elapsed, output_path)
+	return LinkResult(process, elapsed, output_path)
 
 def print_compile_results(stdout, results):
 	for it in results:
@@ -355,7 +361,7 @@ def print_link_result(stdout, result):
 def did_link_successfully(result):
 	return result.process.returncode == 0
 
-class Build_Run:
+class BuildRun:
 	def __init__(self, code, file, line):
 		self.code = code
 		self.file = file
@@ -437,7 +443,7 @@ def collect_build_runs(out):
 		line = int(out[line_num_start: line_num_end].decode('unicode_escape'))
 
 		code = ''.join(pieces)
-		arr.append(Build_Run(code, file_name, line))
+		arr.append(BuildRun(code, file_name, line))
 	return arr
 
 def run_preprocessor(compiler, path):
@@ -468,15 +474,20 @@ def run_build_runs(file, scope):
 		code = compile(it.code, name, 'exec')
 		exec(code, scope)
 
-class Default_Build_Params:
+class DefaultBuildParams:
 	def __init__(self, *,
 		units=[],
-		compile_params=Compilation_Params(),
-		link_params=Link_Params(),
+		compile_params=CompilationParams(),
+		link_params=LinkParams(),
+		target=native_target(),
 	):
 		self.units = units.copy()
 		self.compile_params = compile_params
 		self.link_params = link_params
+		self.target = target
+
+	def set_target(self, target):
+		self.target = target
 
 	def set_optimization_level(self, level):
 		self.compile_params.optimization_level = level
@@ -489,12 +500,6 @@ class Default_Build_Params:
 		run_build_runs(unit)
 		self.units.append(unit)
 
-	def set_target(self, target):
-		self.compile_params.target = target
-
-	def get_target(self):
-		return self.compile_params.target
-
 	def add_define(self, define):
 		self.compile_params.defines.append(define)
 
@@ -505,7 +510,7 @@ class Default_Build_Params:
 		if lib in self.link_params.libraries: return
 		self.link_params.libraries.append(lib)
 
-class Runnable_Executable:
+class RunnableExecutable:
 	def __init__(self, path):
 		self.path = path
 	def __str__(self):
@@ -523,30 +528,37 @@ def build_main():
 	argparser.add_argument('--run', '-r', action='store_true', help="Runs executable after successful compiling")
 	argparser.add_argument('--compiler')
 	argparser.add_argument('--opt_level', type=int, default=0, help="Optimization level")
+	argparser.add_argument('--arch')
 	args, _ = argparser.parse_known_args()
+
+	target = builder.native_target()
 
 	if args.compiler:
 		params.set_compiler(args.compiler)
+	if args.arch:
+		target = builder.Target(target.os, args.arch)
+	
+	params.set_target(target)
 	params.set_optimization_level(args.opt_level)
 
-	compile_results = builder.compile_units_parallel(params.units, params.compile_params)
+	compile_results = builder.compile_units_parallel(params.units, params.compile_params, params.target)
 	builder.print_compile_results(stdout, compile_results)
 	if not builder.did_all_units_compile_successfully(compile_results):
 		return 1
 	output_path = Path(file).parent / "runnable" / builder.build_exec_name(str(Path(file).stem))
-	link_result = builder.link(compile_results, params.link_params, output_path)
+	link_result = builder.link(compile_results, params.link_params, params.target, output_path)
 	builder.print_link_result(stdout, link_result)
 	if not builder.did_link_successfully(link_result):
 		return 1
 	if args.run:
 		builder.run(Path(link_result.output_path).resolve(), stdout=sys.stdout, stdin=sys.stdin, cwd=Path(link_result.output_path).parent)
-	return builder.Runnable_Executable(link_result.output_path)
+	return builder.RunnableExecutable(link_result.output_path)
 """
 
 def build(file, *, stdout=sys.stdout, scope={}):
 	scope.update({
 		"builder": __import__(__name__),
-		"params": Default_Build_Params(),
+		"params": DefaultBuildParams(),
 		"stdout": stdout,
 		"file": file,
 	})
