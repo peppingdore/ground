@@ -216,17 +216,13 @@ def compile_unit(unit, params, target, out_path=None):
 	return CompileResult(unit, process, elapsed, target, out_path)
 
 def compile_units_parallel(units, params, target):
-	threads = []
 	results = []
 	def proc(unit):
 		res = compile_unit(unit, params, target)
 		results.append(res)
-	for it in units:
-		thread = threading.Thread(target=proc, args=[it])
-		thread.start()
-		threads.append(thread)
-	for it in threads:
-		it.join()
+	import multiprocessing
+	pool = multiprocessing.pool.ThreadPool()
+	pool.map(proc, units)
 	return results
 
 def did_all_units_compile_successfully(results):
