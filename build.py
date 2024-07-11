@@ -13,8 +13,6 @@ import traceback
 import linecache
 import uuid
 
-sys.excepthook = traceback.print_exception
-
 MODULE_ROOT = Path(__file__).parent
 
 class CompilerFlag:
@@ -222,7 +220,10 @@ def compile_units_parallel(units, params, target):
 		results.append(res)
 	import multiprocessing
 	pool = multiprocessing.pool.ThreadPool()
-	pool.map(proc, units)
+	res = pool.map_async(proc, units)
+	while True:
+		if res.ready(): break
+		time.sleep(0.1)
 	return results
 
 def did_all_units_compile_successfully(results):

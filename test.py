@@ -10,6 +10,7 @@ from queue import Queue
 from multiprocessing.pool import ThreadPool
 import argparse
 import threading
+import time
 
 ARGS = None
 
@@ -96,48 +97,54 @@ class Tester:
 		self.scan_and_run_hooks(self.path)
 		self.collect_tests()
 		exit_code = -1
-		def runner_thread():
-			nonlocal exit_code
-			pool = ThreadPool()
-			
-			def run_test(test):
-				self.print(f"Running: {test.path}")
-				test.run()
-			try:
-				pool.map(lambda test: test.build(), self.tests)
-				pool.map(lambda test: run_test(test), filter(lambda it: it.build_ok, self.tests))
-				self.print(" -- Summary -- ")
-				for test in self.tests:
-					if not test.build_ok:
-						self.print(f"Test {test.path}: failed to build")
+		pool = ThreadPool()
+		def printer_thread():
+			while it := self.msg_queue.get():
+				if it == None: break
+				print(it)
+		p = threading.Thread(target=printer_thread)
+		p.start()
+		def run_test(test):
+			self.print(f"Running: {test.path}")
+			test.run()
+		try:
+			res = pool.map_async(lambda test: test.build(), self.tests)
+			while True:
+				if res.ready(): break
+				time.sleep(0.1)
+			res =pool.map_async(lambda test: run_test(test), filter(lambda it: it.build_ok, self.tests))
+			while True:
+				if res.ready(): break
+				time.sleep(0.1)
+			self.print(" -- Summary -- ")
+			for test in self.tests:
+				if not test.build_ok:
+					self.print(f"Test {test.path}: failed to build")
+				else:
+					if test.is_ok():
+						self.print(f"Test {test.path}: success")
 					else:
-						if test.is_ok():
-							self.print(f"Test {test.path}: success")
-						else:
-							self.print(f"Test {test.path}: failed")
-							for case in test.cases.values():
-								if not case.is_ok():
-									self.print(f"  Case {case.name}: failed")
-									for expect in case.expects:
-										if not expect.ok:
-											self.print(f"    {expect.message}")
-											if expect.condition:
-												self.print(f"    Condition: {expect.condition}")
-											for it in expect.scope:
-												self.print(f"      at {it[0]}:{it[1]}")
-				ok_tests = [x for x in self.tests if x.is_ok()]
-				ok_cases = [x for x in self.cases() if x.is_ok()]
-				self.print(f"{len(ok_tests)}/{len(self.tests)} tests ok - {len(ok_tests)/len(self.tests)*100:.2f}%")
-				self.print(f"{len(ok_cases)}/{len(self.cases())} cases ok - {len(ok_cases)/len(self.cases())*100:.2f}%")
-				if len(ok_tests) == len(self.tests):
-					exit_code = 0
-				self.print("Success!" if exit_code == 0 else "Failed.")
-			finally:
-				self.msg_queue.put(None)
-		threading.Thread(target=runner_thread).start()
-		while it := self.msg_queue.get():
-			if it == None: break
-			print(it)
+						self.print(f"Test {test.path}: failed")
+						for case in test.cases.values():
+							if not case.is_ok():
+								self.print(f"  Case {case.name}: failed")
+								for expect in case.expects:
+									if not expect.ok:
+										self.print(f"    {expect.message}")
+										if expect.condition:
+											self.print(f"    Condition: {expect.condition}")
+										for it in expect.scope:
+											self.print(f"      at {it[0]}:{it[1]}")
+			ok_tests = [x for x in self.tests if x.is_ok()]
+			ok_cases = [x for x in self.cases() if x.is_ok()]
+			self.print(f"{len(ok_tests)}/{len(self.tests)} tests ok - {len(ok_tests)/len(self.tests)*100:.2f}%")
+			self.print(f"{len(ok_cases)}/{len(self.cases())} cases ok - {len(ok_cases)/len(self.cases())*100:.2f}%")
+			if len(ok_tests) == len(self.tests):
+				exit_code = 0
+			self.print("Success!" if exit_code == 0 else "Failed.")
+		finally:
+			self.msg_queue.put(None)
+		p.join()
 		return exit_code
 		
 class TestCase:
