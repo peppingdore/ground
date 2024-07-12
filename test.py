@@ -15,13 +15,13 @@ import time
 ARGS = None
 
 class Tester:
-	def __init__(self, path, blacklist=[]):
+	def __init__(self, path):
 		self.tests = []
 		self.path = path
 		self.msg_queue = Queue()
 		self.parallel = True
-		self.blacklist = blacklist
-		self.verbose(f'blacklist = {self.blacklist}')
+		self.file_filters = []
+		self.path_filters = []
 
 	def run_exec(self, cmd, *, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, shell=True):
 		self.verbose(f'Running: {cmd}')
@@ -47,45 +47,47 @@ class Tester:
 		if error and ARGS.verbose: self.print(f"Failed to run test {test.path} {error}")
 		else:                      self.print(f"Failed to run test {test.path}")
 
+	def add_file_filter(self, filter):
+		self.file_filters.append(filter)
+		return filter
+	
+	def add_path_filter(self, filter):
+		self.path_filters.append(filter)
+		return filter
+
 	def collect_tests(self):
 		self.scan(self.path)
 		self.print(f"Collected {len(self.tests)} tests.")
-		if ARGS.ci_debug:
-			self.tests = list(filter(lambda it: it.path.endswith("base.h_test.cpp"), self.tests))
 		# chr(10) is newline. this way because f-string can't contain \n literal.
 		self.verbose(f"Tests: \n{chr(10).join(map(lambda it: it.path, self.tests))}")
 
-	def should_ignore(self, entry):
-		if entry.is_dir():
-			if entry.name in map(lambda x: x.removeprefix('/'), filter(lambda x: x.startswith('/'), self.blacklist)):
-				return True
-		if entry.name in filter(lambda x: not x.startswith('/'), self.blacklist):
-			return True
-		return False
-
-	def run_hook(self, path):
+	def load_hook(self, path):
 		import importlib.machinery
-		module = importlib.machinery.SourceFileLoader(path, path).load_module()
+		import importlib.util
+		loader = importlib.machinery.SourceFileLoader(Path(path).stem, path)
+		spec = importlib.util.spec_from_loader(loader.name, loader)
+		module = importlib.util.module_from_spec(spec)
+		loader.exec_module(module)
 		module.run_hook(self)
 
-	def scan_and_run_hooks(self, dir):
+	def scan_and_load_hooks(self, dir):
 		self.verbose(f"Scanning and running hooks in {dir}")
 		for it in os.scandir(dir):
-			if self.should_ignore(it): continue
 			if it.is_dir():
-				self.scan_and_run_hooks(it.path)
+				self.scan_and_load_hooks(it.path)
 				continue
 			if it.name.lower().endswith("_test_hook.py"):
-				self.run_hook(it.path)
+				self.load_hook(it.path)
 
 	def scan(self, dir):
+		if any(map(lambda x: x(dir), self.path_filters)): return
 		self.verbose(f'Scanning for tests in {dir}')
 		for it in os.scandir(dir):
-			if self.should_ignore(it): continue
 			if it.is_dir():
-				self.scan(it.path)
+				self.scan(Path(it.path))
 				continue
 			if it.name.lower().endswith(("_test.h", "_test.cpp", "_test.hpp", "_test.c")):
+				if any(map(lambda x: x(it), self.file_filters)): continue
 				self.add(CppTest(it.path, self))
 
 	def cases(self):
@@ -94,7 +96,7 @@ class Tester:
 		return cases
 
 	def run(self):
-		self.scan_and_run_hooks(self.path)
+		self.scan_and_load_hooks(self.path)
 		self.collect_tests()
 		exit_code = -1
 		pool = ThreadPool()
@@ -263,11 +265,10 @@ def main():
 	parser = argparse.ArgumentParser()
 	parser.add_argument('--path', default=os.getcwd())
 	parser.add_argument('--verbose', action='store_true')
-	parser.add_argument('--blacklist', nargs='*', default=[])
-	parser.add_argument('--ci_debug', action='store_true') 
 	ARGS = parser.parse_args()
 	builder.VERBOSE = ARGS.verbose
-	tester = Tester(Path(__file__).parent, blacklist=ARGS.blacklist)
+	tester = Tester(Path(__file__).parent)
+	sys.modules['test_mod'] = tester
 	return tester.run()
 
 if __name__ == "__main__":

@@ -5,13 +5,11 @@ import sys
 import platform
 import time
 import subprocess
-import threading
 import argparse
 from pathlib import Path
 from collections import namedtuple
-import traceback
 import linecache
-import uuid
+from multiprocessing.pool import ThreadPool
 
 MODULE_ROOT = Path(__file__).parent
 
@@ -218,8 +216,7 @@ def compile_units_parallel(units, params, target):
 	def proc(unit):
 		res = compile_unit(unit, params, target)
 		results.append(res)
-	import multiprocessing
-	pool = multiprocessing.pool.ThreadPool()
+	pool = ThreadPool()
 	res = pool.map_async(proc, units)
 	while True:
 		if res.ready(): break
