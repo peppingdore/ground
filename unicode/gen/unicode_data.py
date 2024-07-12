@@ -156,7 +156,7 @@ def generate(*, version=unicode_version.UNICODE_VERSION):
 			pack_codepoint(cp)
 	c_uniform_ranges = []
 	for it in uniform_ranges:
-		c_uniform_ranges.append(f"{{ {hex(it.codepoint.codepoint)}, {hex(it.codepoint.codepoint)}, {len(offset_into_packed)} }}")
+		c_uniform_ranges.append(f"{{ {hex(it.start)}, {hex(it.end)}, {len(offset_into_packed)} }}")
 		pack_codepoint(it.codepoint)
 
 	c_packed_codepoints = []

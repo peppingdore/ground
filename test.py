@@ -10,17 +10,18 @@ from queue import Queue
 from multiprocessing.pool import ThreadPool
 import argparse
 import threading
+import time
 
 ARGS = None
 
 class Tester:
-	def __init__(self, path, blacklist=[]):
+	def __init__(self, path):
 		self.tests = []
 		self.path = path
 		self.msg_queue = Queue()
 		self.parallel = True
-		self.blacklist = blacklist
-		self.verbose(f'blacklist = {self.blacklist}')
+		self.file_filters = []
+		self.path_filters = []
 
 	def run_exec(self, cmd, *, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, shell=True):
 		self.verbose(f'Running: {cmd}')
@@ -36,12 +37,23 @@ class Tester:
 		if ARGS.verbose:
 			self.msg_queue.put(msg)
 
-	def test_build_failed(self, test):
-		self.print(f"Failed to build {test.path}")
+	def test_build_failed(self, test, output=""):
+		if ARGS.verbose:
+			self.print(f"Failed to build {test.path}\n{output}")
+		else:
+			self.print(f"Failed to build {test.path}")
 
 	def test_run_failed(self, test, error=None):
 		if error and ARGS.verbose: self.print(f"Failed to run test {test.path} {error}")
 		else:                      self.print(f"Failed to run test {test.path}")
+
+	def add_file_filter(self, filter):
+		self.file_filters.append(filter)
+		return filter
+	
+	def add_path_filter(self, filter):
+		self.path_filters.append(filter)
+		return filter
 
 	def collect_tests(self):
 		self.scan(self.path)
@@ -49,37 +61,33 @@ class Tester:
 		# chr(10) is newline. this way because f-string can't contain \n literal.
 		self.verbose(f"Tests: \n{chr(10).join(map(lambda it: it.path, self.tests))}")
 
-	def should_ignore(self, entry):
-		if entry.is_dir():
-			if entry.name in map(lambda x: x.removeprefix('/'), filter(lambda x: x.startswith('/'), self.blacklist)):
-				return True
-		if entry.name in filter(lambda x: not x.startswith('/'), self.blacklist):
-			return True
-		return False
-
-	def run_hook(self, path):
+	def load_hook(self, path):
 		import importlib.machinery
-		module = importlib.machinery.SourceFileLoader(path, path).load_module()
+		import importlib.util
+		loader = importlib.machinery.SourceFileLoader(Path(path).stem, path)
+		spec = importlib.util.spec_from_loader(loader.name, loader)
+		module = importlib.util.module_from_spec(spec)
+		loader.exec_module(module)
 		module.run_hook(self)
 
-	def scan_and_run_hooks(self, dir):
+	def scan_and_load_hooks(self, dir):
 		self.verbose(f"Scanning and running hooks in {dir}")
 		for it in os.scandir(dir):
-			if self.should_ignore(it): continue
 			if it.is_dir():
-				self.scan_and_run_hooks(it.path)
+				self.scan_and_load_hooks(it.path)
 				continue
 			if it.name.lower().endswith("_test_hook.py"):
-				self.run_hook(it.path)
+				self.load_hook(it.path)
 
 	def scan(self, dir):
+		if any(map(lambda x: x(dir), self.path_filters)): return
 		self.verbose(f'Scanning for tests in {dir}')
 		for it in os.scandir(dir):
-			if self.should_ignore(it): continue
 			if it.is_dir():
-				self.scan(it.path)
+				self.scan(Path(it.path))
 				continue
 			if it.name.lower().endswith(("_test.h", "_test.cpp", "_test.hpp", "_test.c")):
+				if any(map(lambda x: x(it), self.file_filters)): continue
 				self.add(CppTest(it.path, self))
 
 	def cases(self):
@@ -88,50 +96,57 @@ class Tester:
 		return cases
 
 	def run(self):
-		self.scan_and_run_hooks(self.path)
+		self.scan_and_load_hooks(self.path)
 		self.collect_tests()
 		exit_code = -1
-		def runner_thread():
-			nonlocal exit_code
-			pool = ThreadPool()
-			
-			def run_test(test):
-				self.print(f"Running: {test.path}")
-				test.run()
-			try:
-				pool.map(lambda test: test.build(), self.tests)
-				pool.map(lambda test: run_test(test), filter(lambda it: it.build_ok, self.tests))
-				self.print(" -- Summary -- ")
-				for test in self.tests:
-					if not test.build_ok:
-						self.print(f"Test {test.path}: failed to build")
+		pool = ThreadPool()
+		def printer_thread():
+			while it := self.msg_queue.get():
+				if it == None: break
+				print(it)
+		p = threading.Thread(target=printer_thread)
+		p.start()
+		def run_test(test):
+			self.print(f"Running: {test.path}")
+			test.run()
+		try:
+			res = pool.map_async(lambda test: test.build(), self.tests)
+			while True:
+				if res.ready(): break
+				time.sleep(0.1)
+			res =pool.map_async(lambda test: run_test(test), filter(lambda it: it.build_ok, self.tests))
+			while True:
+				if res.ready(): break
+				time.sleep(0.1)
+			self.print(" -- Summary -- ")
+			for test in self.tests:
+				if not test.build_ok:
+					self.print(f"Test {test.path}: failed to build")
+				else:
+					if test.is_ok():
+						self.print(f"Test {test.path}: success")
 					else:
-						if test.is_ok():
-							self.print(f"Test {test.path}: success")
-						else:
-							self.print(f"Test {test.path}: failed")
-							for case in test.cases.values():
-								if not case.is_ok():
-									self.print(f"  Case {case.name}: failed")
-									for expect in case.expects:
-										if not expect.ok:
-											self.print(f"    {expect.message}")
-											if expect.condition:
-												self.print(f"    Condition: {expect.condition}")
-											for it in expect.scope:
-												self.print(f"      at {it[0]}:{it[1]}")
-				ok_tests = [x for x in self.tests if x.is_ok()]
-				ok_cases = [x for x in self.cases() if x.is_ok()]
-				self.print(f"{len(ok_tests)}/{len(self.tests)} tests ok - {len(ok_tests)/len(self.tests)*100:.2f}%")
-				self.print(f"{len(ok_cases)}/{len(self.cases())} cases ok - {len(ok_cases)/len(self.cases())*100:.2f}%")
-				if len(ok_tests) == len(self.tests):
-					exit_code = 0
-				self.print("Success!" if exit_code == 0 else "Failed.")
-			finally:
-				self.msg_queue.put(None)
-		threading.Thread(target=runner_thread, daemon=True).start()
-		while it := self.msg_queue.get():
-			print(it)
+						self.print(f"Test {test.path}: failed")
+						for case in test.cases.values():
+							if not case.is_ok():
+								self.print(f"  Case {case.name}: failed")
+								for expect in case.expects:
+									if not expect.ok:
+										self.print(f"    {expect.message}")
+										if expect.condition:
+											self.print(f"    Condition: {expect.condition}")
+										for it in expect.scope:
+											self.print(f"      at {it[0]}:{it[1]}")
+			ok_tests = [x for x in self.tests if x.is_ok()]
+			ok_cases = [x for x in self.cases() if x.is_ok()]
+			self.print(f"{len(ok_tests)}/{len(self.tests)} tests ok - {len(ok_tests)/len(self.tests)*100:.2f}%")
+			self.print(f"{len(ok_cases)}/{len(self.cases())} cases ok - {len(ok_cases)/len(self.cases())*100:.2f}%")
+			if len(ok_tests) == len(self.tests):
+				exit_code = 0
+			self.print("Success!" if exit_code == 0 else "Failed.")
+		finally:
+			self.msg_queue.put(None)
+		p.join()
 		return exit_code
 		
 class TestCase:
@@ -238,21 +253,22 @@ class CppTest(Test):
 		self.tester.print(f'Building: {self.path}')
 		stdout = StringIO()
 		scope = { "test": self }
-		res = builder.build(self.path, stdout=stdout, scope=scope)
-		if isinstance(res, builder.Runnable_Executable):
+		res = builder.build(self.path, stdout=stdout, scope=scope)	
+		if isinstance(res, builder.RunnableExecutable):
 			self.exec_path = res.path
 			self.build_ok = True
 		else:
-			self.tester.test_build_failed(self)
+			self.tester.test_build_failed(self, output=stdout.getvalue())
 
 def main():
 	global ARGS
 	parser = argparse.ArgumentParser()
 	parser.add_argument('--path', default=os.getcwd())
 	parser.add_argument('--verbose', action='store_true')
-	parser.add_argument('--blacklist', nargs='*', default=[])
 	ARGS = parser.parse_args()
-	tester = Tester(Path(__file__).parent, blacklist=ARGS.blacklist)
+	builder.VERBOSE = ARGS.verbose
+	tester = Tester(Path(__file__).parent)
+	sys.modules['test_mod'] = tester
 	return tester.run()
 
 if __name__ == "__main__":

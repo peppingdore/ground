@@ -32,7 +32,7 @@ void default_logger_proc(Logger* logger, LogInfo info, UnicodeString text) {
 	auto unicode_path = copy_unicode_string(make_string(info.loc.file));
 	auto base = path_basename(unicode_path);
 	auto formatted = sprint("%:% %", base, info.loc.line, text);
-	print(formatted);
+	println(formatted);
 	formatted.free();
 	unicode_path.free();
 }
@@ -78,7 +78,8 @@ inline void LogAtLogger(Logger* logger, LogInfo info, UnicodeString text) {
 
 inline void LogAtLogger(Logger* logger, LogInfo info, auto... args) {
 	auto str = sprint_unicode(logger->allocator, args...);
-	LogAtLogger(logger, info, str);
+	LogAtLogger(logger, info, (UnicodeString) str);
+	str.free();
 }
 
 inline void LogWithInfo(LogInfo info, auto... args) {

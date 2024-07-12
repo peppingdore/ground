@@ -32,7 +32,6 @@ Thread start_thread(auto* proc, Args ...args) {
 	data->args = args_tuple;
 
 	auto thread_main = [](void* data_ptr) -> OsThreadReturnType {
-		ZoneScopedN("thread_main");
 		auto* data = (ThreadData*) data_ptr;
 		call_with_tuple(*data->proc, data->args);
 		free(c_allocator, data);

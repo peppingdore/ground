@@ -27,22 +27,22 @@ void verify_one_dim_array(Array<TestRegion> regions, String str, CodeLocation lo
 		last_end = it.start + it.length;
 	}
 
-	auto sb = build_string();
+	Array<char> sb;
 	for (auto it: regions) {
 		for (auto i: range(it.length)) {
-			sb.append(it.c);
+			add(&sb, it.c);
 		}
 	}
-	EXPECT(sb.get_string() == str);
-	println(sb.get_string());
+	EXPECT(sb == str);
+	println(sb);
 }
 
 Array<TestRegion> build_test_regions() {
 	Array<TestRegion> regions;
-	regions.add(TestRegion{0,  10, 'a'});
-	regions.add(TestRegion{10, 10, 'B'});
-	regions.add(TestRegion{20, 10, 'c'});
-	regions.add(TestRegion{30, 10, 'D'});
+	add(&regions, TestRegion{0,  10, 'a'});
+	add(&regions, TestRegion{10, 10, 'B'});
+	add(&regions, TestRegion{20, 10, 'c'});
+	add(&regions, TestRegion{30, 10, 'D'});
 	return regions;
 }
 
@@ -50,26 +50,26 @@ TEST(one_dim) {
 	auto regions = build_test_regions();
 	
 	auto get_region = [&](s64 i) {
-		auto reg = *regions[i];
+		auto reg = regions[i];
 		return OneDimRegion { reg.start, reg.length };
 	};
 
 	auto resize = [&](s64 i, s64 start, s64 end) {
-		regions[i]->start = start;
-		regions[i]->length = end - start;
+		regions[i].start = start;
+		regions[i].length = end - start;
 	};
 
 	char insert_letter = 'N';
 	auto insert = [&](s64 i, s64 start, s64 end, s64 copy_idx) {
 		if (copy_idx == -1) {
-			regions.add_at_index(i, TestRegion{start, end - start, insert_letter});
+			add(&regions, TestRegion{start, end - start, insert_letter}, i);
 		} else {
-			regions.add_at_index(i, TestRegion{start, end - start, regions[copy_idx]->c });
+			add(&regions, TestRegion{start, end - start, regions[copy_idx].c }, i);
 		}
 	};
 
 	auto remove = [&](s64 i) {
-		regions.remove_at_index(i);
+		remove_at_index(&regions, i);
 	};
 
 	verify_one_dim_array(regions, "aaaaaaaaaaBBBBBBBBBBccccccccccDDDDDDDDDD"_b);

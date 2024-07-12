@@ -1,14 +1,18 @@
 import os
+from pathlib import Path
 
 def run_hook(tester):
-	tester.blacklist.extend([
-		"/b_lib",
-		"/.git",
-		"/.vscode",
-		"/.vs",
-		"/__pycache__",
-	])
-	if os.name == 'nt':
-		tester.blacklist.append('posix_sync.h_test.cpp')
-	else:
-		tester.blacklist.append('win_sync.h_test.cpp')
+	@tester.add_file_filter
+	def file_filter(path: Path):
+		if os.name == 'nt':
+			if str(path).endswith("posix_sync.h_test.cpp"):
+				return True
+		else:
+			if str(path).endswith("win_sync.h_test.cpp"):
+				return True
+			
+	@tester.add_path_filter
+	def path_filter(path: Path):
+		for it in path.parts:
+			if it in ["b_lib", ".git", ".vscode", ".vs", "__pycache__"]:
+				return True

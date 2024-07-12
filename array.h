@@ -90,7 +90,7 @@ T* add(Array<T>* arr, Span<T> src, s64 index = -1, CodeLocation loc = caller_loc
 
 // add initializer list
 template <typename T>
-T* add(Array<T>* arr, std::initializer_list<T> list, s64 index = -1, CodeLocation loc = caller_loc()) {
+T* add(Array<T>* arr, std::initializer_list<std::type_identity_t<T>> list, s64 index = -1, CodeLocation loc = caller_loc()) {
 	return add(arr, (T*) list.begin(), list.size(), index, loc);
 }
 
@@ -120,7 +120,7 @@ template <typename T>
 Array<T> to_array(Allocator allocator, Generator<T>&& generator) {
 	Array<T> arr = { .allocator = allocator };
 	for (auto it: generator) {
-		arr.add(it);
+		add(&arr, it);
 	}
 	return arr;
 }

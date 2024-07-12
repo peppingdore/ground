@@ -55,9 +55,9 @@ template <>      struct Atomic_Integral_Impl<2> { using Type = s16; };
 #endif
 template <>      struct Atomic_Integral_Impl<8> { using Type = s64; };
 #if COMPILER_MSVC
-	template <>  struct Atomic_Integral_Impl<16> { using Type = struct { s64 low; s64 high; }; };
+	template <>  struct alignas(16) Atomic_Integral_Impl<16> { using Type = struct { s64 low; s64 high; }; };
 #else
-	template <>  struct Atomic_Integral_Impl<16>{ using Type = __int128_t; };
+	template <>  struct alignas(16) Atomic_Integral_Impl<16>{ using Type = __int128_t; };
 #endif
 
 template <typename T>
@@ -114,7 +114,7 @@ consteval MemoryOrder map_compare_and_swap_mo(MemoryOrder success_mo) {
 	if (success_mo == MemoryOrder::Acquire) return MemoryOrder::Acquire;
 	if (success_mo == MemoryOrder::Release) return MemoryOrder::Relaxed;
 	if (success_mo == MemoryOrder::Acq_Rel) return MemoryOrder::Acquire;
-	else                                     return MemoryOrder::Seq_Cst;
+	else                                    return MemoryOrder::Seq_Cst;
 }
 
 template <
@@ -163,7 +163,7 @@ T compare_and_swap(T* dst, T comp_v, T xchg_v) {
 template <AtomicSize T, MemoryOrder mo = MemoryOrder::Seq_Cst>
 T atomic_load(T* x) {
 	T value = {};
-	return compare_and_swap<T, mo, mo>(x, value, value);
+	return compare_and_swap<T, mo>(x, value, value);
 }
 
 template <typename T>
@@ -175,7 +175,7 @@ template <AtomicSize T, MemoryOrder mo = MemoryOrder::Seq_Cst>
 void atomic_store(T* dst, T value) {
 	while (true) {
 		T read = *dst;
-		T prev = compare_and_swap<T, mo, mo>(dst, read, value);
+		T prev = compare_and_swap<T, mo>(dst, read, value);
 		if (atomic_internal_compare(prev, read)) {
 			break;
 		}

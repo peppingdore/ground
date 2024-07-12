@@ -27,10 +27,10 @@ struct Span {
 		s64 start_val = start.has_value ? start.value : 0;
 		s64 end_val   = end.has_value   ? end.value   : count;
 		if (start_val < 0) {
-			start_val += count + 1;
+			start_val += count;
 		}
 		if (end_val < 0) {
-			end_val += count + 1;
+			end_val += count;
 		}
 		assert(start_val >= 0);
 		assert(end_val >= 0);

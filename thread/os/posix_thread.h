@@ -1,6 +1,7 @@
 #pragma once
 
 #include <pthread.h>
+#include <unistd.h>
 
 using ThreadId = pthread_t;
 
