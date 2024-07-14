@@ -2909,7 +2909,7 @@ Tuple<AstStructType*, Error*> parse_struct(CLikeParser* p, Token start_tok) {
 		next(p);
 
 		ProgramTextRegion reg;
-		reg.start = start_tok.reg.start;
+		reg.start = pre_type.reg.start;
 		reg.end = name.reg.end;
 		if (init_expr && init_expr->text_region.has_value) {
 			reg.end = init_expr->text_region.value.end;
