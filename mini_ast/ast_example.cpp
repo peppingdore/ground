@@ -72,19 +72,11 @@ UR"TAG(
 )TAG"_b;
 #endif
 
-void print_error(Error* e) {
-	if (auto error = reflect_cast<CLikeParserError>(e)) {
-		print_parser_error(error);
-	} else {
-		println(e->text);
-	}
-	println("Generated at %", e->loc);
-}
 
 int main() {
 	auto [program, e] = parse_c_like(PROGRAM);
 	if (e) {
-		print_error(e);
+		print_parser_error(e);
 		return -1;
 	}
 	// println(print_ast_node(program));
@@ -97,32 +89,32 @@ int main() {
 
 			auto [ssa, e] = emit_function_ssa(c_allocator, f);
 			if (e) {
-				print_error(e);
+				print_parser_error(e);
 				return -1;
 			}
 
 			auto [file, e1] = open_file(U"xxx.spv"_b, FILE_WRITE | FILE_CREATE_NEW);
 			if (e1) {
-				print_error(e1);
+				print_parser_error(e);1);
 				return -1;
 			}
 			auto m = make_spirv_emitter(f->p, c_allocator);			
 			e = emit_spirv_function(&m, ssa);
 			if (e) {
-				print_error(e);
+				print_parser_error(e);
 				return -1;
 			}
 			print_ssa(ssa->entry);
 
 			e = finalize_spirv(&m);
 			if (e) {
-				print_error(e);
+				print_parser_error(e);
 				return -1;
 			}
 
 			e = write_file(&file, m.spv.data, len(m.spv) * sizeof(u32));
 			if (e) {
-				print_error(e);
+				print_parser_error(e);
 				return -1;
 			}
 			println("Emitted ssa");

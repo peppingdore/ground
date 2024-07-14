@@ -643,22 +643,27 @@ void add_text(CLikeParser* p, CLikeParserError* error, auto... args) {
 	add(&error->pieces, piece);
 }
 
-void print_parser_error(CLikeParserError* e) {
-	print(e->text);
-	for (auto it: e->pieces) {
-		if (len(it.message) > 0) {
-			println(it.message);
-		}
-		for (auto reg: it.highlight_regions) {
-			auto text = e->program_text[reg.start, reg.start + reg.length];
-			u64 regular_color = reg.color & 0xf;
-			if (regular_color) {
-				print("\x1b[0;%m", 30 + regular_color - 1);
+void print_parser_error(Error* e) {
+	if (auto x = reflect_cast<CLikeParserError>(e)) {
+		print(x->text);
+		for (auto it: x->pieces) {
+			if (len(it.message) > 0) {
+				println(it.message);
 			}
-			print(text);
-			print("\x1b[0m");
+			for (auto reg: it.highlight_regions) {
+				auto text = x->program_text[reg.start, reg.start + reg.length];
+				u64 regular_color = reg.color & 0xf;
+				if (regular_color) {
+					print("\x1b[0;%m", 30 + regular_color - 1);
+				}
+				print(text);
+				print("\x1b[0m");
+			}
 		}
+	} else {
+		println(e->text);
 	}
+	println("Generated at %", e->loc);
 }
 
 CLikeParserError* simple_parser_error(CLikeParser* p, CodeLocation loc, Optional<ProgramTextRegion> reg, auto... args) {
