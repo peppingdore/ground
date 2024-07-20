@@ -836,6 +836,178 @@ Token peek(CLikeParser* p) {
 	return p->current_token;
 }
 
+struct PrepComment {
+	s64 start = 0;
+	s64 end   = 0;
+
+	REFLECT(PrepComment) {
+		MEMBER(start);
+		MEMBER(end);
+	}
+};
+
+struct Preprocessor;
+
+struct PrepNode {
+	Type*         type = NULL;
+	Preprocessor* pp = NULL;
+	PrepNode*     parent = NULL;
+
+	REFLECT(PrepNode) {
+		MEMBER(type); TAG(RealTypeMember{});
+		MEMBER(pp);
+		MEMBER(parent);
+	}
+};
+
+template <typename T>
+T* make_prep_node(Preprocessor* pp) {
+	auto node = make<T>(pp->allocator);
+	node->type = reflect_type_of<T>();
+	node->pp = pp;
+	return node;
+}
+
+struct PrepFile {
+	UnicodeString path;
+	UnicodeString str;
+};
+
+struct PrepFileNode: PrepNode {
+	PrepFile* file = NULL;
+	s64       file_offset = 0;
+
+	REFLECT(PrepFileNode) {
+		BASE_TYPE(PrepNode);
+		MEMBER(file);
+		MEMBER(file_offset);
+	}
+};
+
+struct PrepNodeReg {
+	PrepNode* node = NULL;
+	s64       start = 0;
+	s64       end = -1;
+};
+
+struct Preprocessor {
+	Allocator              allocator;
+	AllocatedUnicodeString pr;
+	Array<PrepNode*>       scope;
+	Array<PrepFile*>       files;
+	Array<PrepNodeReg*>    regs;
+};
+
+void push_reg(Preprocessor* pp) {
+	if (len(pp->scope) == 0) {
+		return;
+	}
+	auto reg = make<PrepNodeReg>(pp->allocator);
+	reg->node = pp->scope[-1];
+	reg->start = len(pp->pr);
+	while (len(pp->regs) > 0) {
+		if (pp->regs[-1]->start < reg->start) {
+			break;
+		}
+		remove_at_index(&pp->regs, -1);
+	}
+	if (len(pp->regs) > 0) {
+		pp->regs[-1]->end = reg->start;
+	}
+	add(&pp->regs, reg);
+}
+
+void push_scope(Preprocessor* pp, PrepNode* node) {
+	if (len(pp->scope) > 0) {
+		assert(node->parent == NULL);
+		node->parent = pp->scope[-1];
+	}
+	add(&pp->scope, node);
+	push_reg(pp);
+}
+
+void pop_scope(Preprocessor* pp) {
+	pop(&pp->scope);
+	push_reg(pp);
+}
+
+Error* prep_file(Preprocessor* pp, UnicodeString str, UnicodeString path) {
+	auto file = make<PrepFile>(pp->allocator);
+	file->path = path;
+	file->str = str;
+	add(&pp->files, file);
+
+	auto node = make_prep_node<PrepFileNode>(pp);
+	node->file = file;
+	node->file_offset = 0;
+	push_scope(pp, node);
+
+	s64 cursor = 0;
+	while (cursor < len(str)) {
+		UnicodeString remaining = str[cursor, {}];
+		if (starts_with(remaining, "//")) {
+			s64 start = cursor;
+			s64 end = len(str);
+			for (auto i: range_from_to(cursor, len(str))) {
+				if (is_line_break(str[i])) {
+					end = i;
+					break;
+				}
+			}
+			cursor = end;
+			pop_scope(pp);
+			auto comment_node = make_prep_node<PrepFileNode>(pp);
+			comment_node->file = file;
+			comment_node->file_offset = start;
+			push_scope(pp, comment_node);
+			add(&pp->pr, ' ');
+			pop_scope(pp);
+			auto new_node = make_prep_node<PrepFileNode>(pp);
+			new_node->file = file;
+			new_node->file_offset = end;
+			push_scope(pp, new_node);
+			continue;
+		}
+		if (starts_with(remaining, "/*")) {
+			s64 start = cursor;
+			cursor += 2;
+			s64 level = 1;
+			while (cursor < len(str)) {
+				if (starts_with(str[cursor, {}], "/*")) {
+					cursor += 2;
+					level += 1;
+				} else if (starts_with(str[cursor, {}], "*/")) {
+					cursor += 2;
+					level -= 1;
+					if (level == 0) {
+						break;
+					}
+				}
+			}
+			if (level > 0) {
+				// @TODO: continue.
+				// Add preprocessor text region.
+			}
+		}
+		// if (starts_with(remaining, "#")) {
+			
+		// }
+		add(&pp->pr, str[cursor]);
+		cursor += 1;
+	}
+	return NULL;
+}
+
+Preprocessor* make_preprocessor(Allocator allocator) {
+	auto pp = make<Preprocessor>(allocator);
+	pp->allocator = allocator;
+	pp->pr.allocator = allocator;
+	pp->files.allocator = allocator;
+	pp->scope.allocator = allocator;
+	pp->regs.allocator = allocator;
+	return pp;
+}
+
 Generator<AstSymbol*> resolve_symbols(AstNode* node) {
 	if (auto sym = reflect_cast<AstSymbol>(node)) {
 		co_yield sym;
