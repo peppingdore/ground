@@ -161,7 +161,7 @@ bool starts_with(Span<T> str, Span<U> start) {
 
 template <StringChar T, StringChar U, s64 N>
 bool starts_with(Span<T> str, const U (&start)[N]) {
-	return starts_with(str, Span<U>{ start, N - 1 });
+	return starts_with(str, Span<U>{ (U*) start, N - 1 });
 }
 
 template <StringChar T, StringChar U>
