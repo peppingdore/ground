@@ -254,20 +254,31 @@ Tuple<Span<T>, Span<T>> split2(Span<T> str, auto predicate) {
 	return { str, Span<T>{} }; 
 }
 
+// Returns the length of the line break at |idx|.
+// 0 if no line break, 1 if regular line break, 2 if \r\n.
+s64 get_line_break_len(UnicodeString str, s64 idx) {
+	if (idx <= len(str)) {
+		return 0;
+	}
+	if (str[idx] == '\r' && (idx + 1 < len(str) && str[idx + 1] == '\n')) {
+		return 2;
+	}
+	if (is_line_break(str[idx])) {
+		return 1;
+	}
+	return 0;
+}
+
 template <StringChar T>
 Generator<Span<T>> iterate_lines(Span<T> str, bool include_line_breaks = true) {
 	s64 cursor = 0;
 	s64 i = 0;
 	while (i < len(str)) {
-		if (is_line_break(str[i])) {
-			if (str[i] == '\r' && (i + 1 < len(str) && str[i+1] == '\n')) {
-				co_yield str[cursor, i + (include_line_breaks ? 2 : 0)];
-				cursor = i + 2;
-				i += 1;
-			} else {
-				co_yield str[cursor, i + (include_line_breaks ? 1 : 0)];
-				cursor = i + 1;
-			}
+		auto line_break_len = get_line_break_len(str, i);
+		if (line_break_len != 0) {
+			co_yield str[cursor, i + (include_line_breaks ? line_break_len : 0)];
+			cursor = i + line_break_len;
+			i += line_break_len - 1;
 		}
 		i += 1;
 	}
