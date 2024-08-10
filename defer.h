@@ -19,3 +19,4 @@ struct DeferMaker {
 };
 
 #define defer const auto& CONCAT(defer__, __LINE__ ) = DeferMaker() + [&]()
+#define defer_x(stmt) defer { stmt; };

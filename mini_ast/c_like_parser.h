@@ -982,6 +982,8 @@ Error* prep_file(Preprocessor* pp, UnicodeString str, UnicodeString path) {
 					if (level == 0) {
 						break;
 					}
+				} else {
+					cursor += 1;
 				}
 			}
 			if (level > 0) {
