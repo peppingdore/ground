@@ -41,6 +41,15 @@ struct Span {
 		return slice;
 	}
 
+	struct SpanRange {
+		Optional<s64> start;
+		Optional<s64> end;
+	};
+
+	Span operator[](SpanRange x) {
+		return operator[](x.start, x.end);
+	}
+
 	template <typename U>
 	bool operator==(Span<U> rhs) {
 		if (count != rhs.count) return false;
