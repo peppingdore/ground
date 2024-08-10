@@ -141,6 +141,11 @@ T* copy(Allocator allocator, T thing, CodeLocation loc = caller_loc()) {
 }
 
 template <typename T>
+T* copy(Allocator allocator, T* thing, CodeLocation loc = caller_loc()) {
+	return (T*) copy(allocator, *thing, loc);
+}
+
+template <typename T>
 T* make(Allocator allocator = c_allocator, CodeLocation loc = caller_loc()) {
 	T* mem = Alloc<T>(allocator,1, loc);
 	return new(mem) T();
