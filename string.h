@@ -256,15 +256,15 @@ Tuple<Span<T>, Span<T>> split2(Span<T> str, auto predicate) {
 
 // Returns the length of the line break at |idx|.
 // 0 if no line break, 1 if regular line break, 2 if \r\n.
-s64 get_line_break_len(UnicodeString str, s64 idx) {
-	if (idx <= len(str)) {
-		return 0;
-	}
-	if (str[idx] == '\r' && (idx + 1 < len(str) && str[idx + 1] == '\n')) {
-		return 2;
-	}
-	if (is_line_break(str[idx])) {
-		return 1;
+template <StringChar T>
+s64 get_line_break_len(Span<T> str, s64 idx) {
+	if (idx < len(str)) {
+		if (str[idx] == '\r' && (idx + 1 < len(str) && str[idx + 1] == '\n')) {
+			return 2;
+		}
+		if (is_line_break(str[idx])) {
+			return 1;
+		}
 	}
 	return 0;
 }
