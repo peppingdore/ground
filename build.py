@@ -504,6 +504,9 @@ class DefaultBuildParams:
 		if lib in self.link_params.libraries: return
 		self.link_params.libraries.append(lib)
 
+	def add_natvis_file(self, file):
+		self.link_params.natvis_files.append(file)
+
 class RunnableExecutable:
 	def __init__(self, path):
 		self.path = path
@@ -534,6 +537,7 @@ def build_main():
 	
 	params.set_target(target)
 	params.set_optimization_level(args.opt_level)
+	params.add_natvis_file(builder.MODULE_ROOT / "gnd.natvis")
 
 	compile_results = builder.compile_units_parallel(params.units, params.compile_params, params.target)
 	builder.print_compile_results(stdout, compile_results)
