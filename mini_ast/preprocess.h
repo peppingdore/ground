@@ -70,6 +70,7 @@ enum PrepMacroRegionKind {
 
 struct PrepMacroRegion {
 	PrepMacroRegionKind kind = PREP_MACRO_TOKEN_REGION_REGULAR;
+	s64                 prev_offset = 0;
 	s64                 length = 0;
 };
 
@@ -560,14 +561,24 @@ void replace(Prep* p, Array<PrepNode*>* regs, s64 start, s64 end, PrepNode* node
 	}
 }
 
-PrepMacroArg* find_macro_arg_desc()
+PrepMacroArg* find_macro_arg(PrepMacro* macro, UnicodeString name) {
+	for (auto it: macro->args) {
+		if (it.name == name) {
+			return &it;
+		}
+	}
+	return NULL;
+}
 
 Error* parse_macro(Prep* p, s64* cursor, s64 define_start, s64* end) {
 	println("parse macro");
+	PrepMacro* macro = make<PrepMacro>(p->allocator);
+	macro->args.allocator = p->allocator;
+	macro->regs.allocator = p->allocator;
+	macro->macro_regions.allocator = p->allocator;
 	auto name_tok = prep_next_token(p, cursor, PREP_NEXT_TOKEN_TAKE_LINE_BREAK);
+	macro->name = copy(p->allocator, tok_str(name_tok, p->src));
 	// @TODO: report if name is not a valid identifier.
-	Array<PrepMacroArg> args;
-	args.allocator = p->allocator;
 	s64 body_start = *cursor;
 	auto first_tok = prep_next_token(p, cursor, PREP_NEXT_TOKEN_TAKE_LINE_BREAK);
 	bool is_object = true;
@@ -579,7 +590,7 @@ Error* parse_macro(Prep* p, s64* cursor, s64 define_start, s64* end) {
 				body_start = macro_tok.end;
 				break;
 			}
-			if (len(args) > 0) {
+			if (len(macro->args) > 0) {
 				if (tok_str(macro_tok, p->src) != ",") {
 					panic("Expected ',' after macro argument");
 				}
@@ -590,25 +601,17 @@ Error* parse_macro(Prep* p, s64* cursor, s64 define_start, s64* end) {
 			}
 			auto name = copy(p->allocator, tok_str(macro_tok, p->src));
 			auto loc = slice(p->regs, macro_tok.start, macro_tok.end);
-			add(&args, PrepMacroArg{name, loc});
+			add(&macro->args, PrepMacroArg{name, loc});
 		}
 	}
-	println("args: %", args);
-	Array<PrepMacroRegion> macro_regions;
-	macro_regions.allocator = p->allocator;
-	s64 macro_region_start = body_start;
+	println("args: %", macro->args);
+	s64 last_macro_region_end = body_start;
 	while (true) {
 		auto macro_tok = prep_next_token(p, cursor, PREP_NEXT_TOKEN_TAKE_LINE_BREAK);
 		if (macro_tok.kind == PREP_TOKEN_KIND_LINE_BREAK || macro_tok.kind == PREP_TOKEN_KIND_EOF) {
 			auto body = p->src[{body_start, macro_tok.start}];
-			body = copy(p->allocator, body);
-			auto macro = make<PrepMacro>(p->allocator);
-			macro->name = copy(p->allocator, tok_str(name_tok, p->src));
-			macro->body = body;
+			macro->body = copy(p->allocator, body);
 			macro->regs = slice(p->regs, define_start, macro_tok.end);
-			macro->is_object = is_object;
-			macro->args = args;
-			add(&p->macros, macro);
 			validate_regs_integrity(p);
 			replace(p, &p->regs, define_start, macro_tok.end, NULL);
 			remove_at_index(&p->src, define_start, macro_tok.end - define_start);
@@ -616,9 +619,7 @@ Error* parse_macro(Prep* p, s64* cursor, s64 define_start, s64* end) {
 			*end -= macro_tok.end - define_start;
 			// @TODO: verify macro tokens.
 			break;
-		}
-		if (tok_str(macro_tok, p->src) == "#") {
-			s64 str_start = macro_tok.start;
+		} else if (tok_str(macro_tok, p->src) == "#") {
 			auto name_tok = prep_next_token(p, cursor, PREP_NEXT_TOKEN_TAKE_LINE_BREAK);
 			if (name_tok.kind != PREP_TOKEN_KIND_IDENT) {
 				panic("Stringized token must be an ident");
@@ -626,9 +627,18 @@ Error* parse_macro(Prep* p, s64* cursor, s64 define_start, s64* end) {
 			if (name_tok.start != macro_tok.end) {
 				panic("Stringized token must immediately follow '#'.");
 			}
-			
+			auto reg = PrepMacroRegion {
+				.kind = PREP_MACRO_TOKEN_REGION_STRINGIZE,
+				.prev_offset = name_tok.start - last_macro_region_end, 
+				.length = name_tok.end - macro_tok.start
+			};
+			last_macro_region_end = name_tok.end;
+			add(&macro->macro_regions, reg);
+		} else {
+			panic("Unexpected token while parsing macro body: %", tok_str(macro_tok, p->src));
 		}
 	}
+	add(&p->macros, macro);
 	return NULL;
 }
 
@@ -711,6 +721,7 @@ Error* expand_macro(Prep* p, PrepMacro* macro, Array<MacroArgLoc> args, s64 *cur
 	
 	s64 stringize_diff = process_stringize_ops(p, rep_end, rep_end + len(exp->str), exp, args);
 
+	// Remove macro call.
 	replace(p, &p->regs, rep_start, rep_end, NULL);
 	remove_at_index(&p->src, rep_start, rep_end - rep_start);
 	validate_regs_integrity(p);
