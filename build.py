@@ -446,14 +446,14 @@ def run_preprocessor(compiler, path):
 	if is_msvc_interface(compiler):
 		args.append('/E /TP /C')
 		if compiler == 'clang-cl':
-			args.append('/clang:"-std=c++2b"')
+			args.append('/clang:"-std=c++23"')
 		else:
 			args.append('/std:c++latest')
 	else:
 		if platform.system() == 'Darwin':
 			args.append('-x objective-c++')
 		args.append('-E')
-		args.append('-std=c++2b')
+		args.append('-std=c++23')
 	cmdline = ' '.join(args)
 	return run(cmdline)
 
