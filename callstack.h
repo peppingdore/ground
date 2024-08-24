@@ -1,6 +1,10 @@
 #pragma once
 
-#include <stacktrace>
+#if __cpp_lib_stacktrace
+	#include <stacktrace>
+#endif
+
+#include <string>
 #include "format.h"
 
 struct CallStackEntry {
@@ -31,18 +35,20 @@ const char* callstack_copy_std_string(Allocator allocator, std::string&& str) {
 }
 
 CallStack get_callstack(Allocator allocator = c_allocator) {
-	auto cpp_st = std::stacktrace::current();
 	CallStack st;
 	st.allocator = allocator;
-	// Skipping first entry to skip get_callstack()'s frame.
-	st.count = cpp_st.size() - 1;
-	st.entries = Alloc<CallStackEntry>(allocator, st.count);
-	for (auto i: range_from_to(1, st.count + 1)) {
-		auto& x = cpp_st[i];
-		auto f_str = callstack_copy_std_string(allocator, x.source_file());
-		st.entries[i - 1].loc = make_code_location(x.source_line(), f_str);
-		st.entries[i - 1].desc = callstack_copy_std_string(allocator, x.description());
-	}
+	#if __cpp_lib_stacktrace
+		auto cpp_st = std::stacktrace::current();
+		// Skipping first entry to skip get_callstack()'s frame.
+		st.count = cpp_st.size() - 1;
+		st.entries = Alloc<CallStackEntry>(allocator, st.count);
+		for (auto i: range_from_to(1, st.count + 1)) {
+			auto& x = cpp_st[i];
+			auto f_str = callstack_copy_std_string(allocator, x.source_file());
+			st.entries[i - 1].loc = make_code_location(x.source_line(), f_str);
+			st.entries[i - 1].desc = callstack_copy_std_string(allocator, x.description());
+		}
+	#endif
 	return st;
 }
 
