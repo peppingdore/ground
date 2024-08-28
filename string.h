@@ -98,10 +98,13 @@ T* copy_c_str(Span<T> str, Allocator allocator = c_allocator) {
 }
 
 template <StringChar T>
-Array<T> copy_string(Span<T> str, Allocator allocator = c_allocator, CodeLocation loc = caller_loc()) {
-	Array<T> result = { .allocator = allocator };
-	add(&result, str);
-	return result;
+Array<T> copy_string(Allocator allocator, Span<T> str, CodeLocation loc = caller_loc()) {
+	return copy_array(allocator, str, loc);
+}
+
+template <StringChar T>
+Array<T> copy_string(Span<T> str, CodeLocation loc = caller_loc()) {
+	return copy_string(c_allocator, str, loc);
 }
 
 AllocatedUnicodeString copy_unicode_string(Allocator allocator, String str) {

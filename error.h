@@ -69,7 +69,7 @@ T* make_error(AllocatedString text, CodeLocation loc = caller_loc()) {
 
 template <typename T = Error>
 T* make_error(const char* str, CodeLocation loc = caller_loc()) {
-	return make_error<T>(copy(make_string(str)), loc); 
+	return make_error<T>(copy_string(make_string(str)), loc); 
 }
 
 template <typename T = Error>

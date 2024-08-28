@@ -105,15 +105,15 @@ void clear(Array<T>* arr, CodeLocation loc = caller_loc()) {
 }
 
 template <typename T>
-Array<T> copy(Allocator allocator, Span<T> src, CodeLocation loc = caller_loc()) {
+Array<T> copy_array(Allocator allocator, Span<T> src, CodeLocation loc = caller_loc()) {
 	Array<T> result = { .allocator = allocator };
 	add(&result, src, -1, loc);
 	return result;
 }
 
 template <typename T>
-Array<T> copy(Span<T> src, CodeLocation loc = caller_loc()) {
-	return copy(c_allocator, src, loc);
+Array<T> copy_array(Span<T> src, CodeLocation loc = caller_loc()) {
+	return copy_array(c_allocator, src, loc);
 }
 
 template <typename T>
