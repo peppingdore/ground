@@ -25,7 +25,7 @@ struct Tuple<A> {
 	#define TUPLE_LIST(func) \
 		func(A, _0)
 	
-	#define TUPLE_MEMBER(T, N) T N;
+	#define TUPLE_MEMBER(T, N) T N = {};
 	TUPLE_LIST(TUPLE_MEMBER)
 	void hash(Hasher* hasher) {
 		#define TUPLE_HASH(T, N) hasher->hash(N);
@@ -50,7 +50,7 @@ struct Tuple<A, B> {
 		func(A, _0) \
 		func(B, _1)
 
-	#define TUPLE_MEMBER(T, N) T N;
+	#define TUPLE_MEMBER(T, N) T N = {};
 	TUPLE_LIST(TUPLE_MEMBER)
 	void hash(Hasher* hasher) {
 		#define TUPLE_HASH(T, N) hasher->hash(N);
@@ -76,7 +76,7 @@ struct Tuple<A, B, C> {
 		func(B, _1) \
 		func(C, _2)
 
-	#define TUPLE_MEMBER(T, N) T N;
+	#define TUPLE_MEMBER(T, N) T N = {};
 	TUPLE_LIST(TUPLE_MEMBER)
 	void hash(Hasher* hasher) {
 		#define TUPLE_HASH(T, N) hasher->hash(N);
@@ -103,7 +103,7 @@ struct Tuple<A, B, C, D> {
 		func(C, _2) \
 		func(D, _3)
 
-	#define TUPLE_MEMBER(T, N) T N;
+	#define TUPLE_MEMBER(T, N) T N = {};
 	TUPLE_LIST(TUPLE_MEMBER)
 	void hash(Hasher* hasher) {
 		#define TUPLE_HASH(T, N) hasher->hash(N);
@@ -131,7 +131,7 @@ struct Tuple<A, B, C, D, E> {
 		func(D, _3) \
 		func(E, _4)
 
-	#define TUPLE_MEMBER(T, N) T N;
+	#define TUPLE_MEMBER(T, N) T N = {};
 	TUPLE_LIST(TUPLE_MEMBER)
 	void hash(Hasher* hasher) {
 		#define TUPLE_HASH(T, N) hasher->hash(N);
@@ -160,7 +160,7 @@ struct Tuple<A, B, C, D, E, F> {
 		func(E, _4) \
 		func(F, _5)
 
-	#define TUPLE_MEMBER(T, N) T N;
+	#define TUPLE_MEMBER(T, N) T N = {};
 	TUPLE_LIST(TUPLE_MEMBER)
 	void hash(Hasher* hasher) {
 		#define TUPLE_HASH(T, N) hasher->hash(N);
@@ -190,7 +190,7 @@ struct Tuple<A, B, C, D, E, F, G> {
 		func(F, _5) \
 		func(G, _6)
 
-	#define TUPLE_MEMBER(T, N) T N;
+	#define TUPLE_MEMBER(T, N) T N = {};
 	TUPLE_LIST(TUPLE_MEMBER)
 	void hash(Hasher* hasher) {
 		#define TUPLE_HASH(T, N) hasher->hash(N);
@@ -221,7 +221,7 @@ struct Tuple<A, B, C, D, E, F, G, H> {
 		func(G, _6) \
 		func(H, _7)
 
-	#define TUPLE_MEMBER(T, N) T N;
+	#define TUPLE_MEMBER(T, N) T N = {};
 	TUPLE_LIST(TUPLE_MEMBER)
 	void hash(Hasher* hasher) {
 		#define TUPLE_HASH(T, N) hasher->hash(N);
