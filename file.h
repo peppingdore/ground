@@ -180,7 +180,7 @@ Reader file_reader(File* file) {
 	return r;
 }
 
-Tuple<String, Error*> read_text_at_path(Allocator allocator, UnicodeString path) {
+Tuple<AllocatedString, Error*> read_text_at_path(Allocator allocator, UnicodeString path) {
 	auto [f, e] = open_file(path);
 	if (e) {
 		return { {}, e };
@@ -192,6 +192,6 @@ Tuple<String, Error*> read_text_at_path(Allocator allocator, UnicodeString path)
 	return { text, NULL };
 }
 
-Tuple<String, Error*> read_text_at_path(UnicodeString path) {
+Tuple<AllocatedString, Error*> read_text_at_path(UnicodeString path) {
 	return read_text_at_path(c_allocator, path);
 }

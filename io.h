@@ -44,14 +44,14 @@ Tuple<Array<u8>, Error*> read_all(Reader reader) {
 	return read_all(c_allocator, reader);
 }
 
-Tuple<String, Error*> read_text(Allocator allocator, Reader reader) {
+Tuple<AllocatedString, Error*> read_text(Allocator allocator, Reader reader) {
 	auto [data, e] = read_all(allocator, reader);
 	if (e) {
 		return { {}, e };
 	}
-	return { make_string((char*) data.data, len(data)), NULL };
+	return { *((AllocatedString*) &data) };
 }
 
-Tuple<String, Error*> read_text(Reader reader) {
+Tuple<AllocatedString, Error*> read_text(Reader reader) {
 	return read_text(c_allocator, reader);
 }
