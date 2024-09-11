@@ -30,6 +30,7 @@ TEST(prep_splice) {
 #define MACRO1 aboba
 #define MACRO(x, y) x##y x y
 #define MACRO2(x) #x
+#define a DEFINED1
 	MACRO( a , b )
 	MACRO1
 	MACRO2(a != b)

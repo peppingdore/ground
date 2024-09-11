@@ -824,8 +824,11 @@ PrepMacroExp maybe_expand_macro(Prep* p, Span<Token> tokens, s64* cursor) {
 		// Prescan.
 		for (s64 i = 0; i < len(body); i++) {
 			if (body[i].kind == PREP_TOKEN_KIND_MACRO_PRESCAN_IDENT) {
-				auto [arg_tokens, found] = get_arg_tokens(macro, tokens, args, tok_str(body[i])[{1, {}}]);
+				auto [arg_tokens, found] = get_arg_tokens(macro, tokens, args, tok_str(body[i]));
+				println("found: %", found);
 				if (found) {
+					s64 body_cursor = i;
+					remove_at_index(&body, i);
 					s64 arg_cursor = 0;
 					while (arg_cursor < len(arg_tokens)) {
 						if (arg_tokens[arg_cursor].kind == PREP_TOKEN_KIND_IDENT) {
@@ -834,13 +837,15 @@ PrepMacroExp maybe_expand_macro(Prep* p, Span<Token> tokens, s64* cursor) {
 								return { exp.e };
 							}
 							if (exp.is_expanded) {
-								remove_at_index(&body, exp.exp_start, exp.exp_end - exp.exp_start);
-								add(&body, exp.expanded, exp.exp_start);
+								add(&body, exp.expanded, body_cursor);
+								body_cursor += len(exp.expanded);
+								arg_cursor += 1;
 								exp.expanded.free();
-								arg_cursor = exp.exp_start + len(exp.expanded);
 								continue;
 							}
 						}
+						add(&body, arg_tokens[arg_cursor], body_cursor);
+						body_cursor += 1;
 						arg_cursor += 1;
 					}
 				}
@@ -879,7 +884,6 @@ Error* preprocess(Prep* p, PrepFile* file) {
 			}
 			if (exp.is_expanded) {
 				add(&p->tokens, exp.expanded);
-				cursor += len(exp.expanded);
 				continue;
 			}
 		}
