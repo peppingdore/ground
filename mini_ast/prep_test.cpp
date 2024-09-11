@@ -1,4 +1,4 @@
-#include "preprocess.h"
+#include "preprocess2.h"
 #include "../testing.h"
 #include "../format.h"
 
@@ -27,9 +27,20 @@ TEST(prep_splice) {
     MACRO(a, b)
 	MACRO1
 	MACRO2(a != b)
+	#include "test.txt"
 	)RAW"_b;
 	p = make_prep(c_allocator, str2, U"test.txt"_b);
-	preprocess(p, 0, len(p->src));
+	p->include_hook = [](Prep* p, UnicodeString path, bool global) -> PrepFile* {
+		auto file = make<PrepFile>(c_allocator);
+		file->src = U"file content"_b;
+		file->full_path = path;
+		return file;
+	};
+	s64 cursor = 0;
+	auto [e, diff] = preprocess(p, &cursor, len(p->src));
 	print_prep_state(p);
 	println(p->src);
+	if (e) {
+		print_asx_error(e);
+	}
 }

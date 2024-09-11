@@ -58,7 +58,7 @@ PrepToken make_tok(PrepTokenKind kind, s64 start, s64 end) {
 
 struct PrepFile {
 	UnicodeString src;
-	UnicodeString path;
+	UnicodeString full_path;
 };
 
 enum PrepNodeKind {
@@ -66,39 +66,45 @@ enum PrepNodeKind {
 	PREP_NODE_KIND_FILE,
 	PREP_NODE_KIND_MACRO,
 	PREP_NODE_KIND_STRINGIZE,
+	PREP_NODE_KIND_INCLUDE_MISSING_NEWLINE,
 };
 REFLECT(PrepNodeKind) {
 	ENUM_VALUE(PREP_NODE_KIND_NONE);
 	ENUM_VALUE(PREP_NODE_KIND_FILE);
 	ENUM_VALUE(PREP_NODE_KIND_MACRO);
 	ENUM_VALUE(PREP_NODE_KIND_STRINGIZE);
+	ENUM_VALUE(PREP_NODE_KIND_INCLUDE_MISSING_NEWLINE);
 }
 
 struct Prep;
 struct MacroExpansion;
+struct Stringize;
+struct PrepNode;
+
+struct PrepInclude {
+	PrepFile*        file = NULL;
+	PrepInclude*     parent_include = NULL;
+	Array<PrepNode*> replace_regs;
+};
 
 struct PrepNode {
 	Prep*            p = NULL;
 	PrepNodeKind     kind = PREP_NODE_KIND_NONE;
 	UnicodeString    str;
-	PrepFile*        file = NULL;
-	s64              file_start = 0;
-	Array<PrepNode*> macro_replace_regs;
 	MacroExpansion*  macro_exp = NULL;
-	s64              macro_exp_offset = 0;
-	Array<PrepNode*> stringsize_replace_regs;
+	Stringize*       stringize = NULL;
+	PrepInclude*     include = NULL;
+	s64              node_offset = 0;
 	// Array<PrepNode*> parents;
 
 	REFLECT(PrepNode) {
 		MEMBER(p);
 		MEMBER(kind);
 		MEMBER(str);
-		MEMBER(file);
-		MEMBER(file_start);
-		MEMBER(macro_replace_regs);
 		MEMBER(macro_exp);
-		MEMBER(macro_exp_offset);
-		MEMBER(stringsize_replace_regs);
+		MEMBER(stringize);
+		MEMBER(include);
+		MEMBER(node_offset);
 		// MEMBER(parents);
 	}
 };
@@ -163,6 +169,12 @@ struct MacroExpansion {
 	Array<MacroArgLoc>     args;
 	Array<PrepMacroRegion> exp_regions;
 	MacroExpansion*        parent_exp = NULL;
+	Array<PrepNode*>       replace_regs;
+};
+
+struct Stringize {
+	AllocatedUnicodeString str;
+	Array<PrepNode*>       replace_regs;
 };
 
 struct Prep {
@@ -171,6 +183,8 @@ struct Prep {
 	Array<PrepNode*>       regs;
 	Array<PrepMacro*>      macros;
 	MacroExpansion*        expanding_macro = NULL;
+	PrepInclude*           current_include = NULL;
+	PrepFile*            (*include_hook) (Prep* p, UnicodeString path, bool global) = NULL;
 };
 
 enum GndAsxErrorTokenColor: u64 {
@@ -215,6 +229,7 @@ GndAsxError* make_asx_error(Prep* p, CodeLocation loc, auto... args) {
 	auto str = sprint_unicode(p->allocator, args...);
 	defer { Free(p->allocator, str.data); };
 	auto error = format_error<GndAsxError>(loc, str);
+	error->p = p;
 	error->on_free = [](Error* uncasted) {
 		auto e = (GndAsxError*) uncasted;
 		for (auto it: e->pieces) {
@@ -351,9 +366,9 @@ void add_text(GndAsxError* error, auto... args) {
 	add(&error->pieces, piece);
 }
 
-void print_ast_error(Error* e) {
+void print_asx_error(Error* e) {
 	if (auto x = reflect_cast<GndAsxError>(e)) {
-		print(x->text);
+		println(x->text);
 		for (auto it: x->pieces) {
 			if (len(it.message) > 0) {
 				println(it.message);
@@ -432,9 +447,9 @@ PrepNode* slice(PrepNode* node, s64 start, s64 end) {
 	}
 	auto nn = copy_value(node->p->allocator, *node);
 	if (nn->kind == PREP_NODE_KIND_FILE) {
-		nn->file_start += start;
+		nn->node_offset += start;
 	} else if (nn->kind == PREP_NODE_KIND_MACRO) {
-		nn->macro_exp_offset += start;
+		nn->node_offset += start;
 	} else {
 		panic("slice(): Unsupported node kind: %", nn->kind);
 	}
@@ -487,10 +502,13 @@ Prep* make_prep(Allocator allocator, UnicodeString src, UnicodeString path) {
 	p->src = copy_string(allocator, src);
 	auto file = make<PrepFile>(allocator);
 	file->src = src;
-	file->path = path;
+	file->full_path = path;
+	auto include = make<PrepInclude>(p->allocator);
+	include->file = file;
+	include->parent_include = NULL;
 	auto node = make_prep_node(p, PREP_NODE_KIND_FILE, src);
-	node->file = file;
-	node->file_start = 0;
+	node->include = include;
+	node->node_offset = 0;
 	add(&p->regs, node, 0);
 	return p;
 }
@@ -513,13 +531,10 @@ void splice_lines(Prep* p, s64 start, s64 end) {
 	while (cursor < end) {
 		if (p->src[cursor] == '\\') {
 			auto lb_len = get_line_break_len(p->src, cursor + 1);
-			// @TODO: do not forget to adpd line break at the end of the files, if it is missing.
+			// @TODO: do not forget to add line break at the end of the files, if it is missing.
 			//   because if last line ends with backslash,
 			//   it's going to concat with the first line of the next file.
 			if (lb_len > 0 || (cursor == end - 1)) {
-				if (lb_len == 0) {
-					int k = 43;
-				}
 				replace(p, cursor, cursor + lb_len + 1, NULL);
 				end -= lb_len + 1;
 				cursor += lb_len + 1;
@@ -577,15 +592,18 @@ s64 prep_maybe_number_tok(UnicodeString src, s64 start) {
 
 s64 prep_maybe_string_tok(UnicodeString src, s64 start) {
 	for (s64 i = start; i < len(src); i++) {
-		if (i == start && src[i] != '"') {
-			return 0;
-		}
-		if (src[i] == '"') {
-			return i + 1;
-		}
-		if (starts_with(src[{i, {}}], R"xx(\")xx")) {
-			i += 1;
-			continue;
+		if (i == start) {
+			if (src[i] != '"') {
+				return 0;
+			}
+		} else {
+			if (src[i] == '"') {
+				return i + 1;
+			}
+			if (starts_with(src[{i, {}}], R"xx(\")xx")) {
+				i += 1;
+				continue;
+			}
 		}
 	}
 	return 0;
@@ -667,6 +685,9 @@ s64 prep_maybe_ident(UnicodeString src, s64 start) {
 }
 
 Optional<PrepToken> prep_get_token_at(UnicodeString src, s64 start) {
+	if (start >= len(src)) {
+		return make_tok(PREP_TOKEN_KIND_EOF, len(src), len(src));
+	}
 	s64 number_end = prep_maybe_number_tok(src, start);
 	if (number_end > 0) {
 		return make_tok(PREP_TOKEN_KIND_NUMBER, start, number_end);
@@ -698,9 +719,6 @@ Optional<PrepToken> prep_get_token_at(UnicodeString src, s64 start) {
 	if (prep_is_punct(src[start])) {
 		return make_tok(PREP_TOKEN_KIND_PUNCT, start, start + 1); 
 	}
-	if (start == len(src)) {
-		return make_tok(PREP_TOKEN_KIND_EOF, len(src), len(src));
-	}
 	return {};
 }
 
@@ -709,7 +727,7 @@ enum PrepNextTokenFlags {
 	PREP_NEXT_TOKEN_TAKE_LINE_BREAK = 1 << 0,
 };
 
-Tuple<PrepToken, Error*> prep_next_token(Prep* p, s64* cursor, PrepNextTokenFlags flags = PREP_NEXT_TOKEN_FLAGS_NONE) {
+Tuple<PrepToken, Error*> prep_next_token(Prep* p, s64* cursor, u32 flags = PREP_NEXT_TOKEN_FLAGS_NONE) {
 	println("prep_next_token: %, %", *cursor, len(p->src));
 	println("src: %", p->src);
 	while (*cursor < len(p->src)) {
@@ -737,7 +755,8 @@ Tuple<PrepToken, Error*> prep_next_token(Prep* p, s64* cursor, PrepNextTokenFlag
 	auto [tok, has_value] = prep_get_token_at(p->src, *cursor);
 	if (!has_value) {
 		GndAsxPrepRegion reg = { .start = *cursor, .end = *cursor };
-		return { {}, simple_parser_error(p, current_loc(), reg, "Invalid token") };
+		auto part = p->src[{*cursor, min(len(p->src), *cursor + 10)}];
+		return { {}, simple_parser_error(p, current_loc(), reg, "Invalid token: %", part) };
 	}
 	println("tok: %, %, (%: %)", tok.kind, tok_str(tok, p->src), tok.reg.start, tok.reg.end);
 	*cursor = tok.reg.end;
@@ -798,7 +817,7 @@ PrepMacroArg* find_macro_arg(PrepMacro* macro, UnicodeString name) {
 	return NULL;
 }
 
-Error* parse_macro(Prep* p, s64* cursor, s64 define_start, s64* end) {
+Error* parse_macro(Prep* p, s64* cursor, s64 define_start, s64 *diff) {
 	println("parse macro");
 	PrepMacro* macro = make<PrepMacro>(p->allocator);
 	macro->args.allocator = p->allocator;
@@ -831,7 +850,7 @@ Error* parse_macro(Prep* p, s64* cursor, s64 define_start, s64* end) {
 			}
 			if (len(macro->args) > 0) {
 				if (tok_str(macro_tok, p->src) != ",") {
-					panic("Expected ',' after macro argument");
+					return simple_parser_error(p, current_loc(), macro_tok.reg, "Expected ',' after macro argument");
 				}
 				auto [mt, e3] = prep_next_token(p, cursor, PREP_NEXT_TOKEN_TAKE_LINE_BREAK);
 				if (e3) {
@@ -840,7 +859,7 @@ Error* parse_macro(Prep* p, s64* cursor, s64 define_start, s64* end) {
 				macro_tok = mt;
 			}
 			if (macro_tok.kind != PREP_TOKEN_KIND_IDENT) {
-				panic("Expected ident tok for macro argument");
+				return simple_parser_error(p, current_loc(), macro_tok.reg, "Expected identifier as macro argument");
 			}
 			auto name = copy_string(p->allocator, tok_str(macro_tok, p->src));
 			auto loc = slice(p->regs, macro_tok.reg.start, macro_tok.reg.end);
@@ -859,23 +878,29 @@ Error* parse_macro(Prep* p, s64* cursor, s64 define_start, s64* end) {
 			macro->body = copy_string(p->allocator, body);
 			macro->regs = slice(p->regs, define_start, macro_tok.reg.end);
 			replace(p, define_start, macro_tok.reg.end, NULL);
-			*end -= macro_tok.reg.end - define_start;
+			*diff -= macro_tok.reg.end - define_start;
 			// @TODO: verify macro tokens.
-			break;
+			add(&p->macros, macro);
+			return NULL;
 		} else if (tok_str(macro_tok, p->src) == "#") {
 			auto [name_tok, e1] = prep_next_token(p, cursor, PREP_NEXT_TOKEN_TAKE_LINE_BREAK);
 			if (e1) {
 				return e1;
 			}
 			if (name_tok.kind != PREP_TOKEN_KIND_IDENT) {
-				panic("Stringized token must be an ident");
+				return simple_parser_error(p, current_loc(), name_tok.reg, "Stringized token must be an ident");
 			}
 			if (name_tok.reg.start != macro_tok.reg.end) {
-				panic("Stringized token must immediately follow '#'.");
+				auto e = make_asx_error(p, current_loc(), U"Expected '#' after stringized token");
+				add_site(e,
+					GndAsxErrorToken { .reg = name_tok.reg, .color = GND_ASX_ERROR_TOKEN_COLOR_REGULAR_RED },
+					GndAsxErrorToken { .reg = macro_tok.reg, .color = GND_ASX_ERROR_TOKEN_COLOR_REGULAR_BLUE }
+				);
+				return e;
 			}
 			auto arg = find_macro_arg(macro, tok_str(name_tok, p->src));
 			if (!arg) {
-				panic("Unknown macro arg '%' after '#'", tok_str(name_tok, p->src));
+				return simple_parser_error(p, current_loc(), name_tok.reg, "Unknown macro argument after '#'");
 			}
 			auto reg = PrepMacroRegion {
 				.kind = PREP_MACRO_TOKEN_REGION_STRINGIZE,
@@ -887,7 +912,7 @@ Error* parse_macro(Prep* p, s64* cursor, s64 define_start, s64* end) {
 			add(&macro->macro_regions, reg);
 		}
 	}
-	add(&p->macros, macro);
+	assert(false);
 	return NULL;
 }
 
@@ -905,29 +930,32 @@ Error* process_stringize_ops(Prep* p, MacroExpansion* exp, s64* diff, s64 macro_
 			}
 			s64 start = arg_loc->start;
 			s64 end = arg_loc->end;
-			if (reg.stringize_arg->name == "__VA_ARGS__") {
-				end = exp->args[-1].end;
-			}
+			// if (reg.stringize_arg->name == "__VA_ARGS__") {
+			// 	end = exp->args[-1].end;
+			// }
 
-			AllocatedUnicodeString str = { .allocator = p->allocator };
-			add(&str, '"');
+			auto stringize = make<Stringize>(p->allocator);
+			stringize->str.allocator = p->allocator;
+			stringize->replace_regs = copy_array(p->allocator, slice(p->regs, cursor, cursor + reg.length));
+
+			add(&stringize->str, '"');
 			// @TODO: escape.
-			add(&str, p->src[{start, end}]);
-			add(&str, '"');
+			add(&stringize->str, p->src[{start, end}]);
+			add(&stringize->str, '"');
 
-			auto node = make_prep_node(p, PREP_NODE_KIND_STRINGIZE, str);
-			node->stringsize_replace_regs = slice(p->regs, cursor, cursor + reg.length);
+			auto node = make_prep_node(p, PREP_NODE_KIND_STRINGIZE, stringize->str);
+			node->stringize = stringize;
 			replace(p, cursor, cursor + reg.length, node);
 
-			*diff += len(str) - reg.length; 
-			reg.length = len(str);
+			*diff += len(stringize->str) - reg.length; 
+			reg.length = len(stringize->str);
 		}
 		cursor += reg.length;
 	}
 	return NULL;
 }
 
-Error* expand_macro(Prep* p, PrepMacro* macro, Array<MacroArgLoc> args, s64 *cursor, s64* end, s64 rep_start, s64 rep_end) {
+Error* expand_macro(Prep* p, PrepMacro* macro, Array<MacroArgLoc> args, s64 *cursor, s64* diff, s64 rep_start, s64 rep_end) {
 	println("macro: %, body: %", macro->name, macro->body);
 	println("macro args: %", args);
 	print_regs(p->regs);
@@ -939,25 +967,27 @@ Error* expand_macro(Prep* p, PrepMacro* macro, Array<MacroArgLoc> args, s64 *cur
 	exp->str.capacity = len(macro->body) + 2;
 	exp->parent_exp = p->expanding_macro;
 	exp->exp_regions = copy_array(p->allocator, macro->macro_regions);
+	exp->replace_regs = copy_array(p->allocator, slice(p->regs, rep_start, rep_end));
 	add(&exp->str, ' ');
 	add(&exp->str, macro->body);
 	add(&exp->str, ' ');
-
+	
 	p->expanding_macro = exp;
 	defer { p->expanding_macro = p->expanding_macro->parent_exp; };
 
-	auto replace_slice = slice(p->regs, rep_start, rep_end);
 	auto macro_node = make_prep_node(p, PREP_NODE_KIND_MACRO, exp->str);
-	macro_node->macro_replace_regs = replace_slice;
 	macro_node->macro_exp = exp;
-	macro_node->macro_exp_offset = 0;
+	macro_node->node_offset = 0;
 	replace(p, rep_end, rep_end, macro_node);
 	
 	println("src after insertion: %", p->src);
 	print_regs(p->regs);
 	
-	s64 diff = len(exp->str) - (rep_end - rep_start);
-	auto e = process_stringize_ops(p, exp, &diff, rep_end);
+	s64 local_diff = len(exp->str) - (rep_end - rep_start);
+	auto e = process_stringize_ops(p, exp, &local_diff, rep_end);
+	if (e) {
+		return e;
+	}
 
 	// Remove macro call.
 	replace(p, rep_start, rep_end, NULL);
@@ -965,8 +995,8 @@ Error* expand_macro(Prep* p, PrepMacro* macro, Array<MacroArgLoc> args, s64 *cur
 	println("src after removal: %", p->src);
 	print_regs(p->regs);
 
-	*end += diff;
-	*cursor = rep_end + diff;
+	diff += local_diff;
+	*cursor = rep_end + local_diff;
 	return NULL;
 }
 
@@ -980,10 +1010,10 @@ Tuple<Error*, Array<MacroArgLoc>> parse_macro_args(Prep* p, s64* cursor, PrepMac
 			return { e1, args };
 		}
 		if (tok_str(paren, p->src) != "(") {
-			panic("Expected '(' after function like macro");
+			return { simple_parser_error(p, current_loc(), paren.reg, "Expected '(' after function like macro") };
 		}
 		if (paren.reg.start != macro_name_tok.reg.end) {
-			panic("'(' must immediately follow macro name");
+			return { simple_parser_error(p, current_loc(), macro_name_tok.reg, "'(' must immediately follow macro name") };
 		}
 		s64 arg_start = *cursor;
 		while (true) {
@@ -993,7 +1023,7 @@ Tuple<Error*, Array<MacroArgLoc>> parse_macro_args(Prep* p, s64* cursor, PrepMac
 				return { e2, args };
 			}
 			if (arg_tok.kind == PREP_TOKEN_KIND_EOF) {
-				panic("Unexpected EOF");
+				return { simple_parser_error(p, current_loc(), arg_tok.reg, "Expected argument, got EOF") };
 			}
 			auto t_str = tok_str(arg_tok, p->src);
 			if (t_str == ")") {
@@ -1013,7 +1043,7 @@ Tuple<Error*, Array<MacroArgLoc>> parse_macro_args(Prep* p, s64* cursor, PrepMac
 			}
 			if (!macro->is_variadic) {
 				if (len(args) >= len(macro->args)) {
-					panic("Too many macro args");
+					return { simple_parser_error(p, current_loc(), arg_tok.reg, "Expected % arguments at most for a macro", len(macro->args)) };
 				}
 			}
 			s64 idx = len(args);
@@ -1042,39 +1072,136 @@ PrepMacro* find_macro(Prep* p, UnicodeString name) {
 	return NULL;
 }
 
-Error* preprocess(Prep* p, s64 start, s64 end) {
-	s64 cursor = start;
-	while (cursor < end) {
-		s64 before_main_tok = cursor;
-		auto [tok, e1] = prep_next_token(p, &cursor);
+Tuple<Error*, s64> preprocess(Prep* p, s64* cursor, s64 end) {
+	s64 diff = 0;
+	while (*cursor < end + diff) {
+		s64 before_main_tok = *cursor;
+		auto [tok, e1] = prep_next_token(p, cursor);
 		if (e1) {
-			return e1;
+			return { e1 };
+		}
+		if (tok.kind == PREP_TOKEN_KIND_EOF) {
+			break;
 		}
 		if (tok_str(tok, p->src) == "#define") {
-			auto e = parse_macro(p, &cursor, tok.reg.start, &end);
+			auto e = parse_macro(p, cursor, tok.reg.start, &diff);
 			if (e) {
-				return e;
+				return { e };
 			}
-			cursor = before_main_tok;
+			*cursor = before_main_tok;
 			continue;
+		}
+		if (tok_str(tok, p->src) == "#include") {
+			s64 include_path_start = *cursor;
+			s64 include_path_end = *cursor;
+			while (true) {
+				auto [tok, e2] = prep_next_token(p, cursor, PREP_NEXT_TOKEN_TAKE_LINE_BREAK);
+				if (e2) {
+					return { e2 };
+				}
+				if (tok.kind == PREP_TOKEN_KIND_IDENT) {
+					auto macro = find_macro(p, tok_str(tok, p->src));
+					if (!macro) {
+						return { simple_parser_error(p, current_loc(), tok.reg, "Unknown macro in #include") };
+					}
+					auto [e, args] = parse_macro_args(p, cursor, macro, tok);
+					if (e) {
+						return { e };
+					}
+					auto e1 = expand_macro(p, macro, args, cursor, &diff, tok.reg.start, *cursor);
+					if (e1) {
+						return { e1 };
+					}
+					continue;
+				}
+				if (tok.kind == PREP_TOKEN_KIND_EOF || tok.kind == PREP_TOKEN_KIND_LINE_BREAK) {
+					include_path_end = tok.reg.start;
+					break;
+				}
+			}
+			*cursor = include_path_start;
+			auto [first_tok, e3] = prep_next_token(p, cursor, PREP_NEXT_TOKEN_TAKE_LINE_BREAK);
+			if (e3) {
+				return { e3 };
+			}
+			GndAsxPrepRegion str_reg;
+			UnicodeString include_path;
+			bool is_global = false;
+			if (first_tok.kind == PREP_TOKEN_KIND_STRING) {
+				auto [after_tok, e4] = prep_next_token(p, cursor, PREP_NEXT_TOKEN_TAKE_LINE_BREAK);
+				if (e4) {
+					return { e4 };
+				}
+				if (after_tok.kind != PREP_TOKEN_KIND_EOF && after_tok.kind != PREP_TOKEN_KIND_LINE_BREAK) {
+					return { simple_parser_error(p, current_loc(), after_tok.reg, "Expected EOF or line break after include path") };
+				}
+				auto str = tok_str(first_tok, p->src);
+				if (str[0] != '"' || str[-1] != '"') {
+					return { simple_parser_error(p, current_loc(), first_tok.reg, "Expected quoted string after #include") };
+				}
+				str_reg = first_tok.reg;
+				include_path = str[{1, -1}];
+			} else if (tok_str(first_tok, p->src) == "<") {
+				GndAsxPrepRegion angled_end_reg;
+				while (true) {
+					auto [tok, e2] = prep_next_token(p, cursor, PREP_NEXT_TOKEN_TAKE_LINE_BREAK);
+					if (e2) {
+						return { e2 };
+					}
+					if (tok.kind == PREP_TOKEN_KIND_EOF || tok.kind == PREP_TOKEN_KIND_LINE_BREAK) {
+						return { simple_parser_error(p, current_loc(), tok.reg, "Expected > to end include path") };
+					}
+					if (tok_str(tok, p->src) == ">") {
+						angled_end_reg = tok.reg;
+						break;
+					}
+				}
+				str_reg = { first_tok.reg.start, angled_end_reg.end };
+				include_path = p->src[{first_tok.reg.end, angled_end_reg.start}];
+			} else {
+				return { simple_parser_error(p, current_loc(), first_tok.reg, "Expected include path after #include") };
+			}
+			auto file = p->include_hook(p, include_path, is_global);
+			if (!file) {
+				return { simple_parser_error(p, current_loc(), str_reg, "Failed to find #include file '%'", include_path) };
+			}
+			auto include = make<PrepInclude>(p->allocator);
+			include->file = file;
+			include->parent_include = p->current_include;
+
+			auto node = make_prep_node(p, PREP_NODE_KIND_FILE, file->src);
+			node->include = include;
+			node->node_offset = 0;
+			p->current_include = include;
+
+			replace(p, tok.reg.start, *cursor, node);
+			if (len(file->src) == 0 || get_line_break_len(file->src, len(file->src) - 1) == 0) {
+				auto lb = copy_string(p->allocator, U"\n"_b);
+				auto nl_node = make_prep_node(p, PREP_NODE_KIND_FILE, lb);
+				nl_node->include = include;
+				s64 idx = tok.reg.start + len(node->str);
+				replace(p, idx, idx, nl_node);
+			}
+
+			// @TODO: preprocess include.
 		}
 		if (tok.kind == PREP_TOKEN_KIND_IDENT) {
 			auto macro = find_macro(p, tok_str(tok, p->src));
 			if (macro) {
 				println("matched macro: %", macro->name);
-				auto [e, args] = parse_macro_args(p, &cursor, macro, tok);
+				auto [e, args] = parse_macro_args(p, cursor, macro, tok);
 				if (e) {
-					return e;
+					return { e };
 				}
-				auto e1 = expand_macro(p, macro, args, &cursor, &end, tok.reg.start, cursor);
+				auto e1 = expand_macro(p, macro, args, cursor, &end, tok.reg.start, *cursor);
 				if (e1) {
-					return e1;
+					return { e1 };
 				}
 				continue;
 			}
 		}
 	}
-	return NULL;
+	return { NULL, diff };
 }
 
 void print_prep_node(PrepNode* node, s64 ident, s64 node_start) {
@@ -1093,16 +1220,16 @@ void print_prep_node(PrepNode* node, s64 ident, s64 node_start) {
 	println("   %", wo_prefix);
 	print_ident();
 	if (node->kind == PREP_NODE_KIND_FILE) {
-		println("   '%'", node->file->src[{node->file_start, node->file_start + len(node->str)}]);
+		println("   '%'", node->include->file->src[{node->node_offset, node->node_offset + len(node->str)}]);
 	} else if (node->kind == PREP_NODE_KIND_MACRO) {
-		println("   '%'", node->macro_exp->str[{node->macro_exp_offset, node->macro_exp_offset + len(node->str)}]);
+		println("   '%'", node->macro_exp->str[{node->node_offset, node->node_offset + len(node->str)}]);
 	} else if (node->kind == PREP_NODE_KIND_STRINGIZE) {
 		print_ident();
 		println("   '%'", node->p->src[{node_start, node_start + len(node->str)}]);
 		ident += 1;
 		print_ident();
 		println(" Stringized regs {");
-		for (auto it: node->stringsize_replace_regs) {
+		for (auto it: node->stringize->replace_regs) {
 			print_prep_node(it, ident, -1);
 		}
 		print_ident();

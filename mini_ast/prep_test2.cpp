@@ -1,3 +1,9 @@
+// #define A(...) __VA_ARGS__
+// #define C(a, b, c) a##b##c
+// #define PARENL (
+// #define PARENR )
+// A(C PARENL a, b, c PARENR)
+
 #include "preprocess2.h"
 #include "../testing.h"
 #include "../format.h"
@@ -22,9 +28,9 @@ TEST(prep_splice) {
 
 	UnicodeString str2 = UR"RAW(
 #define MACRO1 aboba
-#define MACRO(x, y) x##y
+#define MACRO(x, y) x##y x y
 #define MACRO2(x) #x
-    MACRO(a, b)
+	MACRO( a , b )
 	MACRO1
 	MACRO2(a != b)
 	#include "test.txt"
@@ -32,7 +38,7 @@ TEST(prep_splice) {
 	p = make_prep(c_allocator);
 	p->load_file_hook = [](Prep* p, UnicodeString path) -> PrepFile* {
 		auto file = make<PrepFile>(c_allocator);
-		file->src = U"file content"_b;
+		file->og_src = U"file content"_b;
 		file->fullpath = path;
 		return file;
 	};
