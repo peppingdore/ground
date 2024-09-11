@@ -150,6 +150,26 @@ bool contains(Span<T> span, auto item) {
 }
 
 template <typename T>
+s64 len(std::initializer_list<T> list) {
+	return list.size();
+}
+
+template <typename T>
+s64 index_of(std::initializer_list<T> list, auto item) {
+	for (auto i: range(len(list))) {
+		if (list.begin()[i] == item) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+template <typename T>
+bool contains(std::initializer_list<T> list, auto item) {
+	return index_of(list, item) != -1;
+}
+
+template <typename T>
 void type_hash(Hasher* hasher, Span<T> array) {
 	hasher->hash(array.count);
 	for (auto item: array) {
