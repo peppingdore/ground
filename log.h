@@ -73,6 +73,9 @@ inline Logger* get_logger() {
 //   with math log() function.
 
 inline void LogAtLogger(Logger* logger, LogInfo info, UnicodeString text) {
+	if (info.level > logger->pass_level) {
+		return;
+	}
 	logger->proc(logger, info, text);
 }
 
