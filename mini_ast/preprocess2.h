@@ -7,6 +7,7 @@
 #include "../panic.h"
 #include "../file.h"
 #include "../log.h"
+#include "../arena_allocator.h"
 
 enum PrepTokenKind {
 	PREP_TOKEN_KIND_NONE,
@@ -37,7 +38,6 @@ REFLECT(PrepTokenKind) {
 	ENUM_VALUE(PREP_TOKEN_KIND_CONCAT);
 	ENUM_VALUE(PREP_TOKEN_KIND_CONCATTED);
 	ENUM_VALUE(PREP_TOKEN_KIND_STRINGIZE);
-	ENUM_VALUE(PREP_TOKEN_KIND_STRINGIZED);
 	ENUM_VALUE(PREP_TOKEN_KIND_MACRO_PRESCAN_IDENT);
 }
 
@@ -48,13 +48,42 @@ struct PrepFileMapping {
 };
 
 struct PrepFile;
+struct MacroExp;
+
+enum PrepTokenFlags {
+	PREP_TOKEN_FLAG_NONE = 0,
+	PREP_TOKEN_FLAG_CUSTOM_STR = 1 << 0,
+	PREP_TOKEN_FLAG_SOURCE_FILE = 1 << 1,
+	PREP_TOKEN_FLAG_SOURCE_STRINGIZE = 1 << 2,
+	PREP_TOKEN_FLAG_SOURCE_MACRO = 1 << 3,
+	PREP_TOKEN_FLAG_CONCATTED = 1 << 4,
+	PREP_TOKEN_FLAG_CONCAT_RESIDUE = 1 << 5,
+	PREP_TOKEN_FLAG_PRESCAN_EXP = 1 << 6,
+};
 
 struct Token {
-	PrepTokenKind          kind = PREP_TOKEN_KIND_NONE;
+	PrepTokenKind          kind  = PREP_TOKEN_KIND_NONE;
+	s64                    flags = PREP_TOKEN_FLAG_NONE;
+	AllocatedUnicodeString custom_str;
+	PrepFile*              file = NULL;
 	s64                    file_start = 0;
 	s64                    file_end = 0;
-	PrepFile*              file = NULL;
-	AllocatedUnicodeString custom_str;
+	MacroExp*              stringize_exp = NULL;
+	Token*                 stringize_tok = NULL;
+	MacroExp*              og_macro_exp = NULL;
+	Token*                 og_macro_tok = NULL;
+	Token*                 concat_lhs = NULL;
+	Token*                 concat_rhs = NULL;
+	Token*                 concat_lhs_content = NULL;
+	Token*                 concat_rhs_content = NULL;
+	Token*                 concat_residue_og = NULL;
+	Token*                 prescan_exp_og = NULL;
+};
+
+struct IncludeSite {
+	IncludeSite*  parent = NULL;
+	Array<Token*> site_toks;
+	PrepFile*     file = NULL;
 };
 
 struct PrepFile {
@@ -63,25 +92,33 @@ struct PrepFile {
 	UnicodeString          src;
 	Array<PrepFileMapping> splice_mappings;
 	Array<PrepFileMapping> comment_mappings;
-	Array<Token>           tokens;
+	Array<Token*>          tokens;
 };
 
 struct PrepMacro {
-	Token        start;
-	Token        end;
-	Token        name;
-	Array<Token> arg_defs;
-	Span<Token>  tokens;
-	bool         is_object = true;
+	IncludeSite*  def_site = NULL;
+	s64           start_tok_idx = 0;
+	s64           end_tok_idx = 0;
+	Token*        name;
+	Array<Token*> arg_defs;
+	Span<Token*>  tokens;
+	bool          is_object = true;
+};
+
+struct MacroExp {
+	MacroExp*     parent = NULL;
+	PrepMacro*    macro = NULL;
+	Array<Token*> body;
 };
 
 struct Prep {
 	Allocator         allocator;
-	Array<Token>      tokens;
+	Allocator         arena;
+	Array<Token*>     tokens;
 	Array<PrepFile*>  files;
 	Array<PrepMacro*> macros;
-	Array<PrepFile*>  include_stack;
-	Array<PrepMacro*> macro_stack;
+	MacroExp*         macro_exp = NULL;
+	IncludeSite*      include_site = NULL;
 	UnicodeString   (*resolve_fullpath_hook) (Prep* p, UnicodeString path, bool global) = NULL;
 	PrepFile*       (*load_file_hook)        (Prep* p, UnicodeString fullpath) = NULL;
 };
@@ -103,8 +140,8 @@ PrepFileError* make_prep_file_error(Prep* p, PrepFile* file, s64 start, s64 end,
 	return e;
 }
 
-PrepFileError* make_prep_file_error(Prep* p, Token tok, auto... args) {
-	return make_prep_file_error(p, tok.file, tok.file_start, tok.file_end, args...);
+PrepFileError* make_prep_file_error(Prep* p, Token* tok, auto... args) {
+	return make_prep_file_error(p, tok->file, tok->file_start, tok->file_end, args...);
 }
 
 s64 map_index(Span<PrepFileMapping> mappings, s64 index) {
@@ -167,13 +204,26 @@ void print_prep_error(Error* e) {
 	}
 }
 
-Token make_token(Prep* p, PrepTokenKind kind, PrepFile* file, s64 file_start, s64 file_end) {
-	Token tok;
-	tok.kind = kind;
-	tok.file = file;
-	tok.file_start = file_start;
-	tok.file_end = file_end;
+Token* make_file_token(Prep* p, PrepTokenKind kind, PrepFile* file, s64 file_start, s64 file_end) {
+	Token* tok = make<Token>(p->arena);
+	tok->flags |= PREP_TOKEN_FLAG_SOURCE_FILE;
+	tok->kind = kind;
+	tok->file = file;
+	tok->file_start = file_start;
+	tok->file_end = file_end;
 	return tok;
+}
+
+Token* make_token(Prep* p, PrepTokenKind kind) {
+	Token* tok = make<Token>(p->arena);
+	tok->kind = kind;
+	tok->custom_str.allocator = null_allocator;
+	return tok;
+}
+
+void prep_use_custom_str(Prep* p, Token* tok) {
+	tok->flags |= PREP_TOKEN_FLAG_CUSTOM_STR;
+	tok->custom_str.allocator = p->allocator;
 }
 
 void prep_push_mapping(Array<PrepFileMapping>* mappings, Prep* p, PrepFile* file, s64* cursor, s64 end, s64 rm_len, s64* removed_len, s64* i) {
@@ -362,13 +412,13 @@ Tuple<s64, PrepTokenKind> get_str_token_at(UnicodeString src, s64 cursor) {
 	return { 0 };
 }
 
-Tuple<Token, Error*> get_token_at(Prep* p, PrepFile* file, s64 cursor) {
+Tuple<Token*, Error*> get_token_at(Prep* p, PrepFile* file, s64 cursor) {
 	if (cursor == len(file->src)) {
-		return { make_token(p, PREP_TOKEN_KIND_EOF, file, cursor, cursor) };
+		return { make_file_token(p, PREP_TOKEN_KIND_EOF, file, cursor, cursor) };
 	}
 	if (file->src[cursor] == '#') {
 		if (starts_with(file->src[{cursor, {}}], "##")) {
-			return { make_token(p, PREP_TOKEN_KIND_CONCAT, file, cursor, cursor + 2) };
+			return { make_file_token(p, PREP_TOKEN_KIND_CONCAT, file, cursor, cursor + 2) };
 		}
 		s64 dir_end = len(file->src);
 		for (s64 i: range_from_to(cursor + 1, len(file->src))) {
@@ -382,27 +432,27 @@ Tuple<Token, Error*> get_token_at(Prep* p, PrepFile* file, s64 cursor) {
 		}
 		auto str = file->src[{cursor, dir_end}];
 		if (str == "#include" || str == "#define") {
-			return { make_token(p, PREP_TOKEN_KIND_DIRECTIVE, file, cursor, dir_end) };
+			return { make_file_token(p, PREP_TOKEN_KIND_DIRECTIVE, file, cursor, dir_end) };
 		}
-		return { make_token(p, PREP_TOKEN_KIND_STRINGIZE, file, cursor, dir_end) };
+		return { make_file_token(p, PREP_TOKEN_KIND_STRINGIZE, file, cursor, dir_end) };
 	}
 	auto [tok_end, tok_kind] = get_str_token_at(file->src, cursor);
 	if (tok_end != 0) {
-		return { make_token(p, tok_kind, file, cursor, tok_end) };
+		return { make_file_token(p, tok_kind, file, cursor, tok_end) };
 	}
 	return { {}, make_prep_file_error(p, file, cursor, len(file->src), "Invalid token. First char: %", file->src[cursor]) };
 }
 
-Tuple<Token, Error*> prep_file_next_token(Prep* p, PrepFile* file, s64* cursor) {
+Tuple<Token*, Error*> prep_file_next_token(Prep* p, PrepFile* file, s64* cursor) {
 	while (*cursor < len(file->src)) {
 		auto lb_len = get_line_break_len(file->src, *cursor);
 		if (lb_len > 0) {
 			defer { *cursor += lb_len; };
-			return { make_token(p, PREP_TOKEN_KIND_LINE_BREAK, file, *cursor, *cursor + lb_len) };
+			return { make_file_token(p, PREP_TOKEN_KIND_LINE_BREAK, file, *cursor, *cursor + lb_len) };
 		}
 		if (is_whitespace(file->src[*cursor])) {
 			defer { *cursor += 1; };
-			return { make_token(p, PREP_TOKEN_KIND_SPACE, file, *cursor, *cursor + 1) };
+			return { make_file_token(p, PREP_TOKEN_KIND_SPACE, file, *cursor, *cursor + 1) };
 		}
 		break;
 	}
@@ -410,19 +460,30 @@ Tuple<Token, Error*> prep_file_next_token(Prep* p, PrepFile* file, s64* cursor) 
 	if (e) {
 		return { {}, e };
 	}
-	*cursor = tok.file_end;
+	assert(tok->flags & PREP_TOKEN_FLAG_SOURCE_FILE);
+	*cursor = tok->file_end;
 	return { tok, NULL };
 }
 
-UnicodeString tok_str(Token tok) {
-	if (tok.kind == PREP_TOKEN_KIND_STRINGIZED || tok.kind == PREP_TOKEN_KIND_CONCATTED) {
-		return tok.custom_str;
+UnicodeString tok_str(Token* tok) {
+	if (tok->flags & PREP_TOKEN_FLAG_CUSTOM_STR) {
+		return tok->custom_str;
 	}
-	return tok.file->src[{tok.file_start, tok.file_end}];
+	if (tok->flags & PREP_TOKEN_FLAG_SOURCE_MACRO) {
+		return tok_str(tok->og_macro_tok);
+	}
+	if (tok->flags & PREP_TOKEN_FLAG_CONCAT_RESIDUE) {
+		return tok_str(tok->concat_residue_og);
+	}
+	if (tok->flags & PREP_TOKEN_FLAG_PRESCAN_EXP) {
+		return tok_str(tok->prescan_exp_og);
+	}
+	assert(tok->flags & PREP_TOKEN_FLAG_SOURCE_FILE);
+	return tok->file->src[{tok->file_start, tok->file_end}];
 }
 
-UnicodeString tok_str_content(Token tok) {
-	assert(tok.kind == PREP_TOKEN_KIND_STRING);
+UnicodeString tok_str_content(Token* tok) {
+	assert(tok->kind == PREP_TOKEN_KIND_STRING);
 	return tok_str(tok)[{1, -1}];
 }
 
@@ -436,9 +497,9 @@ Error* tokenize(Prep* p, PrepFile* file) {
 		if (e) {
 			return e;
 		}
-		println("file: %, cursor: %, tok: %, '%'", file->fullpath, cursor, tok.kind, tok_str(tok));
+		println("file: %, cursor: %, tok: %, '%'", file->fullpath, cursor, tok->kind, tok_str(tok));
 		add(&file->tokens, tok);
-		if (tok.kind == PREP_TOKEN_KIND_EOF) {
+		if (tok->kind == PREP_TOKEN_KIND_EOF) {
 			break;
 		}
 	}
@@ -472,10 +533,10 @@ PrepFile* prep_default_load_file_hook(Prep* p, UnicodeString fullpath) {
 Prep* make_prep(Allocator allocator) {
 	auto p = make<Prep>(allocator);
 	p->allocator = allocator;
+	p->arena = make_arena_allocator(allocator);
 	p->files.allocator = allocator;
 	p->tokens.allocator = allocator;
-	p->include_stack.allocator = allocator;
-	p->macro_stack.allocator = allocator;
+	p->macros.allocator = allocator;
 	p->load_file_hook = prep_default_load_file_hook;
 	p->resolve_fullpath_hook = prep_default_resolve_fullpath_hook;
 	return p;
@@ -490,15 +551,17 @@ AllocatedUnicodeString prep_str(Prep* p) {
 }
 
 // After get_next_token() cursor points to the returned token.
-Token get_next_token(Span<Token> tokens, s64* cursor) {
+Token* get_next_token(Span<Token*> tokens, s64* cursor) {
 	while (++(*cursor) < len(tokens)) {
 		auto tok = tokens[*cursor];
-		if (tok.kind != PREP_TOKEN_KIND_SPACE && tok.kind != PREP_TOKEN_KIND_LINE_BREAK) {
+		if (tok->kind != PREP_TOKEN_KIND_SPACE &&
+			tok->kind != PREP_TOKEN_KIND_LINE_BREAK
+		) {
 			return tok;
 		}
 	}
 	assert(len(tokens) > 0);
-	assert(tokens[-1].kind == PREP_TOKEN_KIND_EOF);
+	assert(tokens[-1]->kind == PREP_TOKEN_KIND_EOF);
 	return tokens[-1];
 }
 
@@ -523,12 +586,25 @@ s64 find_macro_arg_def_tok_idx(PrepMacro* macro, UnicodeString name) {
 
 Error* preprocess(Prep* p, PrepFile* file);
 
-Error* handle_prep_directive(Prep* p, PrepFile* file, Token tok, s64* cursor) {
-	if (tok_str(tok) == "#include") {
+bool does_include_stack_contain_file(Prep* p, PrepFile* file) {
+	auto entry = p->include_site;
+	while (entry) {
+		if (entry->file == file) {
+			return true;
+		}
+		entry = entry->parent;
+	}
+	return false;
+}
+
+Error* handle_prep_directive(Prep* p, PrepFile* file, s64* cursor) {
+	auto first_directive_tok = file->tokens[*cursor];
+	if (tok_str(first_directive_tok) == "#include") {
+		s64 inc_start_tok_idx = *cursor;
 		// @TODO: do not skip newline.
 		// @TODO: do computed includes.
 		auto next_tok = get_next_token(file->tokens, cursor);
-		if (next_tok.kind != PREP_TOKEN_KIND_STRING) {
+		if (next_tok->kind != PREP_TOKEN_KIND_STRING) {
 			return make_prep_file_error(p, next_tok, "Expected file path after #include");
 		}
 		auto fullpath = p->resolve_fullpath_hook(p, tok_str_content(next_tok), false);
@@ -549,35 +625,42 @@ Error* handle_prep_directive(Prep* p, PrepFile* file, Token tok, s64* cursor) {
 			}
 			add(&p->files, included_file);
 		}
-		if (!contains(p->include_stack, included_file)) {
-			add(&p->include_stack, included_file);
-			defer { pop(&p->include_stack); };
+		if (!does_include_stack_contain_file(p, included_file)) {
+			auto inc_site = make<IncludeSite>(p->arena);
+			inc_site->file = included_file;
+			inc_site->parent = p->include_site;
+			// @TODO: set site_toks properly if we do computed includes.
+			inc_site->site_toks = copy_array(p->allocator, file->tokens[{inc_start_tok_idx, *cursor}]);
+			p->include_site = inc_site;
+			defer { p->include_site = inc_site->parent; };
 			auto e = preprocess(p, included_file);
 			if (e) {
 				return e;
 			}
 		}
-	} else if (tok_str(tok) == "#define") {
+	} else if (tok_str(first_directive_tok) == "#define") {
+		s64 start_tok_idx = *cursor;
 		auto ident_tok = get_next_token(file->tokens, cursor);
-		if (ident_tok.kind != PREP_TOKEN_KIND_IDENT) {
+		if (ident_tok->kind != PREP_TOKEN_KIND_IDENT) {
 			return make_prep_file_error(p, ident_tok, "Expected an identifier after #define");
 		}
 		auto macro = make<PrepMacro>(p->allocator);
-		macro->start = tok;
+		macro->def_site = p->include_site;
+		macro->start_tok_idx = start_tok_idx;
 		macro->name = ident_tok;
 		add(&p->macros, macro);
 
 		s64 first_macro_body_tok = *cursor + 1;
 		if (first_macro_body_tok < len(file->tokens) &&
 			tok_str(file->tokens[first_macro_body_tok]) == "(" &&
-			file->tokens[first_macro_body_tok].file_start == ident_tok.file_end)
+			file->tokens[first_macro_body_tok]->file_start == ident_tok->file_end)
 		{
 			*cursor += 1;
 			macro->is_object = false;
 			while (true) {
 				auto arg_tok = get_next_token(file->tokens, cursor);
 				if (tok_str(arg_tok) == ")") {
-					macro->end = arg_tok;
+					macro->end_tok_idx = *cursor;
 					*cursor += 1;
 					break;
 				}
@@ -587,7 +670,7 @@ Error* handle_prep_directive(Prep* p, PrepFile* file, Token tok, s64* cursor) {
 					}
 					arg_tok = get_next_token(file->tokens, cursor);
 				}
-				if (arg_tok.kind != PREP_TOKEN_KIND_IDENT) {
+				if (arg_tok->kind != PREP_TOKEN_KIND_IDENT) {
 					return make_prep_file_error(p, arg_tok, "Expected an identifier as a macro argument");
 				}
 				for (auto it: macro->arg_defs) {
@@ -604,31 +687,31 @@ Error* handle_prep_directive(Prep* p, PrepFile* file, Token tok, s64* cursor) {
 		}
 		while (*cursor < len(file->tokens)) {
 			auto macro_tok = file->tokens[*cursor];
-			if (macro_tok.kind == PREP_TOKEN_KIND_EOF || macro_tok.kind == PREP_TOKEN_KIND_LINE_BREAK) {
+			if (macro_tok->kind == PREP_TOKEN_KIND_EOF || macro_tok->kind == PREP_TOKEN_KIND_LINE_BREAK) {
 				break;
-			} else if (macro_tok.kind == PREP_TOKEN_KIND_STRINGIZE) {
+			} else if (macro_tok->kind == PREP_TOKEN_KIND_STRINGIZE) {
 				auto def_tok_idx = find_macro_arg_def_tok_idx(macro, tok_str(macro_tok)[{1, {}}]);
 				if (def_tok_idx == -1) {
 					return make_prep_file_error(p, macro_tok, "Macro argument is not found for stringizing");
 				}
-			} else if (macro_tok.kind == PREP_TOKEN_KIND_DIRECTIVE) {
+			} else if (macro_tok->kind == PREP_TOKEN_KIND_DIRECTIVE) {
 				return make_prep_file_error(p, macro_tok, "Unexpected preprocessor directive in a macro");
 			}
-			assert(macro_tok.kind != PREP_TOKEN_KIND_NONE);
+			assert(macro_tok->kind != PREP_TOKEN_KIND_NONE);
 			*cursor += 1;
 		}
 		macro->tokens = copy_array(p->allocator, file->tokens[{first_macro_body_tok, *cursor}]);
 		for (auto& it: macro->tokens) {
-			if (it.kind == PREP_TOKEN_KIND_IDENT) {
-				it.kind = PREP_TOKEN_KIND_MACRO_PRESCAN_IDENT;
+			if (it->kind == PREP_TOKEN_KIND_IDENT) {
+				it->kind = PREP_TOKEN_KIND_MACRO_PRESCAN_IDENT;
 			}
 		}
 		LogTrace("Macro tokens {%}", tok_str(macro->name));
 		for (auto it: macro->tokens) {
-			LogTrace("  %, %: %, %", tok_str(it), it.file_start, it.file_end, it.kind);
+			LogTrace("  %, %: %, %", tok_str(it), it->file_start, it->file_end, it->kind);
 		}
 	} else {
-		return make_prep_file_error(p, tok, "Unknown preprocessor directive '%'", tok_str(tok));
+		return make_prep_file_error(p, first_directive_tok, "Unknown preprocessor directive '%'", tok_str(first_directive_tok));
 	}
 	return NULL;
 }
@@ -648,12 +731,12 @@ struct PrepMacroArg {
 	s64          end;
 };
 
-void prep_stringize_tok(Token* dst, Token arg, PrepMacro* macro) {
+void prep_stringize_tok(Token* dst, Token* arg) {
 	// @TODO: escape.
 	add(&dst->custom_str, tok_str(arg));
 }
 
-Tuple<Error*, Array<PrepMacroArg>> parse_macro_args(Prep* p, PrepMacro* macro, Span<Token> tokens, s64* cursor, Token paren_tok) {
+Tuple<Error*, Array<PrepMacroArg>> parse_macro_args(Prep* p, PrepMacro* macro, Span<Token*> tokens, s64* cursor, Token* paren_tok) {
 	Array<PrepMacroArg> args = { .capacity = len(macro->arg_defs), .allocator = p->allocator };
 	s64 paren_level = 0;
 	s64 arg_start = -1;
@@ -708,7 +791,7 @@ Tuple<Error*, Array<PrepMacroArg>> parse_macro_args(Prep* p, PrepMacro* macro, S
 	return { NULL, args };
 }
 
-Optional<Span<Token>> get_arg_tokens(PrepMacro* macro, Span<Token> tokens, Span<PrepMacroArg> args, UnicodeString name) {
+Optional<Span<Token*>> get_arg_tokens(PrepMacro* macro, Span<Token*> tokens, Span<PrepMacroArg> args, UnicodeString name) {
 	auto def_idx = find_macro_arg_def_tok_idx(macro, name);
 	if (def_idx == -1) {
 		return {};
@@ -717,7 +800,7 @@ Optional<Span<Token>> get_arg_tokens(PrepMacro* macro, Span<Token> tokens, Span<
 		if (def_idx < len(args)) {
 			return tokens[{args[def_idx].start, args[-1].end}];
 		} else {
-			return make_optional<Span<Token>>({});
+			return make_optional<Span<Token*>>({});
 		}
 	} else {
 		auto arg = args[def_idx];
@@ -725,37 +808,58 @@ Optional<Span<Token>> get_arg_tokens(PrepMacro* macro, Span<Token> tokens, Span<
 	}
 }
 
-struct PrepMacroExp {
+struct MaybeExpandedMacro {
 	Error*       e = NULL;
-	Array<Token> expanded;
-	s64          exp_start;
-	s64          exp_end;
-	bool         is_expanded = false;
+	MacroExp*    exp = NULL;
+	s64          exp_start = 0;
+	s64          exp_end = 0;
 };
 
-PrepMacroExp maybe_expand_macro(Prep* p, Span<Token> tokens, s64* cursor) {
+bool does_macro_stack_contain_macro(Prep* p, PrepMacro* macro) {
+	auto entry = p->macro_exp;
+	while (entry) {
+		if (entry->macro == macro) {
+			return true;
+		}
+		entry = entry->parent;
+	}
+	return false;
+}
+
+MaybeExpandedMacro maybe_expand_macro(Prep* p, Span<Token*> tokens, s64* cursor) {
 	auto exp_start = *cursor;
 	auto name_tok = tokens[*cursor];
-	assert(name_tok.kind == PREP_TOKEN_KIND_IDENT || name_tok.kind == PREP_TOKEN_KIND_MACRO_PRESCAN_IDENT);
+	assert(name_tok->kind == PREP_TOKEN_KIND_IDENT || name_tok->kind == PREP_TOKEN_KIND_MACRO_PRESCAN_IDENT);
 	auto macro = find_macro(p, tok_str(name_tok));
 	if (!macro) {
 		return { };
 	}
-	Token paren_tok = {};
+	Token* paren_tok = NULL;
 	if (!macro->is_object) {
 		paren_tok = get_next_token(tokens, cursor);
-		if (tok_str(paren_tok) != "(" || paren_tok.file_start != name_tok.file_end) {
+		if (tok_str(paren_tok) != "(" || paren_tok->file_start != name_tok->file_end) {
 			return { };
 		}
 	}
 
-	if (contains(p->macro_stack, macro)) {
+	if (does_macro_stack_contain_macro(p, macro)) {
 		return { };
 	}
-	add(&p->macro_stack, macro);
-	defer { pop(&p->macro_stack); };
 
-	Array<Token> body = copy_array(p->allocator, macro->tokens);
+	auto exp = make<MacroExp>(p->arena);
+	exp->macro = macro;
+	exp->parent = p->macro_exp;
+	exp->body.allocator = p->allocator;
+	p->macro_exp = exp;
+	defer { p->macro_exp = exp->parent; };
+
+	for (auto tok: macro->tokens) {
+		auto nt = make_token(p, tok->kind);
+		nt->flags |= PREP_TOKEN_FLAG_SOURCE_MACRO;
+		nt->og_macro_tok = tok;
+		nt->og_macro_exp = exp;
+		add(&exp->body, nt);
+	}
 
 	if (!macro->is_object) {
 		auto [e, args] = parse_macro_args(p, macro, tokens, cursor, paren_tok);
@@ -763,33 +867,42 @@ PrepMacroExp maybe_expand_macro(Prep* p, Span<Token> tokens, s64* cursor) {
 			return { e };
 		}
 		// Stringize.
-		for (s64 i = 0; i < len(body); i++) {
-			if (body[i].kind == PREP_TOKEN_KIND_STRINGIZE) {
-				auto new_tok = make_token(p, PREP_TOKEN_KIND_STRINGIZED, NULL, 0, 0);
-				new_tok.custom_str.allocator = p->allocator;
-				append(&body[i].custom_str, U"\"");
-				auto [arg_tokens, found] = get_arg_tokens(macro, tokens, args, tok_str(body[i])[{1, {}}]);
+		for (s64 i = 0; i < len(exp->body); i++) {
+			if (exp->body[i]->kind == PREP_TOKEN_KIND_STRINGIZE) {
+				auto str_tok = make_token(p, PREP_TOKEN_KIND_STRING);
+				str_tok->flags |= PREP_TOKEN_FLAG_SOURCE_STRINGIZE;
+				str_tok->stringize_exp = exp;
+				str_tok->stringize_tok = exp->body[i];
+				prep_use_custom_str(p, str_tok);
+				append(&str_tok->custom_str, U"\"");
+				auto [arg_tokens, found] = get_arg_tokens(macro, tokens, args, tok_str(exp->body[i])[{1, {}}]);
 				if (!found) {
-					return { make_prep_file_error(p, body[i], "Macro argument is not found for stringizing") };
+					return { make_prep_file_error(p, exp->body[i], "Macro argument is not found for stringizing") };
 				}
 				for (auto tok: arg_tokens) {
-					prep_stringize_tok(&body[i], tok, macro);
+					prep_stringize_tok(str_tok, tok);
 				}
-				append(&body[i].custom_str, U"\"");
+				append(&str_tok->custom_str, U"\"");
+				exp->body[i] = str_tok;
 			}
 		}
 		// Concat.
-		for (s64 i = 0; i < len(body); i++) {
-			if (body[i].kind == PREP_TOKEN_KIND_CONCAT) {
-				if (i - 1 < 0 || contains({PREP_TOKEN_KIND_SPACE, PREP_TOKEN_KIND_EOF}, body[i - 1].kind)) {
-					return { make_prep_file_error(p, body[i], "Missing left argument for ## operator") };
+		for (s64 i = 0; i < len(exp->body); i++) {
+			if (exp->body[i]->kind == PREP_TOKEN_KIND_CONCAT) {
+				if (i - 1 < 0 || contains({PREP_TOKEN_KIND_SPACE, PREP_TOKEN_KIND_EOF}, exp->body[i - 1]->kind)) {
+					return { make_prep_file_error(p, exp->body[i], "Missing left argument for ## operator") };
 				}
-				if (i + 1 >= len(body) || contains({PREP_TOKEN_KIND_SPACE, PREP_TOKEN_KIND_EOF}, body[i + 1].kind)) {
-					return { make_prep_file_error(p, body[i], "Missing right argument for ## operator") };
+				if (i + 1 >= len(exp->body) || contains({PREP_TOKEN_KIND_SPACE, PREP_TOKEN_KIND_EOF}, exp->body[i + 1]->kind)) {
+					return { make_prep_file_error(p, exp->body[i], "Missing right argument for ## operator") };
 				}
-				auto lhs_tok = body[i - 1];
-				Span<Token> lhs = body[{i - 1, i}];
-				Span<Token> rhs = body[{i + 1, i + 2}];
+				Token* tok = make_token(p, PREP_TOKEN_KIND_NONE);
+				tok->flags |= PREP_TOKEN_FLAG_CONCATTED;
+				prep_use_custom_str(p, tok);
+				auto lhs_tok = exp->body[i - 1];
+				Span<Token*> lhs = exp->body[{i - 1, i}];
+				Span<Token*> rhs = exp->body[{i + 1, i + 2}];
+				tok->concat_lhs = lhs[0];
+				tok->concat_rhs = rhs[0];
 				auto [lhs_toks, lhs_found] = get_arg_tokens(macro, tokens, args, tok_str(lhs[0]));
 				if (lhs_found) {
 					lhs = lhs_toks;
@@ -798,53 +911,68 @@ PrepMacroExp maybe_expand_macro(Prep* p, Span<Token> tokens, s64* cursor) {
 				if (rhs_found) {
 					rhs = rhs_toks;
 				}
-				Token tok = make_token(p, PREP_TOKEN_KIND_CONCATTED, NULL, 0, 0);
-				tok.custom_str.allocator = p->allocator;
-				Span<Token> lhs_residue;
-				Span<Token> rhs_residue;
+				Span<Token*> lhs_residue;
+				Span<Token*> rhs_residue;
 				if (len(lhs) > 0) {
-					append(&tok.custom_str, tok_str(lhs[-1]));
+					tok->concat_lhs_content = lhs[-1];
+					append(&tok->custom_str, tok_str(lhs[-1]));
 					lhs_residue = lhs[{0, -1}];
 				}
 				if (len(rhs) > 0) {
-					append(&tok.custom_str, tok_str(rhs[0]));
+					tok->concat_rhs_content = rhs[0];
+					append(&tok->custom_str, tok_str(rhs[0]));
 					rhs_residue = rhs[{1, {}}];
 				}
-				auto [end, kind] = get_str_token_at(tok.custom_str, 0);
-				if (end != len(tok.custom_str)) {
-					return { make_prep_file_error(p, body[i], "Concatenated string '%' doesn't form a valid token", tok_str(tok)) };
+				auto [end, kind] = get_str_token_at(tok->custom_str, 0);
+				if (end != len(tok->custom_str)) {
+					return { make_prep_file_error(p, exp->body[i], "Concatenated string '%' doesn't form a valid token", tok_str(tok)) };
 				}
-				remove_at_index(&body, i - 1, 3);
-				add(&body, lhs_residue, i - 1);
-				add(&body, tok,         i - 1 + len(lhs_residue));
-				add(&body, rhs_residue, i - 1 + len(lhs_residue) + 1);
+				for (auto& it: lhs_residue) {
+					auto t = make_token(p, it->kind);
+					t->flags |= PREP_TOKEN_FLAG_CONCAT_RESIDUE;
+					t->concat_residue_og = it;
+					it = t;
+				}
+				for (auto& it: rhs_residue) {
+					auto t = make_token(p, it->kind);
+					t->flags |= PREP_TOKEN_FLAG_CONCAT_RESIDUE;
+					t->concat_residue_og = it;
+					it = t;
+				}
+				tok->kind = kind;
+				remove_at_index(&exp->body, i - 1, 3);
+				add(&exp->body, lhs_residue, i - 1);
+				add(&exp->body, tok,         i - 1 + len(lhs_residue));
+				add(&exp->body, rhs_residue, i - 1 + len(lhs_residue) + 1);
 				i = i - 1 + len(lhs_residue) + len(rhs_residue);
 			}
 		}
 		// Prescan.
-		for (s64 i = 0; i < len(body); i++) {
-			if (body[i].kind == PREP_TOKEN_KIND_MACRO_PRESCAN_IDENT) {
-				auto [arg_tokens, found] = get_arg_tokens(macro, tokens, args, tok_str(body[i]));
+		for (s64 i = 0; i < len(exp->body); i++) {
+			if (exp->body[i]->kind == PREP_TOKEN_KIND_MACRO_PRESCAN_IDENT) {
+				auto [arg_tokens, found] = get_arg_tokens(macro, tokens, args, tok_str(exp->body[i]));
 				println("found: %", found);
 				if (found) {
 					s64 body_cursor = i;
-					remove_at_index(&body, i);
+					remove_at_index(&exp->body, i);
 					s64 arg_cursor = 0;
 					while (arg_cursor < len(arg_tokens)) {
-						if (arg_tokens[arg_cursor].kind == PREP_TOKEN_KIND_IDENT) {
-							auto exp = maybe_expand_macro(p, arg_tokens, &arg_cursor);
-							if (exp.e) {
-								return { exp.e };
+						if (arg_tokens[arg_cursor]->kind == PREP_TOKEN_KIND_IDENT) {
+							auto mb = maybe_expand_macro(p, arg_tokens, &arg_cursor);
+							if (mb.e) {
+								return { mb.e };
 							}
-							if (exp.is_expanded) {
-								add(&body, exp.expanded, body_cursor);
-								body_cursor += len(exp.expanded);
+							if (mb.exp) {
+								add(&exp->body, mb.exp->body, body_cursor);
+								body_cursor += len(mb.exp->body);
 								arg_cursor += 1;
-								exp.expanded.free();
 								continue;
 							}
 						}
-						add(&body, arg_tokens[arg_cursor], body_cursor);
+						auto t = make_token(p, arg_tokens[arg_cursor]->kind);
+						t->flags |= PREP_TOKEN_FLAG_PRESCAN_EXP;
+						t->prescan_exp_og = arg_tokens[arg_cursor];
+						add(&exp->body, t, body_cursor);
 						body_cursor += 1;
 						arg_cursor += 1;
 					}
@@ -853,11 +981,10 @@ PrepMacroExp maybe_expand_macro(Prep* p, Span<Token> tokens, s64* cursor) {
 		}
 	}
 
-	PrepMacroExp res = {
-		.expanded = body,
+	MaybeExpandedMacro res = {
+		.exp = exp,
 		.exp_start = exp_start,
 		.exp_end = *cursor,
-		.is_expanded = true,
 	};
 	return res;
 }
@@ -870,24 +997,24 @@ Error* preprocess(Prep* p, PrepFile* file) {
 	s64 cursor = -1;
 	while (++cursor < len(file->tokens)) {
 		auto tok = file->tokens[cursor];
-		if (tok.kind == PREP_TOKEN_KIND_DIRECTIVE) {
-			auto e = handle_prep_directive(p, file, tok, &cursor);
+		if (tok->kind == PREP_TOKEN_KIND_DIRECTIVE) {
+			auto e = handle_prep_directive(p, file, &cursor);
 			if (e) {
 				return e;
 			}
 			continue;
 		}
-		if (tok.kind == PREP_TOKEN_KIND_IDENT) {
-			auto exp = maybe_expand_macro(p, file->tokens, &cursor);
-			if (exp.e) {
+		if (tok->kind == PREP_TOKEN_KIND_IDENT) {
+			auto mb = maybe_expand_macro(p, file->tokens, &cursor);
+			if (mb.e) {
 				return e;
 			}
-			if (exp.is_expanded) {
-				add(&p->tokens, exp.expanded);
+			if (mb.exp) {
+				add(&p->tokens, mb.exp->body);
 				continue;
 			}
 		}
-		if (tok.kind == PREP_TOKEN_KIND_EOF) {
+		if (tok->kind == PREP_TOKEN_KIND_EOF) {
 			break;
 		}
 		add(&p->tokens, tok);
