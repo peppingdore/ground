@@ -11,14 +11,29 @@
 #include <stdio.h>
 
 enum AllocatorVerb: s32 {
-	ALLOCATOR_VERB_ALLOC          = 0,
-	ALLOCATOR_VERB_REALLOC        = 1,
-	ALLOCATOR_VERB_FREE           = 2,
-	ALLOCATOR_VERB_GET_TYPE       = 3,
-	ALLOCATOR_VERB_FREE_ALLOCATOR = 4,
+	ALLOCATOR_VERB_NONE           = 0,
+	ALLOCATOR_VERB_ALLOC          = 1 << 0,
+	ALLOCATOR_VERB_FREE           = 1 << 2,
+	ALLOCATOR_VERB_REALLOC        = 1 << 1,
+	ALLOCATOR_VERB_GET_TYPE       = 1 << 3,
+	ALLOCATOR_VERB_FREE_ALLOCATOR = 1 << 4,
 };
 
-using AllocatorProc = void* (AllocatorVerb, void* old_data, u64 old_size, u64 new_size, void* allocator_data, CodeLocation);
+struct AllocatorProcResult {
+	void* data = NULL;
+	Type* allocator_type = NULL;
+};
+
+struct AllocatorProcParams {
+	AllocatorVerb verb;
+	void*         old_data = 0;
+	u64           old_size = 0;
+	u64           new_size = 0;
+	void*         allocator_data = 0;
+	CodeLocation  loc;
+};
+
+using AllocatorProc = AllocatorProcResult (AllocatorProcParams);
 
 struct Allocator {
 	// We could just put |proc| in AllocatorData struct,
@@ -33,11 +48,11 @@ struct Allocator {
 };
 
 Type* get_allocator_type(Allocator allocator) {
-	return (Type*) allocator.proc(ALLOCATOR_VERB_GET_TYPE, NULL, 0, 0, allocator.allocator_data, current_loc());
+	return allocator.proc({.verb = ALLOCATOR_VERB_GET_TYPE, .loc = current_loc()}).type;	
 }
 
 void free_allocator(Allocator allocator) {
-	allocator.proc(ALLOCATOR_VERB_FREE_ALLOCATOR, NULL, 0, 0, allocator.allocator_data, current_loc());
+	allocator.proc({.verb = ALLOCATOR_VERB_FREE_ALLOCATOR, .loc = current_loc()});
 }
 
 
@@ -64,14 +79,14 @@ struct CRTAllocator {
 	REFLECT(CRTAllocator) {}
 };
 
-void* c_allocator_proc(AllocatorVerb verb, void* old_data, u64 old_size, u64 size, void* allocator_data, CodeLocation loc) {
-	switch (verb) {
+void* c_allocator_proc(AllocatorProcParams params) {
+	switch (params.verb) {
 		case ALLOCATOR_VERB_ALLOC:
-			return malloc_crash_on_failure(size);
+			return malloc_crash_on_failure(params.new_size);
 		case ALLOCATOR_VERB_REALLOC:
-			return realloc_crash_on_failure(old_data, size);
+			return realloc_crash_on_failure(params.old_data, params.new_size);
 		case ALLOCATOR_VERB_FREE:
-			free(old_data);
+			free(params.old_data);
 			break;
 		case ALLOCATOR_VERB_GET_TYPE:
 			return reflect_type_of<CRTAllocator>();
@@ -97,7 +112,13 @@ constexpr Allocator null_allocator = {
 };
 
 void* Malloc(Allocator allocator, u64 size, CodeLocation loc = caller_loc()) {
-	return allocator.proc(ALLOCATOR_VERB_ALLOC, NULL, 0, size, allocator.allocator_data, loc);
+	AllocatorProcParams p = {
+		.verb = ALLOCATOR_VERB_ALLOC,
+		.new_size = size,
+		.allocator_data = allocator.allocator_data,
+		.loc = loc
+	};
+	return allocator.proc(p).data;
 }
 
 void* Malloc(u64 size, CodeLocation loc = caller_loc()) {
@@ -108,7 +129,13 @@ void Free(Allocator allocator, void* data, CodeLocation loc = caller_loc()) {
 	if (data == NULL) {
 		return;
 	}
-	allocator.proc(ALLOCATOR_VERB_FREE, data, 0, 0, allocator.allocator_data, loc);
+	AllocatorProcParams p = {
+		.verb = ALLOCATOR_VERB_FREE,
+		.old_data = data,
+		.allocator_data = allocator.allocator_data,
+		.loc = loc
+	};
+	allocator.proc(p);
 }
 
 void Free(void* data, CodeLocation loc = caller_loc()) {
@@ -116,7 +143,15 @@ void Free(void* data, CodeLocation loc = caller_loc()) {
 }
 
 void* Realloc(Allocator allocator, void* data, u64 old_size, u64 new_size, CodeLocation loc = caller_loc()) {
-	return allocator.proc(ALLOCATOR_VERB_REALLOC, data, old_size, new_size, allocator.allocator_data, loc);
+	AllocatorProcParams p = {
+		.verb = ALLOCATOR_VERB_REALLOC,
+		.old_data = data,
+		.old_size = old_size,
+		.new_size = new_size,
+		.allocator_data = allocator.allocator_data,
+		.loc = loc
+	};
+	return allocator.proc(p).data;
 }
 
 void* Realloc(void* data, u64 old_size, u64 new_size, CodeLocation loc = caller_loc()) {

@@ -4,7 +4,7 @@
 // #define PARENR )
 // A(C PARENL a, b, c PARENR)
 
-#include "preprocess2.h"
+#include "preprocess.h"
 #include "../testing.h"
 #include "../format.h"
 
@@ -37,14 +37,14 @@ TEST(prep_splice) {
 	#include "test.txt"
 	)RAW"_b;
 	p = make_prep(c_allocator);
-	p->load_file_hook = [](Prep* p, UnicodeString path) -> PrepFile* {
+	p->load_file_hook = [](Prep* p, UnicodeString path) -> Tuple<Error*, PrepFile*> {
 		auto file = make<PrepFile>(c_allocator);
 		file->og_src = U"file content"_b;
 		file->fullpath = path;
-		return file;
+		return { NULL, file };
 	};
 	auto file = make_mem_prep_file(p, str2, U"/files/text.txt"_b);
-	auto e = preprocess(p, file);
+	auto e = preprocess_file(p, file);
 	println(prep_str(p));
 	if (e) {
 		print_prep_error(e);
