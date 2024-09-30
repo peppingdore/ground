@@ -176,8 +176,9 @@ def build_compile_cmdline(unit, params, target, out_path):
 			args.append(('/' if is_msvc_interface(params.compiler) else '-') + f'D{it}')
 	if is_msvc_interface(params.compiler):
 		args.append('/TP')
-	if is_darwin(target.os):
-		args.append('-x objective-c++')
+	if not is_msvc_interface(params.compiler):
+		# If we don't specify -x c++/objective-c++ clang will compile *.h files into a precompiled header.
+		args.append('-x objective-c++' if is_darwin(target.os) else '-x c++')
 	if not is_msvc_interface(params.compiler):
 		args.append(f'--target={make_target_triplet(target)}')
 	if params.optimization_level < 0 or params.optimization_level > 3:
