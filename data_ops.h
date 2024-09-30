@@ -16,7 +16,7 @@ void reverse(T* data, u64 length) {
 	}
 }
 
-template <typename Return_Type, typename T> requires (sizeof(Return_Type) == sizeof(T))
-Return_Type bitcast(T thing) {
-	return *reinterpret_cast<Return_Type*>(&thing);
+template <typename ReturnType, typename T> requires (sizeof(ReturnType) == sizeof(T))
+ReturnType bitcast(T thing) {
+	return *reinterpret_cast<ReturnType*>(&thing);
 }
