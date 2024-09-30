@@ -48,7 +48,7 @@ struct Allocator {
 };
 
 Type* get_allocator_type(Allocator allocator) {
-	return allocator.proc({.verb = ALLOCATOR_VERB_GET_TYPE, .loc = current_loc()}).type;	
+	return allocator.proc({.verb = ALLOCATOR_VERB_GET_TYPE, .loc = current_loc()}).allocator_type;	
 }
 
 void free_allocator(Allocator allocator) {
@@ -79,22 +79,22 @@ struct CRTAllocator {
 	REFLECT(CRTAllocator) {}
 };
 
-void* c_allocator_proc(AllocatorProcParams params) {
+AllocatorProcResult c_allocator_proc(AllocatorProcParams params) {
 	switch (params.verb) {
 		case ALLOCATOR_VERB_ALLOC:
-			return malloc_crash_on_failure(params.new_size);
+			return { .data = malloc_crash_on_failure(params.new_size) };
 		case ALLOCATOR_VERB_REALLOC:
-			return realloc_crash_on_failure(params.old_data, params.new_size);
+			return { .data = realloc_crash_on_failure(params.old_data, params.new_size) };
 		case ALLOCATOR_VERB_FREE:
 			free(params.old_data);
 			break;
 		case ALLOCATOR_VERB_GET_TYPE:
-			return reflect_type_of<CRTAllocator>();
+			return { .allocator_type = reflect_type_of<CRTAllocator>() };
 		default:
 			assert(false);
-			return NULL;
+			return {};
 	}
-	return NULL;
+	return {};
 }
 
 constexpr Allocator crt_allocator = {
