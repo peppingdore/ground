@@ -11,38 +11,41 @@ constexpr u64 panic_message_memory_size = 16 * 1024;
 inline u8     panic_message_memory[panic_message_memory_size];
 inline u64    panic_message_memory_offset = 0;
 
-inline void* panic_allocator_proc(AllocatorVerb verb, void* old_data, u64 old_size, u64 size, void* allocator_data, CodeLocation loc) {
-	switch (verb) {
+AllocatorProcResult panic_allocator_proc(void* allocator_data, AllocatorProcParams p) {
+	switch (p.verb) {
 		case ALLOCATOR_VERB_ALLOC: {
-			if (size + panic_message_memory_offset > panic_message_memory_size) {
+			if (p.new_size + panic_message_memory_offset > panic_message_memory_size) {
 				abort(); // Just die at this point.
-				return NULL;
+				return {};
 			}
 			auto result = panic_message_memory + panic_message_memory_offset;
-			panic_message_memory_offset += size;
-			return result;
+			panic_message_memory_offset += p.new_size;
+			return { .data = result };
 		}
 		break;
-		case ALLOCATOR_VERB_FREE: return NULL;
+		case ALLOCATOR_VERB_FREE: return {};
 		case ALLOCATOR_VERB_REALLOC: {
-			void* new_data = panic_allocator_proc(ALLOCATOR_VERB_ALLOC, NULL, 0, size, allocator_data, loc);
-			memcpy(new_data, old_data, min(old_size, size));
-			panic_allocator_proc(ALLOCATOR_VERB_FREE, old_data, 0, 0, allocator_data, loc);
-			return new_data;
+			auto sub_p = p;
+			sub_p.verb = ALLOCATOR_VERB_ALLOC;
+			auto new_res = panic_allocator_proc(allocator_data, sub_p);
+			memcpy(new_res.data, p.old_data, min_u64(p.old_size, p.new_size));
+			sub_p = p;
+			sub_p.verb = ALLOCATOR_VERB_FREE;
+			panic_allocator_proc(allocator_data, sub_p);
+			return new_res;
 		}
 		break;
-		case ALLOCATOR_VERB_GET_TYPE: return NULL;
-		case ALLOCATOR_VERB_FREE_ALLOCATOR: return NULL;
+		case ALLOCATOR_VERB_GET_TYPE: return {};
+		case ALLOCATOR_VERB_FREE_ALLOCATOR: return {};
+		default:
+			return {};
 	}
-	return NULL;
+	return {};
 }
 
 constexpr Allocator panic_allocator = {
-	.proc           = &panic_allocator_proc,
-	.allocator_data = NULL,
-#ifdef ALLOCATOR_NAMES
-	.name = "panic_allocator",
-#endif
+	.proc = &panic_allocator_proc,
+	.data = NULL,
 };
 
 Spinlock PANIC_LOCK;

@@ -39,14 +39,14 @@ Arena* make_arena(Allocator parent_allocator, u64 size) {
 	return arena;
 }
 
-void* arena_allocator_proc(AllocatorVerb verb, void* old_data, u64 old_size, u64 size, void* allocator_data, CodeLocation loc) {
+AllocatorProcResult arena_allocator_proc(void* allocator_data, AllocatorProcParams p) {
 	auto arenas = (LinkedArenas*) allocator_data;
-	switch (verb) {
+	switch (p.verb) {
 		case ALLOCATOR_VERB_ALLOC: {
 			Arena* last = &arenas->first;
 			Arena* found = NULL;
 			while (true) {
-				if (last->allocated + size <= arenas->arena_size) { 
+				if (last->allocated + p.new_size <= arenas->arena_size) { 
 					found = last;
 					break;
 				}
@@ -59,29 +59,29 @@ void* arena_allocator_proc(AllocatorVerb verb, void* old_data, u64 old_size, u64
 				last = last->next;
 			}
 			if (!found) {
-				u64 new_arena_size = max(arenas->arena_size, size);
+				u64 new_arena_size = max_u64(arenas->arena_size, p.new_size);
 				last = make_arena(arenas->parent_allocator, new_arena_size);
 			}
 			void* ptr = ptr_add(last, sizeof(Arena) + last->allocated);
-			last->allocated += size;
-			return ptr;
+			last->allocated += p.new_size;
+			return { .data = ptr };
 		}
 		break;
 		case ALLOCATOR_VERB_REALLOC: {
-			void* new_data = arena_allocator_proc(ALLOCATOR_VERB_ALLOC, NULL, 0, size, allocator_data, loc);
-			memcpy(new_data, old_data, min(old_size, size));
-			arena_allocator_proc(ALLOCATOR_VERB_FREE, old_data, 0, 0, allocator_data, loc);
-			return new_data;
+			auto res = arena_allocator_proc(allocator_data, { .verb = ALLOCATOR_VERB_ALLOC, .new_size = p.new_size, .loc = p.loc });
+			memcpy(res.data, p.old_data, min_u64(p.old_size, p.new_size));
+			arena_allocator_proc(allocator_data, { .verb = ALLOCATOR_VERB_FREE, .old_data = p.old_data, .loc = p.loc });
+			return res;
 		}
 		case ALLOCATOR_VERB_FREE:
-			return NULL;
+			return {};
 		case ALLOCATOR_VERB_GET_TYPE:
-			return reflect_type_of<LinkedArenas>();
+			return { .allocator_type = reflect_type_of<LinkedArenas>() };
 		case ALLOCATOR_VERB_FREE_ALLOCATOR:
 			free_linked_arenas(arenas);
 			break;
 	}
-	return NULL;
+	return {};
 }
 
 Allocator make_arena_allocator(Allocator parent_allocator, u64 arena_size = DEFAULT_ARENA_SIZE) {
@@ -96,7 +96,7 @@ Allocator make_arena_allocator(Allocator parent_allocator, u64 arena_size = DEFA
 	};
 	Allocator allocator = {
 		.proc = arena_allocator_proc,
-		.allocator_data = arenas,
+		.data = arenas,
 	};
 	return allocator;
 }
@@ -151,7 +151,7 @@ ArenaAllocatorSnapshot snapshot(Allocator allocator) {
 	if (type != reflect_type_of<LinkedArenas>()) {
 		return {};
 	}
-	return snapshot((LinkedArenas*) allocator.allocator_data);
+	return snapshot((LinkedArenas*) allocator.data);
 }
 
 void restore(Allocator allocator, ArenaAllocatorSnapshot snapshot) {
@@ -159,5 +159,5 @@ void restore(Allocator allocator, ArenaAllocatorSnapshot snapshot) {
 	if (type != reflect_type_of<LinkedArenas>()) {
 		return;
 	}
-	restore((LinkedArenas*) allocator.allocator_data, snapshot);
+	restore((LinkedArenas*) allocator.data, snapshot);
 }
