@@ -72,7 +72,7 @@ using u32  = uint32_t;
 // if we use int64_t for s64 we can't simply use %lld in printf for both os's.
 // So we hardcode s64 as long long.
 using s64  = long long;
-using u64  = uint64_t;
+using u64  = unsigned long long;
 using f32  = float;
 using f64  = double;
 
