@@ -652,6 +652,21 @@ void format_map(Formatter* formatter, MapType* type, void* thing) {
 
 template <typename T> requires (std::numeric_limits<T>::is_integer)
 void format_integer_primitive(Formatter* formatter, T num, String spec) {
+	if (spec == "sz") {
+		if (num >= 1024ULL * 1024 * 1024 * 1024) {
+			format(formatter, "% TB", f64(num) / f64(1024ULL * 1024 * 1024 * 1024));
+		} else if (num >= 1024ULL * 1024 * 1024) {
+			format(formatter, "% GB", f64(num) / f64(1024ULL * 1024 * 1024));
+		} else if (num >= 1024ULL * 1024) {
+			format(formatter, "% MB", f64(num) / f64(1024ULL * 102));
+		} else if (num >= 1024) {
+			format(formatter, "% KB", f64(num) / f64(1024ULL));
+		} else {
+			format(formatter, "% B", num);
+		}
+		return;
+	}
+
 	IntegerStringParams p;
 	if (spec == "b"_b) {
 		p.base = 2;
