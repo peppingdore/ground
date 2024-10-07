@@ -13,6 +13,7 @@ struct Test {
 	const char*         name = NULL;
 	s64                 expect_succeeded = 0;
 	s64                 expect_failed = 0;
+	s64                 idx = 0;
 };
 
 struct TestScopeNode {
@@ -34,15 +35,23 @@ void run_test(Test* test) {
 	tester.current_test = NULL;
 }
 
-void register_test(void(*proc)(), const char* name) {
+void register_test(void(*proc)(), const char* name, s64 idx) {
 	Test* test = new Test();
 	test->proc = proc;
 	test->name = name;
+	test->idx = idx;
 	if (!tester.first_test) {
 		tester.first_test = test;
 	} else {
-		test->next = tester.first_test;
-		tester.first_test = test;
+		auto** dst = &tester.first_test;
+		while (*dst) {
+			if (idx <= (*dst)->idx) {
+				break;
+			}
+			dst = &(*dst)->next;
+		}
+		test->next = *dst;
+		*dst = test;
 	}
 }
 
@@ -172,7 +181,7 @@ void tester_scope_pop() {
 #define TEST(name)\
 BUILD_RUN("if 'test' in globals(): test.get_case(\"" #name "\")");\
 void test_##name ();\
-int register_test_##name = []() { register_test(&test_##name, #name); return 0; }();\
+int register_test_##name = []() { register_test(&test_##name, #name, __COUNTER__); return 0; }();\
 inline void test_##name()
 
 #define FAIL(message) test_expect(false, "", message)
