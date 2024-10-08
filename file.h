@@ -195,3 +195,15 @@ Tuple<AllocatedString, Error*> read_text_at_path(Allocator allocator, UnicodeStr
 Tuple<AllocatedString, Error*> read_text_at_path(UnicodeString path) {
 	return read_text_at_path(c_allocator, path);
 }
+
+Error* write_string_to_file(String str, UnicodeString path) {
+	auto [f, e] = open_file(path, FILE_WRITE | FILE_CREATE_NEW);
+	if (e) {
+		return e;
+	}
+	auto e1 = write_file(&f, str.data, len(str) * sizeof(str[0]));
+	if (e1) {
+		return e;
+	}
+	return NULL;
+}
