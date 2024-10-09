@@ -731,21 +731,21 @@ void format_primitive(Formatter* formatter, PrimitiveType* type, void* thing, St
 		break;
 
 		case PrimitiveKind::P_char: {
-			format(formatter, "'%()'", String((char*) thing, 1));
+			format(formatter, "%", String((char*) thing, 1));
 		}
 		break;
 		case PrimitiveKind::P_wchar: {
 			char32_t c = (char32_t) (*(wchar_t*) thing);
-			format(formatter, "'%()'", UnicodeString(&c, 1));
+			format(formatter, "%", UnicodeString(&c, 1));
 		}
 		break;
 		case PrimitiveKind::P_char16: {
 			char32_t c = *(char16_t*) thing;
-			format(formatter, "'%()'", UnicodeString(&c, 1));
+			format(formatter, "%", UnicodeString(&c, 1));
 		}
 		break;
 		case PrimitiveKind::P_char32: {
-			format(formatter, "'%()'", UnicodeString((char32_t*) thing, 1));
+			format(formatter, "%", UnicodeString((char32_t*) thing, 1));
 		}
 		break;
 
