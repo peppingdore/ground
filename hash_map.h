@@ -194,7 +194,7 @@ HashMapEntry<K, V>* get_entry(HashMap<K, V>* map, std::type_identity_t<K> key) {
 }
 
 template <typename K, typename V>
-HashMapEntry<K, V>* remove_entry(HashMap<K, V>* map, std::type_identity_t<K> key) {
+HashMapEntry<K, V>* remove(HashMap<K, V>* map, std::type_identity_t<K> key) {
 	if (!map->data) {
 		return NULL;
 	}
@@ -221,7 +221,7 @@ HashMapEntry<K, V>* remove_entry(HashMap<K, V>* map, std::type_identity_t<K> key
 				if (hash_map_get_home(map, shift_e) == shift_idx) {
 					break;
 				}
-				assert(distance_from_home(hash_map_get_home(map, shift_e), shift_idx) > distance_from_home(hash_map_get_home(map, shift_e), prev_idx));
+				assert(hash_map_distance_from_home(hash_map_get_home(map, shift_e), shift_idx, map->capacity) > hash_map_distance_from_home(hash_map_get_home(map, shift_e), prev_idx, map->capacity));
 
 				map->data[prev_idx] = *shift_e;
 				prev_idx = shift_idx;
