@@ -3,6 +3,10 @@
 #include "reflect.h"
 #include <initializer_list>
 
+#define TUPLE_MEMBER(T, N) T N = {};
+#define TUPLE_HASH(T, N) hasher->hash(N);
+#define TUPLE_EQ(T, N) if (N != rhs.N) return false;
+
 template <typename... Args>
 struct Tuple;
 
@@ -25,21 +29,15 @@ struct Tuple<A> {
 	#define TUPLE_LIST(func) \
 		func(A, _0)
 	
-	#define TUPLE_MEMBER(T, N) T N = {};
 	TUPLE_LIST(TUPLE_MEMBER)
 	void hash(Hasher* hasher) {
-		#define TUPLE_HASH(T, N) hasher->hash(N);
 		TUPLE_LIST(TUPLE_HASH)
 	}
 	bool operator==(Tuple rhs) {
-		#define TUPLE_EQ(T, N) if (N != rhs.N) return false;
 		TUPLE_LIST(TUPLE_EQ)
 		return true;
 	}
 	#undef TUPLE_LIST
-	#undef TUPLE_MEMBER
-	#undef TUPLE_HASH
-	#undef TUPLE_EQ
 };
 
 template <typename A, typename B>
@@ -50,21 +48,15 @@ struct Tuple<A, B> {
 		func(A, _0) \
 		func(B, _1)
 
-	#define TUPLE_MEMBER(T, N) T N = {};
 	TUPLE_LIST(TUPLE_MEMBER)
 	void hash(Hasher* hasher) {
-		#define TUPLE_HASH(T, N) hasher->hash(N);
 		TUPLE_LIST(TUPLE_HASH)
 	}
 	bool operator==(Tuple rhs) {
-		#define TUPLE_EQ(T, N) if (N != rhs.N) return false;
 		TUPLE_LIST(TUPLE_EQ)
 		return true;
 	}
 	#undef TUPLE_LIST
-	#undef TUPLE_MEMBER
-	#undef TUPLE_HASH
-	#undef TUPLE_EQ
 };
 
 template <typename A, typename B, typename C>
@@ -76,21 +68,15 @@ struct Tuple<A, B, C> {
 		func(B, _1) \
 		func(C, _2)
 
-	#define TUPLE_MEMBER(T, N) T N = {};
 	TUPLE_LIST(TUPLE_MEMBER)
 	void hash(Hasher* hasher) {
-		#define TUPLE_HASH(T, N) hasher->hash(N);
 		TUPLE_LIST(TUPLE_HASH)
 	}
 	bool operator==(Tuple rhs) {
-		#define TUPLE_EQ(T, N) if (N != rhs.N) return false;
 		TUPLE_LIST(TUPLE_EQ)
 		return true;
 	}
 	#undef TUPLE_LIST
-	#undef TUPLE_MEMBER
-	#undef TUPLE_HASH
-	#undef TUPLE_EQ
 };
 
 template <typename A, typename B, typename C, typename D>
@@ -103,21 +89,15 @@ struct Tuple<A, B, C, D> {
 		func(C, _2) \
 		func(D, _3)
 
-	#define TUPLE_MEMBER(T, N) T N = {};
 	TUPLE_LIST(TUPLE_MEMBER)
 	void hash(Hasher* hasher) {
-		#define TUPLE_HASH(T, N) hasher->hash(N);
 		TUPLE_LIST(TUPLE_HASH)
 	}
 	bool operator==(Tuple rhs) {
-		#define TUPLE_EQ(T, N) if (N != rhs.N) return false;
 		TUPLE_LIST(TUPLE_EQ)
 		return true;
 	}
 	#undef TUPLE_LIST
-	#undef TUPLE_MEMBER
-	#undef TUPLE_HASH
-	#undef TUPLE_EQ
 };
 
 template <typename A, typename B, typename C, typename D, typename E>
@@ -131,21 +111,15 @@ struct Tuple<A, B, C, D, E> {
 		func(D, _3) \
 		func(E, _4)
 
-	#define TUPLE_MEMBER(T, N) T N = {};
 	TUPLE_LIST(TUPLE_MEMBER)
 	void hash(Hasher* hasher) {
-		#define TUPLE_HASH(T, N) hasher->hash(N);
 		TUPLE_LIST(TUPLE_HASH)
 	}
 	bool operator==(Tuple rhs) {
-		#define TUPLE_EQ(T, N) if (N != rhs.N) return false;
 		TUPLE_LIST(TUPLE_EQ)
 		return true;
 	}
 	#undef TUPLE_LIST
-	#undef TUPLE_MEMBER
-	#undef TUPLE_HASH
-	#undef TUPLE_EQ
 };
 
 template <typename A, typename B, typename C, typename D, typename E, typename F>
@@ -160,21 +134,15 @@ struct Tuple<A, B, C, D, E, F> {
 		func(E, _4) \
 		func(F, _5)
 
-	#define TUPLE_MEMBER(T, N) T N = {};
 	TUPLE_LIST(TUPLE_MEMBER)
 	void hash(Hasher* hasher) {
-		#define TUPLE_HASH(T, N) hasher->hash(N);
 		TUPLE_LIST(TUPLE_HASH)
 	}
 	bool operator==(Tuple rhs) {
-		#define TUPLE_EQ(T, N) if (N != rhs.N) return false;
 		TUPLE_LIST(TUPLE_EQ)
 		return true;
 	}
 	#undef TUPLE_LIST
-	#undef TUPLE_MEMBER
-	#undef TUPLE_HASH
-	#undef TUPLE_EQ
 };
 
 template <typename A, typename B, typename C, typename D, typename E, typename F, typename G>
@@ -190,28 +158,22 @@ struct Tuple<A, B, C, D, E, F, G> {
 		func(F, _5) \
 		func(G, _6)
 
-	#define TUPLE_MEMBER(T, N) T N = {};
 	TUPLE_LIST(TUPLE_MEMBER)
 	void hash(Hasher* hasher) {
-		#define TUPLE_HASH(T, N) hasher->hash(N);
 		TUPLE_LIST(TUPLE_HASH)
 	}
 	bool operator==(Tuple rhs) {
-		#define TUPLE_EQ(T, N) if (N != rhs.N) return false;
 		TUPLE_LIST(TUPLE_EQ)
 		return true;
 	}
 	#undef TUPLE_LIST
-	#undef TUPLE_MEMBER
-	#undef TUPLE_HASH
-	#undef TUPLE_EQ
 };
 
 template <typename A, typename B, typename C, typename D, typename E, typename F, typename G, typename H>
 struct Tuple<A, B, C, D, E, F, G, H> {
 	constexpr static u32 size = 8;
 
-   #define TUPLE_LIST(func) \
+	#define TUPLE_LIST(func) \
 		func(A, _0) \
 		func(B, _1) \
 		func(C, _2) \
@@ -221,22 +183,20 @@ struct Tuple<A, B, C, D, E, F, G, H> {
 		func(G, _6) \
 		func(H, _7)
 
-	#define TUPLE_MEMBER(T, N) T N = {};
 	TUPLE_LIST(TUPLE_MEMBER)
 	void hash(Hasher* hasher) {
-		#define TUPLE_HASH(T, N) hasher->hash(N);
 		TUPLE_LIST(TUPLE_HASH)
 	}
 	bool operator==(Tuple rhs) {
-		#define TUPLE_EQ(T, N) if (N != rhs.N) return false;
 		TUPLE_LIST(TUPLE_EQ)
 		return true;
 	}
 	#undef TUPLE_LIST
-	#undef TUPLE_MEMBER
-	#undef TUPLE_HASH
-	#undef TUPLE_EQ
 };
+
+#undef TUPLE_MEMBER
+#undef TUPLE_HASH
+#undef TUPLE_EQ
 
 template <int N>
 struct TupleGetter;
