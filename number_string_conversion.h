@@ -12,8 +12,16 @@
 struct SmallString {
 	char buf[127];
 	u8   length = 0;
+
+	char& operator[](s64 idx) {
+		return buf[idx];
+	}
 };
 static_assert(sizeof(SmallString) == 128);
+
+s64 len(SmallString x) {
+	return x.length;
+}
 
 String as_str(SmallString* x) {
 	return { x->buf, x->length };
