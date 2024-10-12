@@ -1,6 +1,67 @@
-#include "preprocess2.h"
+#include "preprocess.h"
 #include "../testing.h"
 
-TEST(prep_remove_comments) {
-		
+Tuple<Error*, Prep*> simple_preprocess(UnicodeString str, Span<Tuple<UnicodeString, UnicodeString>> files) {
+	auto prep = make_prep();
+	prep->aux_data = &files;
+	prep->load_file_hook = [](Prep* p, UnicodeString fullpath) -> PrepFileSource* {
+		for (auto [name, content]: *(decltype(files)*) p->aux_data) {
+			if (name == fullpath) {
+				auto file = make_mem_prep_file(p, content, fullpath);
+				return file;
+			}
+		}
+		return NULL;
+	};
+	auto root = make_mem_prep_file(prep, str, U"<root_file>"_b);
+	return { preprocess_file(prep, root), prep };
+}
+
+// TEST(include_add_missing_line_breaks) {
+// 	Array<Tuple<UnicodeString, UnicodeString>> files;
+// 	add(&files, { U"file.txt"_b, U"FILE_CONTENT"_b });
+// 	auto [e, prep] = simple_preprocess(U"#include \"file.txt\""_b, files);
+// 	if (e) {
+// 		print_prep_error(e);
+// 	}
+// 	println("prep_str: %", prep_str(prep));
+// 	for (auto tok: prep->tokens) {
+// 		println("%, '%', %", tok->kind, tok_str(tok), tok->src_kind);
+// 		if (tok->src_kind == PREP_TOKEN_SOURCE_INCLUDED_FILE) {
+// 			println("  %", tok->included_file->file->fullpath);
+// 		}
+// 	}
+// 	// One newline for file.txt and other for <root_file>.
+// 	EXPECT(prep_str(prep) == U"FILE_CONTENT\n\n"_b);
+// }
+
+// TEST(include_computed_include) {
+//     Array<Tuple<UnicodeString, UnicodeString>> files;
+//     // Add test files with content
+//     add(&files, { U"computed_include.txt"_b, U"COMPUTED_CONTENT"_b });
+//     // Preprocess code that includes a file via macro expansion
+//     auto [e, prep] = simple_preprocess(
+//         U"#define FILE_NAME \"computed_include.txt\"\n#include FILE_NAME"_b,
+//         files
+//     );
+//     if (e) {
+//         print_prep_error(e);
+//     }
+//     // Output the preprocessed string for verification
+//     println("prep_str: %", prep_str(prep));
+//     // Expect the content of the included file followed by two newlines
+//     EXPECT(prep_str(prep) == U"COMPUTED_CONTENT\n\n"_b);
+// }
+
+
+TEST(error_gen) {
+	// auto [e, prep] = simple_preprocess(U"#define MACRO(a, b) a##b\n MACRO(2, \"a\")"_b, {});
+	auto [e, prep] = simple_preprocess(U"#define MACRO(a, b) a##b\n MACRO(2, \"a\")"_b, {});
+	if (e) {
+		print_prep_error(e);
+	}
+	for (auto tok: prep->tokens) {
+		println("%, '%', %", tok->kind, tok_str(tok), tok->src_kind);
+	}
+	println("prep_str: %", prep_str(prep));
 }

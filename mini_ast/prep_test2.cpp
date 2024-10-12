@@ -37,11 +37,11 @@ TEST(prep_splice) {
 	#include "test.txt"
 	)RAW"_b;
 	p = make_prep(c_allocator);
-	p->load_file_hook = [](Prep* p, UnicodeString path) -> Tuple<Error*, PrepFile*> {
+	p->load_file_hook = [](Prep* p, UnicodeString path) -> PrepFile* {
 		auto file = make<PrepFile>(c_allocator);
 		file->og_src = U"file content"_b;
 		file->fullpath = path;
-		return { NULL, file };
+		return file;
 	};
 	auto file = make_mem_prep_file(p, str2, U"/files/text.txt"_b);
 	auto e = preprocess_file(p, file);

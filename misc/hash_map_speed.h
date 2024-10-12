@@ -14,7 +14,7 @@ int main() {
 	Array<s64> keys;
 	Array<s64> values;
 
-	s64 COUNT = 10000000;
+	s64 COUNT = 1000000;
 	for (auto i: range(COUNT)) {
 		add(&keys, rand_s64());
 		add(&values, rand_s64());
@@ -23,14 +23,21 @@ int main() {
 	Stopwatch w = make_stopwatch();
 	for (auto i: range(COUNT)) {
 		if (i % 65536 == 0) {
-			print("insert %, %", keys[i], values[i]);
+			println("insert %, %", keys[i], values[i]);
 		}
 		put(&map, keys[i], values[i]);
 	}
 	
 	s64 time = nanos_elapsed_s64(&w);
-	reset(&w);
 
-	print("Avg insert time: % ns", f64(time) / f64(COUNT));
+	println("Avg insert time: % ns", f64(time) / f64(COUNT));
+
+	reset(&w);
+	for (auto i: range(COUNT)) {
+		get(&map, keys[i]);
+	}
+	time = nanos_elapsed_s64(&w);
+	println("Avg lookup time: % ns", f64(time) / f64(COUNT));
+
 	return 0;
 }
