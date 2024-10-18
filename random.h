@@ -1,6 +1,6 @@
 #pragma once
 
-#include "base.h"
+#include "grd_base.h"
 #include "data_ops.h"
 
 struct Mul128Result {
@@ -45,7 +45,7 @@ struct RandomState {
 
 inline thread_local RandomState thread_local_random_state;
 
-RandomState make_random_state(u64 seed = DEFAULT_RANDOM_SEED) {
+RandomState grd_make_random_state(u64 seed = DEFAULT_RANDOM_SEED) {
 	return { .wy_state = seed };
 }
 

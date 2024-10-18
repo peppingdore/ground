@@ -1,24 +1,24 @@
-#include "testing.h"
+#include "grd_testing.h"
 #include "one_dim_intersect.h"
 #include "array.h"
 #include "format.h"
-#include "defer.h"
+#include "grd_defer.h"
 
 struct TestRegion {
 	s64  start;
 	s64  length;
 	char c;
 
-	REFLECT(TestRegion) {
-		MEMBER(start);
-		MEMBER(length);
-		MEMBER(c);
+	GRD_REFLECT(TestRegion) {
+		GRD_MEMBER(start);
+		GRD_MEMBER(length);
+		GRD_MEMBER(c);
 	}
 };
 
 void verify_one_dim_array(Array<TestRegion> regions, String str, CodeLocation loc = caller_loc()) {
 	tester_scope_push(loc);
-	defer { tester_scope_pop(); };
+	grd_defer { tester_scope_pop(); };
 
 	s64 last_end = 0;
 	for (auto it: regions) {
@@ -29,7 +29,7 @@ void verify_one_dim_array(Array<TestRegion> regions, String str, CodeLocation lo
 
 	Array<char> sb;
 	for (auto it: regions) {
-		for (auto i: range(it.length)) {
+		for (auto i: grd_range(it.length)) {
 			add(&sb, it.c);
 		}
 	}
@@ -46,7 +46,7 @@ Array<TestRegion> build_test_regions() {
 	return regions;
 }
 
-TEST(one_dim) {
+GRD_TEST(one_dim) {
 	auto regions = build_test_regions();
 	
 	auto get_region = [&](s64 i) {

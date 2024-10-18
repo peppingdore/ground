@@ -3,7 +3,7 @@
 #include "spirv.h"
 #define SPV_REVISION 2
 
-REFLECT(SpvSourceLanguage) {
+GRD_REFLECT(SpvSourceLanguage) {
     ENUM_VALUE(SpvSourceLanguageUnknown);
     ENUM_VALUE(SpvSourceLanguageESSL);
     ENUM_VALUE(SpvSourceLanguageGLSL);
@@ -13,7 +13,7 @@ REFLECT(SpvSourceLanguage) {
     ENUM_VALUE(SpvSourceLanguageMax);
 }
 
-REFLECT(SpvExecutionModel) {
+GRD_REFLECT(SpvExecutionModel) {
     ENUM_VALUE(SpvExecutionModelVertex);
     ENUM_VALUE(SpvExecutionModelTessellationControl);
     ENUM_VALUE(SpvExecutionModelTessellationEvaluation);
@@ -24,21 +24,21 @@ REFLECT(SpvExecutionModel) {
     ENUM_VALUE(SpvExecutionModelMax);
 }
 
-REFLECT(SpvAddressingModel) {
+GRD_REFLECT(SpvAddressingModel) {
     ENUM_VALUE(SpvAddressingModelLogical);
     ENUM_VALUE(SpvAddressingModelPhysical32);
     ENUM_VALUE(SpvAddressingModelPhysical64);
     ENUM_VALUE(SpvAddressingModelMax);
 }
 
-REFLECT(SpvMemoryModel) {
+GRD_REFLECT(SpvMemoryModel) {
     ENUM_VALUE(SpvMemoryModelSimple);
     ENUM_VALUE(SpvMemoryModelGLSL450);
     ENUM_VALUE(SpvMemoryModelOpenCL);
     ENUM_VALUE(SpvMemoryModelMax);
 }
 
-REFLECT(SpvExecutionMode) {
+GRD_REFLECT(SpvExecutionMode) {
     ENUM_VALUE(SpvExecutionModeInvocations);
     ENUM_VALUE(SpvExecutionModeSpacingEqual);
     ENUM_VALUE(SpvExecutionModeSpacingFractionalEven);
@@ -82,7 +82,7 @@ REFLECT(SpvExecutionMode) {
     ENUM_VALUE(SpvExecutionModeMax);
 };
 
-REFLECT(SpvStorageClass) {
+GRD_REFLECT(SpvStorageClass) {
     ENUM_VALUE(SpvStorageClassUniformConstant);
     ENUM_VALUE(SpvStorageClassInput);
     ENUM_VALUE(SpvStorageClassUniform);
@@ -99,7 +99,7 @@ REFLECT(SpvStorageClass) {
     ENUM_VALUE(SpvStorageClassMax);
 }
 
-REFLECT(SpvDim) {
+GRD_REFLECT(SpvDim) {
     ENUM_VALUE(SpvDim1D);
     ENUM_VALUE(SpvDim2D);
     ENUM_VALUE(SpvDim3D);
@@ -110,7 +110,7 @@ REFLECT(SpvDim) {
     ENUM_VALUE(SpvDimMax);
 };
 
-REFLECT(SpvSamplerAddressingMode) {
+GRD_REFLECT(SpvSamplerAddressingMode) {
     ENUM_VALUE(SpvSamplerAddressingModeNone);
     ENUM_VALUE(SpvSamplerAddressingModeClampToEdge);
     ENUM_VALUE(SpvSamplerAddressingModeClamp);
@@ -119,13 +119,13 @@ REFLECT(SpvSamplerAddressingMode) {
     ENUM_VALUE(SpvSamplerAddressingModeMax);
 };
 
-REFLECT(SpvSamplerFilterMode) {
+GRD_REFLECT(SpvSamplerFilterMode) {
     ENUM_VALUE(SpvSamplerFilterModeNearest);
     ENUM_VALUE(SpvSamplerFilterModeLinear);
     ENUM_VALUE(SpvSamplerFilterModeMax);
 };
 
-REFLECT(SpvImageFormat) {
+GRD_REFLECT(SpvImageFormat) {
     ENUM_VALUE(SpvImageFormatUnknown);
     ENUM_VALUE(SpvImageFormatRgba32f);
     ENUM_VALUE(SpvImageFormatRgba16f);
@@ -169,7 +169,7 @@ REFLECT(SpvImageFormat) {
     ENUM_VALUE(SpvImageFormatMax);
 };
 
-REFLECT(SpvImageChannelOrder) {
+GRD_REFLECT(SpvImageChannelOrder) {
     ENUM_VALUE(SpvImageChannelOrderR);
     ENUM_VALUE(SpvImageChannelOrderA);
     ENUM_VALUE(SpvImageChannelOrderRG);
@@ -193,7 +193,7 @@ REFLECT(SpvImageChannelOrder) {
     ENUM_VALUE(SpvImageChannelOrderMax);
 };
 
-REFLECT(SpvImageChannelDataType) {
+GRD_REFLECT(SpvImageChannelDataType) {
     ENUM_VALUE(SpvImageChannelDataTypeSnormInt8);
     ENUM_VALUE(SpvImageChannelDataTypeSnormInt16);
     ENUM_VALUE(SpvImageChannelDataTypeUnormInt8);
@@ -214,7 +214,7 @@ REFLECT(SpvImageChannelDataType) {
     ENUM_VALUE(SpvImageChannelDataTypeMax);
 };
 
-REFLECT(SpvImageOperandsShift) {
+GRD_REFLECT(SpvImageOperandsShift) {
     ENUM_VALUE(SpvImageOperandsBiasShift);
     ENUM_VALUE(SpvImageOperandsLodShift);
     ENUM_VALUE(SpvImageOperandsGradShift);
@@ -226,7 +226,7 @@ REFLECT(SpvImageOperandsShift) {
     ENUM_VALUE(SpvImageOperandsMax);
 };
 
-REFLECT(SpvImageOperandsMask) {
+GRD_REFLECT(SpvImageOperandsMask) {
     ENUM_VALUE(SpvImageOperandsMaskNone);
     ENUM_VALUE(SpvImageOperandsBiasMask);
     ENUM_VALUE(SpvImageOperandsLodMask);
@@ -238,7 +238,7 @@ REFLECT(SpvImageOperandsMask) {
     ENUM_VALUE(SpvImageOperandsMinLodMask);
 };
 
-REFLECT(SpvFPFastMathModeShift) {
+GRD_REFLECT(SpvFPFastMathModeShift) {
     ENUM_VALUE(SpvFPFastMathModeNotNaNShift);
     ENUM_VALUE(SpvFPFastMathModeNotInfShift);
     ENUM_VALUE(SpvFPFastMathModeNSZShift);
@@ -247,7 +247,7 @@ REFLECT(SpvFPFastMathModeShift) {
     ENUM_VALUE(SpvFPFastMathModeMax);
 };
 
-REFLECT(SpvFPFastMathModeMask) {
+GRD_REFLECT(SpvFPFastMathModeMask) {
     ENUM_VALUE(SpvFPFastMathModeMaskNone);
     ENUM_VALUE(SpvFPFastMathModeNotNaNMask);
     ENUM_VALUE(SpvFPFastMathModeNotInfMask);
@@ -256,7 +256,7 @@ REFLECT(SpvFPFastMathModeMask) {
     ENUM_VALUE(SpvFPFastMathModeFastMask);
 };
 
-REFLECT(SpvFPRoundingMode) {
+GRD_REFLECT(SpvFPRoundingMode) {
     ENUM_VALUE(SpvFPRoundingModeRTE);
     ENUM_VALUE(SpvFPRoundingModeRTZ);
     ENUM_VALUE(SpvFPRoundingModeRTP);
@@ -264,20 +264,20 @@ REFLECT(SpvFPRoundingMode) {
     ENUM_VALUE(SpvFPRoundingModeMax);
 };
 
-REFLECT(SpvLinkageType) {
+GRD_REFLECT(SpvLinkageType) {
     ENUM_VALUE(SpvLinkageTypeExport);
     ENUM_VALUE(SpvLinkageTypeImport);
     ENUM_VALUE(SpvLinkageTypeMax);
 };
 
-REFLECT(SpvAccessQualifier) {
+GRD_REFLECT(SpvAccessQualifier) {
     ENUM_VALUE(SpvAccessQualifierReadOnly);
     ENUM_VALUE(SpvAccessQualifierWriteOnly);
     ENUM_VALUE(SpvAccessQualifierReadWrite);
     ENUM_VALUE(SpvAccessQualifierMax);
 };
 
-REFLECT(SpvFunctionParameterAttribute) {
+GRD_REFLECT(SpvFunctionParameterAttribute) {
     ENUM_VALUE(SpvFunctionParameterAttributeZext);
     ENUM_VALUE(SpvFunctionParameterAttributeSext);
     ENUM_VALUE(SpvFunctionParameterAttributeByVal);
@@ -289,7 +289,7 @@ REFLECT(SpvFunctionParameterAttribute) {
     ENUM_VALUE(SpvFunctionParameterAttributeMax);
 };
 
-REFLECT(SpvDecoration) {
+GRD_REFLECT(SpvDecoration) {
     ENUM_VALUE(SpvDecorationRelaxedPrecision);
     ENUM_VALUE(SpvDecorationSpecId);
     ENUM_VALUE(SpvDecorationBlock);
@@ -346,7 +346,7 @@ REFLECT(SpvDecoration) {
     ENUM_VALUE(SpvDecorationMax);
 };
 
-REFLECT(SpvBuiltIn) {
+GRD_REFLECT(SpvBuiltIn) {
     ENUM_VALUE(SpvBuiltInPosition);
     ENUM_VALUE(SpvBuiltInPointSize);
     ENUM_VALUE(SpvBuiltInClipDistance);
@@ -414,19 +414,19 @@ REFLECT(SpvBuiltIn) {
     ENUM_VALUE(SpvBuiltInMax);
 };
 
-REFLECT(SpvSelectionControlShift) {
+GRD_REFLECT(SpvSelectionControlShift) {
     ENUM_VALUE(SpvSelectionControlFlattenShift);
     ENUM_VALUE(SpvSelectionControlDontFlattenShift);
     ENUM_VALUE(SpvSelectionControlMax);
 };
 
-REFLECT(SpvSelectionControlMask) {
+GRD_REFLECT(SpvSelectionControlMask) {
     ENUM_VALUE(SpvSelectionControlMaskNone);
     ENUM_VALUE(SpvSelectionControlFlattenMask);
     ENUM_VALUE(SpvSelectionControlDontFlattenMask);
 };
 
-REFLECT(SpvLoopControlShift) {
+GRD_REFLECT(SpvLoopControlShift) {
     ENUM_VALUE(SpvLoopControlUnrollShift);
     ENUM_VALUE(SpvLoopControlDontUnrollShift);
     ENUM_VALUE(SpvLoopControlDependencyInfiniteShift);
@@ -434,7 +434,7 @@ REFLECT(SpvLoopControlShift) {
     ENUM_VALUE(SpvLoopControlMax);
 };
 
-REFLECT(SpvLoopControlMask) {
+GRD_REFLECT(SpvLoopControlMask) {
     ENUM_VALUE(SpvLoopControlMaskNone);
     ENUM_VALUE(SpvLoopControlUnrollMask);
     ENUM_VALUE(SpvLoopControlDontUnrollMask);
@@ -442,7 +442,7 @@ REFLECT(SpvLoopControlMask) {
     ENUM_VALUE(SpvLoopControlDependencyLengthMask);
 };
 
-REFLECT(SpvFunctionControlShift) {
+GRD_REFLECT(SpvFunctionControlShift) {
     ENUM_VALUE(SpvFunctionControlInlineShift);
     ENUM_VALUE(SpvFunctionControlDontInlineShift);
     ENUM_VALUE(SpvFunctionControlPureShift);
@@ -450,7 +450,7 @@ REFLECT(SpvFunctionControlShift) {
     ENUM_VALUE(SpvFunctionControlMax);
 };
 
-REFLECT(SpvFunctionControlMask) {
+GRD_REFLECT(SpvFunctionControlMask) {
     ENUM_VALUE(SpvFunctionControlMaskNone);
     ENUM_VALUE(SpvFunctionControlInlineMask);
     ENUM_VALUE(SpvFunctionControlDontInlineMask);
@@ -458,7 +458,7 @@ REFLECT(SpvFunctionControlMask) {
     ENUM_VALUE(SpvFunctionControlConstMask);
 };
 
-REFLECT(SpvMemorySemanticsShift) {
+GRD_REFLECT(SpvMemorySemanticsShift) {
     ENUM_VALUE(SpvMemorySemanticsAcquireShift);
     ENUM_VALUE(SpvMemorySemanticsReleaseShift);
     ENUM_VALUE(SpvMemorySemanticsAcquireReleaseShift);
@@ -472,7 +472,7 @@ REFLECT(SpvMemorySemanticsShift) {
     ENUM_VALUE(SpvMemorySemanticsMax);
 };
 
-REFLECT(SpvMemorySemanticsMask) {
+GRD_REFLECT(SpvMemorySemanticsMask) {
     ENUM_VALUE(SpvMemorySemanticsMaskNone);
     ENUM_VALUE(SpvMemorySemanticsAcquireMask);
     ENUM_VALUE(SpvMemorySemanticsReleaseMask);
@@ -486,21 +486,21 @@ REFLECT(SpvMemorySemanticsMask) {
     ENUM_VALUE(SpvMemorySemanticsImageMemoryMask);
 };
 
-REFLECT(SpvMemoryAccessShift) {
+GRD_REFLECT(SpvMemoryAccessShift) {
     ENUM_VALUE(SpvMemoryAccessVolatileShift);
     ENUM_VALUE(SpvMemoryAccessAlignedShift);
     ENUM_VALUE(SpvMemoryAccessNontemporalShift);
     ENUM_VALUE(SpvMemoryAccessMax);
 };
 
-REFLECT(SpvMemoryAccessMask) {
+GRD_REFLECT(SpvMemoryAccessMask) {
     ENUM_VALUE(SpvMemoryAccessMaskNone);
     ENUM_VALUE(SpvMemoryAccessVolatileMask);
     ENUM_VALUE(SpvMemoryAccessAlignedMask);
     ENUM_VALUE(SpvMemoryAccessNontemporalMask);
 };
 
-REFLECT(SpvScope) {
+GRD_REFLECT(SpvScope) {
     ENUM_VALUE(SpvScopeCrossDevice);
     ENUM_VALUE(SpvScopeDevice);
     ENUM_VALUE(SpvScopeWorkgroup);
@@ -509,31 +509,31 @@ REFLECT(SpvScope) {
     ENUM_VALUE(SpvScopeMax);
 };
 
-REFLECT(SpvGroupOperation) {
+GRD_REFLECT(SpvGroupOperation) {
     ENUM_VALUE(SpvGroupOperationReduce);
     ENUM_VALUE(SpvGroupOperationInclusiveScan);
     ENUM_VALUE(SpvGroupOperationExclusiveScan);
     ENUM_VALUE(SpvGroupOperationMax);
 };
 
-REFLECT(SpvKernelEnqueueFlags) {
+GRD_REFLECT(SpvKernelEnqueueFlags) {
     ENUM_VALUE(SpvKernelEnqueueFlagsNoWait);
     ENUM_VALUE(SpvKernelEnqueueFlagsWaitKernel);
     ENUM_VALUE(SpvKernelEnqueueFlagsWaitWorkGroup);
     ENUM_VALUE(SpvKernelEnqueueFlagsMax);
 };
 
-REFLECT(SpvKernelProfilingInfoShift) {
+GRD_REFLECT(SpvKernelProfilingInfoShift) {
     ENUM_VALUE(SpvKernelProfilingInfoCmdExecTimeShift);
     ENUM_VALUE(SpvKernelProfilingInfoMax);
 };
 
-REFLECT(SpvKernelProfilingInfoMask) {
+GRD_REFLECT(SpvKernelProfilingInfoMask) {
     ENUM_VALUE(SpvKernelProfilingInfoMaskNone);
     ENUM_VALUE(SpvKernelProfilingInfoCmdExecTimeMask);
 };
 
-REFLECT(SpvCapability) {
+GRD_REFLECT(SpvCapability) {
     ENUM_VALUE(SpvCapabilityMatrix);
     ENUM_VALUE(SpvCapabilityShader);
     ENUM_VALUE(SpvCapabilityGeometry);
@@ -625,7 +625,7 @@ REFLECT(SpvCapability) {
     ENUM_VALUE(SpvCapabilityMax);
 };
 
-REFLECT(SpvOp) {
+GRD_REFLECT(SpvOp) {
     ENUM_VALUE(SpvOpNop);
     ENUM_VALUE(SpvOpUndef);
     ENUM_VALUE(SpvOpSourceContinued);

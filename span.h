@@ -1,6 +1,6 @@
 #pragma once
 
-#include "base.h"
+#include "grd_base.h"
 #include "range.h"
 #include "hash.h"
 #include "reflect.h"
@@ -54,7 +54,7 @@ struct Span {
 	bool operator==(Span<U> rhs) {
 		if (count != rhs.count) return false;
 		if ((void*) data == (void*) rhs.data) return true;
-		for (auto i: range(count)) {
+		for (auto i: grd_range(count)) {
 			if (data[i] != rhs.data[i]) {
 				return false;
 			}
@@ -70,7 +70,7 @@ struct Span {
 };
 
 template <typename T, s64 N>
-Span<T> make_span(const T (&arr)[N]) {
+Span<T> grd_make_span(const T (&arr)[N]) {
 	return { (T*) arr, N };
 }
 
@@ -88,7 +88,7 @@ T pop(Span<T>* span) {
 
 template <typename T>
 s64 index_of(Span<T> span, T item) {
-	for (auto i: range(len(span))) {
+	for (auto i: grd_range(len(span))) {
 		if (span[i] == item) {
 			return i;
 		}
@@ -101,7 +101,7 @@ s64 index_of(Span<T> span, Span<U> item) {
 	if (len(item) > len(span)) {
 		return -1;
 	}
-	for (auto i: range(len(span) - len(item) + 1)) {
+	for (auto i: grd_range(len(span) - len(item) + 1)) {
 		if (span[i, i + len(item)] == item) {
 			return i;
 		}
@@ -156,7 +156,7 @@ s64 len(std::initializer_list<T> list) {
 
 template <typename T>
 s64 index_of(std::initializer_list<T> list, auto item) {
-	for (auto i: range(len(list))) {
+	for (auto i: grd_range(len(list))) {
 		if (list.begin()[i] == item) {
 			return i;
 		}
@@ -170,7 +170,7 @@ bool contains(std::initializer_list<T> list, auto item) {
 }
 
 template <typename T>
-void type_hash(Hasher* hasher, Span<T> array) {
+void grd_type_hash(Hasher* hasher, Span<T> array) {
 	hasher->hash(array.count);
 	for (auto item: array) {
 		hasher->hash(item);
@@ -179,8 +179,8 @@ void type_hash(Hasher* hasher, Span<T> array) {
 
 template <typename T>
 SpanType* reflect_type(Span<T>* x, SpanType* type) {
-	type->inner = reflect_type_of<T>();
-	type->name = heap_sprintf("Span<%s>", type->inner->name);
+	type->inner = grd_reflect_type_of<T>();
+	type->name = grd_heap_sprintf("Span<%s>", type->inner->name);
 	type->subkind = "span";
 	type->get_count = [](void* arr) {
 		auto casted = (Span<int>*) arr;
@@ -188,7 +188,7 @@ SpanType* reflect_type(Span<T>* x, SpanType* type) {
 	};
 	type->get_item = [](void* arr, s64 index) {
 		auto casted = (Span<int>*) arr;
-		void* item = ptr_add(casted->data, sizeof(T) * index);
+		void* item = grd_ptr_add(casted->data, sizeof(T) * index);
 		return item;
 	};
 	return type;

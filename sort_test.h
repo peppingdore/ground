@@ -1,11 +1,11 @@
 #pragma once
 
-#include "testing.h"
+#include "grd_testing.h"
 #include "array.h"
 #include "sort.h"
 #include "format.h"
 
-TEST(sort) {
+GRD_TEST(sort) {
 	Array<s64> arr;
 	add(&arr, {
 		4,

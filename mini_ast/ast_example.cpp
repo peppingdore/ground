@@ -1,6 +1,6 @@
 #include "../error.h"
 #include "../log.h"
-#include "../defer.h"
+#include "../grd_defer.h"
 #include "c_like_parser.h"
 #include "ast_printer.h" 
 #include "ssa.h"
@@ -21,7 +21,7 @@
 
 UnicodeString PROGRAM = 
 #if PROGRAM_ID == 0
-UR"TAG(
+UR"GRD_TAG(
 float PI = 3.14f;
 
 struct VertexOutput {
@@ -46,9 +46,9 @@ struct VertexOutput {
 			e-=abs(cos(dot_vec3(m=cos(p*s),q/q)))/s,z-=m.y;
 	return o;
 }
-)TAG"_b;
+)GRD_TAG"_b;
 #elif PROGRAM_ID == 1
-UR"TAG(
+UR"GRD_TAG(
 struct VertexOutput {
 	float4 position [[position]];
 };
@@ -62,14 +62,14 @@ struct VertexOutput {
 	float i = r[0][0][0][0].y;
 	r[0][0][0] = r[0][0][0];
 }
-)TAG"_b;
+)GRD_TAG"_b;
 #elif PROGRAM_ID == 2
-UR"TAG(
+UR"GRD_TAG(
 [[fragment]] float4 main(float4* buf) {
 	float4 pen;
 	pen.xyzw.ywzx.x = buf.yzwx.xxxx.x;
 }
-)TAG"_b;
+)GRD_TAG"_b;
 #endif
 
 
@@ -82,7 +82,7 @@ int main() {
 	// println(print_ast_node(program));
 
 	for (auto it: program->globals) {
-		if (auto f = reflect_cast<AstFunction>(it)) {
+		if (auto f = grd_reflect_cast<AstFunction>(it)) {
 			if (!f->block) {
 				continue;
 			}
@@ -98,7 +98,7 @@ int main() {
 				print_parser_error(e);1);
 				return -1;
 			}
-			auto m = make_spirv_emitter(f->p, c_allocator);			
+			auto m = grd_make_spirv_emitter(f->p, c_allocator);			
 			e = emit_spirv_function(&m, ssa);
 			if (e) {
 				print_parser_error(e);

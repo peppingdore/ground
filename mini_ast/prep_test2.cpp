@@ -5,10 +5,10 @@
 // A(C PARENL a, b, c PARENR)
 
 #include "preprocess.h"
-#include "../testing.h"
+#include "../grd_testing.h"
 #include "../format.h"
 
-TEST(prep_splice) {
+GRD_TEST(prep_splice) {
 	Prep* p = NULL;
 // 	UnicodeString str = UR"RAW(line 1\
 // line 2\
@@ -21,7 +21,7 @@ TEST(prep_splice) {
 // line 9\
 // line 10\)RAW"_b;
 
-// 	auto p = make_prep(c_allocator, str, U"test.txt"_b);
+// 	auto p = grd_make_prep(c_allocator, str, U"test.txt"_b);
 // 	splice_lines(p, 0, len(p->src));
 // 	print_prep_state(p);
 // 	println(p->src);
@@ -36,14 +36,14 @@ TEST(prep_splice) {
 	MACRO2(a != b)
 	#include "test.txt"
 	)RAW"_b;
-	p = make_prep(c_allocator);
+	p = grd_make_prep(c_allocator);
 	p->load_file_hook = [](Prep* p, UnicodeString path) -> PrepFile* {
-		auto file = make<PrepFile>(c_allocator);
+		auto file = grd_make<PrepFile>(c_allocator);
 		file->og_src = U"file content"_b;
 		file->fullpath = path;
 		return file;
 	};
-	auto file = make_mem_prep_file(p, str2, U"/files/text.txt"_b);
+	auto file = grd_make_mem_prep_file(p, str2, U"/files/text.txt"_b);
 	auto e = preprocess_file(p, file);
 	println(prep_str(p));
 	if (e) {

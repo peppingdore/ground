@@ -1,9 +1,9 @@
 #pragma once
 
-#include "base.h"
+#include "grd_base.h"
 #include "tuple.h"
 #include "allocator.h"
-#include "code_location.h"
+#include "grd_code_location.h"
 
 #include <utility>
 
@@ -117,13 +117,13 @@ struct Function<ReturnType(ArgsTypes...)> {
 	}
 
 	void operator<<=(auto other) {
-		replace_with(make_function(other));
+		replace_with(grd_make_function(other));
 	}
 
 	Function copy(CodeLocation loc = caller_loc()) const {
 		Function copied = *this;
 		if (kind == FunctionKind::Big_Lambda) {
-			void* new_mem = Malloc(lambda.big_lambda.size, loc);
+			void* new_mem = GrdMalloc(lambda.big_lambda.size, loc);
 			memcpy(new_mem, lambda.big_lambda.mem, lambda.big_lambda.size);
 			copied.lambda.big_lambda.mem = new_mem;
 		}
@@ -133,15 +133,15 @@ struct Function<ReturnType(ArgsTypes...)> {
 	void free(CodeLocation loc = caller_loc()) {
 		assert(!is_using_custom_allocator);
 		if (kind == FunctionKind::Big_Lambda){
-			Free(lambda.big_lambda.mem, loc);
+			GrdFree(lambda.big_lambda.mem, loc);
 		}
 		kind = FunctionKind::None;
 	}
 
-	void free(Allocator allocator, CodeLocation loc = caller_loc()) {
+	void free(GrdAllocator allocator, CodeLocation loc = caller_loc()) {
 		assert(is_using_custom_allocator);
 		if (kind == FunctionKind::Big_Lambda) {
-			Free(allocator, lambda.big_lambda.mem, loc);
+			GrdFree(allocator, lambda.big_lambda.mem, loc);
 		}
 		kind = FunctionKind::None;
 		is_using_custom_allocator = false;
@@ -150,7 +150,7 @@ struct Function<ReturnType(ArgsTypes...)> {
 
 
 template <typename ReturnType, typename... ArgsTypes>
-auto make_function(ReturnType (*function_ptr)(ArgsTypes...)) {
+auto grd_make_function(ReturnType (*function_ptr)(ArgsTypes...)) {
 	Function<ReturnType(ArgsTypes...)> result;
 	result.kind = FunctionKind::Function_Pointer;
 	result.function_ptr.ptr = function_ptr;
@@ -158,12 +158,12 @@ auto make_function(ReturnType (*function_ptr)(ArgsTypes...)) {
 }
 
 // Assert that we do not use heap allocator.
-auto make_no_heap_function(auto lambda, CodeLocation loc = caller_loc()) {
+auto grd_make_no_heap_function(auto lambda, CodeLocation loc = caller_loc()) {
 	static_assert(sizeof(lambda) <= SMALL_LAMBDA_STORAGE_SIZE);
-	return make_function(lambda, loc);
+	return grd_make_function(lambda, loc);
 }
 
-auto make_function(auto lambda, CodeLocation loc = caller_loc()) {
+auto grd_make_function(auto lambda, CodeLocation loc = caller_loc()) {
 	using Lambda_Type = decltype(lambda);
 
 	// static_assert(std::is_same_v<std::invoke_result_t<Lambda_Type, ArgsTypes...>, ReturnType>, "Lambda return type is incorrect");
@@ -179,7 +179,7 @@ auto make_function(auto lambda, CodeLocation loc = caller_loc()) {
 
 		if constexpr (SMALL_LAMBDA_STORAGE_SIZE < sizeof(lambda)) {
 			
-			void* mem = Malloc(sizeof(lambda), loc);
+			void* mem = GrdMalloc(sizeof(lambda), loc);
 			memcpy(mem, &lambda, sizeof(lambda));
 
 			auto flattened_proc = +[](FlattenedType* flattened, ArgsTypes... args) -> ReturnType {
@@ -216,7 +216,7 @@ auto make_function(auto lambda, CodeLocation loc = caller_loc()) {
 
 //  If you do not like wrapping lambdas in the function call:
 //
-//      Function<int(int, int)> f = make_function([&](int x, int y) {
+//      Function<int(int, int)> f = grd_make_function([&](int x, int y) {
 //         return x + y + captured_variable;	
 //	    });
 //
@@ -230,14 +230,14 @@ auto make_function(auto lambda, CodeLocation loc = caller_loc()) {
 
 struct __cast2function {
 	auto operator<<(auto f) {
-		auto function = make_function(f);
+		auto function = grd_make_function(f);
 		return function;
 	}
 };
 
 struct __cast2noheapfunction {
 	auto operator<<(auto f) {
-		auto function = make_no_heap_function(f);
+		auto function = grd_make_no_heap_function(f);
 		return function;
 	}
 };
@@ -245,7 +245,7 @@ struct __cast2noheapfunction {
 #define function_cast  __cast2function() << 
 #define no_heap_function_cast  __cast2noheapfunction() << 
 
-#define lambda(expr) [&] (auto... lambda_args) { auto lambda_args_tuple = make_tuple(lambda_args...); return expr; }
+#define lambda(expr) [&] (auto... lambda_args) { auto lambda_args_tuple = grd_make_tuple(lambda_args...); return expr; }
 #define $0 tuple_get<0>(lambda_args_tuple)
 #define $1 tuple_get<1>(lambda_args_tuple)
 #define $2 tuple_get<2>(lambda_args_tuple)
@@ -266,5 +266,5 @@ auto call_with_tuple(auto f, auto tuple) {
 		(auto f, auto tuple, std::integer_sequence<s64, Indices...>) {
 		return f(tuple_get<Indices>(tuple)...);
 	};
-	return impl(f, tuple, std::make_integer_sequence<s64, decltype(tuple)::size>{});
+	return impl(f, tuple, std::grd_make_integer_sequence<s64, decltype(tuple)::size>{});
 }

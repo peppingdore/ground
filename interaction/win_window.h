@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../build.h"
+#include "../grd_build.h"
 #include "window_interface.h"
 #include "event.h"
 #include "win_key.h"
@@ -10,7 +10,7 @@
 
 #include <windowsx.h>
 
-BUILD_RUN("params.add_lib('user32.lib')");
+GRD_BUILD_RUN("params.add_lib('user32.lib')");
 
 
 struct WindowsWindow: Window {
@@ -48,7 +48,7 @@ const wchar_t* windows_get_window_class() {
 }
 
 Tuple<WindowsWindow*, Error*> os_create_window(WindowParams params) {
-	ScopedLock(WINDOWS_WINDOW_CREATE_LOCK);
+	GrdScopedLock(WINDOWS_WINDOW_CREATE_LOCK);
 
 	s32 window_width  = GetSystemMetrics(SM_CXSCREEN) / 2 - params.initial_size.x / 2;
 	s32 window_height = GetSystemMetrics(SM_CYSCREEN) / 2 - params.initial_size.y / 2;
@@ -56,8 +56,8 @@ Tuple<WindowsWindow*, Error*> os_create_window(WindowParams params) {
 	DWORD window_style = WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX;
 	AdjustWindowRect(&window_rect, window_style, false);
 
-	auto window = make<WindowsWindow>();
-	window->type = reflect_type_of<WindowsWindow>();
+	auto window = grd_make<WindowsWindow>();
+	window->type = grd_reflect_type_of<WindowsWindow>();
 	window->params = params;
 	window->utf16_title = (wchar_t*) encode_utf16(params.title).data;
 	
@@ -79,8 +79,8 @@ Tuple<WindowsWindow*, Error*> os_create_window(WindowParams params) {
 	);
 
 	if (window->hwnd == NULL) {
-		Free(window->utf16_title);
-		Free(window);
+		GrdFree(window->utf16_title);
+		GrdFree(window);
 		return { NULL, windows_error() };
 	}
 
@@ -240,7 +240,7 @@ PointerButtonFlags wparam_to_pointer_buttons(WPARAM wParam) {
 Vector2 convert_windows_coords(HWND hwnd, POINT p) {
 	RECT window_rect;
 	GetWindowRect(hwnd, &window_rect);
-	return Vector2::make(p.x, window_rect.bottom - p.y);
+	return Vector2::grd_make(p.x, window_rect.bottom - p.y);
 }
 
 void push_windows_mouse_button_event(WindowsWindow* window, WPARAM wParam, LPARAM lParam, PointerAction action, PointerButtonFlags button) {
@@ -251,7 +251,7 @@ void push_windows_mouse_button_event(WindowsWindow* window, WPARAM wParam, LPARA
 		.position = convert_windows_coords(window->hwnd, p),
 		.buttons  = wparam_to_pointer_buttons(wParam),
 	};
-	PointerEvent* event = make_event<PointerEvent>();
+	PointerEvent* event = grd_make_event<PointerEvent>();
 	event->pointer = pointer;
 	event->action = action;
 	event->changed_buttons = button;
@@ -261,7 +261,7 @@ void push_windows_mouse_button_event(WindowsWindow* window, WPARAM wParam, LPARA
 LRESULT read_event_wnd_proc(WindowsWindow* window, HWND h, UINT m, WPARAM wParam, LPARAM lParam) {
 	switch (m) {
 		case WM_ACTIVATE: {
-			auto event = make_event<FocusEvent>();
+			auto event = grd_make_event<FocusEvent>();
 			event->have_focus = LOWORD(wParam) != 0;
 			push_windows_window_event(window, event);
 		}
@@ -294,7 +294,7 @@ LRESULT read_event_wnd_proc(WindowsWindow* window, HWND h, UINT m, WPARAM wParam
 			} else {
 				c = (char32_t) wParam;
 			}
-			auto event = make_event<CharEvent>();
+			auto event = grd_make_event<CharEvent>();
 			event->character = c;
 			push_windows_window_event(window, event);
 
@@ -306,7 +306,7 @@ LRESULT read_event_wnd_proc(WindowsWindow* window, HWND h, UINT m, WPARAM wParam
 		case WM_SYSKEYUP:
 		case WM_KEYDOWN:
 		case WM_SYSKEYDOWN: {
-			auto event = make_event<KeyEvent>();
+			auto event = grd_make_event<KeyEvent>();
 			event->action = (m == WM_KEYDOWN || m == WM_SYSKEYDOWN) ? KeyAction::Down : KeyAction::Up;
 			event->key = map_windows_key(wParam, lParam);
 			event->os_key_code = wParam;
@@ -329,7 +329,7 @@ LRESULT read_event_wnd_proc(WindowsWindow* window, HWND h, UINT m, WPARAM wParam
 				.buttons = wparam_to_pointer_buttons(wParam),
 			};
 
-			PointerEvent* event = make_event<PointerEvent>();
+			PointerEvent* event = grd_make_event<PointerEvent>();
 			event->pointer = pointer;
 			event->action = PointerAction::Scroll;
 			event->scroll_delta = { 0, float_delta };
@@ -384,7 +384,7 @@ LRESULT read_event_wnd_proc(WindowsWindow* window, HWND h, UINT m, WPARAM wParam
 					.buttons  = wparam_to_pointer_buttons(wParam),
 				};
 
-				PointerEvent* event = make_event<PointerEvent>();
+				PointerEvent* event = grd_make_event<PointerEvent>();
 				event->pointer = pointer;
 				event->action = PointerAction::Move;
 				push_windows_window_event(window, event, points[i].time);
@@ -405,7 +405,7 @@ LRESULT read_event_wnd_proc(WindowsWindow* window, HWND h, UINT m, WPARAM wParam
 
 		case WM_DESTROY:
 		case WM_CLOSE: {
-			auto event = make_event<WindowCloseEvent>();
+			auto event = grd_make_event<WindowCloseEvent>();
 			push_windows_window_event(window, event);
 		}
 		break;
@@ -414,10 +414,10 @@ LRESULT read_event_wnd_proc(WindowsWindow* window, HWND h, UINT m, WPARAM wParam
 	return DefWindowProcW(h, m, wParam, lParam);
 }
 
-// @TODO: Add a check that makes sure that this function is called from the same thread that created the window, because Windows requires that.
+// @TODO: Add a check that grd_makes sure that this function is called from the same thread that created the window, because Windows requires that.
 //   And the check must be present on all OSs (not Windows only) for consistency.
 Array<Event*> os_read_window_events(WindowsWindow* window) {
-	ScopedRestore(window->wnd_proc);
+	GrdScopedRestore(window->wnd_proc);
 	window->wnd_proc = read_event_wnd_proc;
 
 	MSG msg;

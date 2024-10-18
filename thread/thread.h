@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../sync/atomics.h"
+#include "../sync/grd_atomics.h"
 #include "../panic.h"
 #include "os/os_thread.h"
 
@@ -19,7 +19,7 @@ struct Thread {
 
 template <typename... Args>
 Thread start_thread(auto* proc, Args ...args) {
-	auto args_tuple = make_tuple(args...);
+	auto args_tuple = grd_make_tuple(args...);
 
     Thread thread;
 	struct ThreadData {
@@ -27,7 +27,7 @@ Thread start_thread(auto* proc, Args ...args) {
 		decltype(args_tuple) args;
 	};
 
-	auto data = make<ThreadData>(c_allocator);
+	auto data = grd_make<ThreadData>(c_allocator);
 	data->proc = proc;
 	data->args = args_tuple;
 

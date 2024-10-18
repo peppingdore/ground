@@ -6,7 +6,7 @@
 #include "../../file.h"
 #include "../../log.h"
 #include "../../reflect_utils.h"
-#include "../../testing.h"
+#include "../../grd_testing.h"
 
 #include <stdio.h>
 
@@ -14,7 +14,7 @@ String codepoint_hex_padded(int codepoint) {
 	auto xxxx = sprint("%H", codepoint);
 	auto result = xxxx[2, {}];
 	if (len(result) < 4) {
-		for (auto i: range(4 - len(result))) {
+		for (auto i: grd_range(4 - len(result))) {
 			result = sprint("0%", result);
 		}
 	}
@@ -32,17 +32,17 @@ Array<String> synth_codepoint_unicode_data(u32 codepoint) {
 	}
 
 	const char* name = UNICODE_CODEPOINT_NAMES[cp.name_index];
-	add(&synth, make_string(name));
+	add(&synth, grd_make_string(name));
 	add(&synth, sprint(cp.category));
 	add(&synth, sprint(cp.combining_class));
 	add(&synth, sprint(cp.bidi_category));
 
 	AllocatedString sb;
 
-	for (auto i: range(cp.decomposition.fields_count)) {
+	for (auto i: grd_range(cp.decomposition.fields_count)) {
 		auto field = cp.decomposition.fields[i];
-		auto type = (EnumType*) reflect_type_of<UnicodeDecompositionTag>();
-		auto matching_value = find_matching_enum_value(type, make_primitive_value(field));
+		auto type = (EnumType*) grd_reflect_type_of<UnicodeDecompositionTag>();
+		auto matching_value = find_matching_enum_value(type, grd_make_primitive_value(field));
 		if (matching_value.has_value) {
 			append(&sb, "<");
 			append(&sb, matching_value.value.name);
@@ -63,13 +63,13 @@ Array<String> synth_codepoint_unicode_data(u32 codepoint) {
 	}
 
 	if (cp.field_flags & UNICODE_CODEPOINT_FIELD_DIGIT_VALUE) {
-		add(&synth, make_string(UNICODE_DIGIT_VALUES[cp.digit_value_index]));
+		add(&synth, grd_make_string(UNICODE_DIGIT_VALUES[cp.digit_value_index]));
 	} else {
 		add(&synth, ""_b);
 	}
 
 	if (cp.field_flags & UNICODE_CODEPOINT_FIELD_NUMERIC_VALUE) {
-		add(&synth, make_string(UNICODE_NUMERIC_VALUES[cp.numeric_value_index]));
+		add(&synth, grd_make_string(UNICODE_NUMERIC_VALUES[cp.numeric_value_index]));
 	} else {
 		add(&synth, ""_b);
 	}
@@ -97,7 +97,7 @@ Array<String> synth_codepoint_unicode_data(u32 codepoint) {
 	return synth;
 }
 
-TEST(unicode_data) {
+GRD_TEST(unicode_data) {
 	EXPECT(ends_with(U"<CJK Ideograph Extension A, First>"_b, "First>"_b));
 
 	auto [text, e] = read_text_at_path(U"../UnicodeData.txt"_b);

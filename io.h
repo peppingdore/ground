@@ -1,6 +1,6 @@
 #pragma once
 
-#include "base.h"
+#include "grd_base.h"
 #include "error.h"
 #include "tuple.h"
 #include "array.h"
@@ -23,7 +23,7 @@ struct Reader {
 	}
 };
 
-Tuple<Array<u8>, Error*> read_all(Allocator allocator, Reader reader) {
+Tuple<Array<u8>, Error*> read_all(GrdAllocator allocator, Reader reader) {
 	Array<u8> data = { .allocator = allocator };
 	while (true) {
 		void* dst = reserve(&data, 128);
@@ -44,7 +44,7 @@ Tuple<Array<u8>, Error*> read_all(Reader reader) {
 	return read_all(c_allocator, reader);
 }
 
-Tuple<AllocatedString, Error*> read_text(Allocator allocator, Reader reader) {
+Tuple<AllocatedString, Error*> read_text(GrdAllocator allocator, Reader reader) {
 	auto [data, e] = read_all(allocator, reader);
 	if (e) {
 		return { {}, e };

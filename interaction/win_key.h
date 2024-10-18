@@ -2,7 +2,7 @@
 
 #include "key.h"
 
-BUILD_RUN("params.add_lib('user32.lib')");
+GRD_BUILD_RUN("params.add_lib('user32.lib')");
 
 // stolen from: https://stackoverflow.com/questions/15966642/how-do-you-tell-lshift-apart-from-rshift-in-wm-keydown-events
 WPARAM map_windows_left_and_right_keys(WPARAM wParam, LPARAM lParam) {

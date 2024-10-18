@@ -2,7 +2,7 @@
 
 #include "array.h"
 #include "allocator.h"
-#include "code_location.h"
+#include "grd_code_location.h"
 #include "tuple.h"
 #include "byte_order.h"
 #include "optional.h"
@@ -17,12 +17,12 @@ using AllocatedString = Array<char>;
 using AllocatedUnicodeString = Array<char32_t>;
 
 template <StringChar T>
-constexpr Span<T> make_string(const T* data, s64 length) {
+constexpr Span<T> grd_make_string(const T* data, s64 length) {
 	return { (T*) data, length };
 }
 
 template <StringChar T>
-Span<T> make_string(const T* c_str) {
+Span<T> grd_make_string(const T* c_str) {
 	auto ptr = c_str;
 	while (true) {
 		if (ptr[0] == '\0') {
@@ -44,14 +44,14 @@ constexpr UnicodeString operator""_b(const char32_t* c_str, size_t length) {
 template <StringChar T>
 void append(Array<T>* arr, Span<T> str, s64 index = -1, CodeLocation loc = caller_loc()) { 
 	auto ptr = reserve(arr, len(str), index, loc);
-	for (auto i: range(len(str))) {
+	for (auto i: grd_range(len(str))) {
 		ptr[i] = str[i];
 	}
 }
 
 void append(Array<char32_t>* arr, String str, s64 index = -1, CodeLocation loc = caller_loc()) {
 	auto ptr = reserve(arr, len(str), index, loc);
-	for (auto i: range(len(str))) {
+	for (auto i: grd_range(len(str))) {
 		ptr[i] = str[i];
 	}
 }
@@ -64,7 +64,7 @@ void append(Array<char32_t>* arr, const char32_t (&str)[N], s64 index = -1, Code
 template <s64 N>
 void append(Array<char32_t>* arr, const char (&str)[N], s64 index = -1, CodeLocation loc = caller_loc()) {
 	auto* ptr = reserve(arr, N - 1, index, loc);
-	for (auto i: range(N - 1)) {
+	for (auto i: grd_range(N - 1)) {
 		ptr[i] = str[i];
 	}
 }
@@ -75,22 +75,22 @@ void append(Array<char>* arr, const char (&str)[N], s64 index = -1, CodeLocation
 }
 
 void append(Array<char32_t>* arr, const char32_t* str, s64 index = -1, CodeLocation loc = caller_loc()) {
-	auto s = make_string(str);
+	auto s = grd_make_string(str);
 	add(arr, s, index, loc);
 }
 
 void append(Array<char32_t>* arr, const char* str, s64 index = -1, CodeLocation loc = caller_loc()) {
-	auto s = make_string(str);
+	auto s = grd_make_string(str);
 	append(arr, s, index, loc);
 }
 
 void append(Array<char>* arr, const char* str, s64 index = -1, CodeLocation loc = caller_loc()) {
-	auto s = make_string(str);
+	auto s = grd_make_string(str);
 	add(arr, s, index, loc);
 }
 
 template <StringChar T>
-T* copy_c_str(Span<T> str, Allocator allocator = c_allocator) {
+T* copy_c_str(Span<T> str, GrdAllocator allocator = c_allocator) {
 	auto cp = Alloc<T>(allocator, len(str) + 1);
 	memcpy(cp, str.data, len(str) * sizeof(T));
 	cp[len(str)] = '\0';
@@ -98,7 +98,7 @@ T* copy_c_str(Span<T> str, Allocator allocator = c_allocator) {
 }
 
 template <StringChar T>
-Array<T> copy_string(Allocator allocator, Span<T> str, CodeLocation loc = caller_loc()) {
+Array<T> copy_string(GrdAllocator allocator, Span<T> str, CodeLocation loc = caller_loc()) {
 	return copy_array(allocator, str, loc);
 }
 
@@ -107,7 +107,7 @@ Array<T> copy_string(Span<T> str, CodeLocation loc = caller_loc()) {
 	return copy_string(c_allocator, str, loc);
 }
 
-AllocatedUnicodeString copy_unicode_string(Allocator allocator, String str) {
+AllocatedUnicodeString copy_unicode_string(GrdAllocator allocator, String str) {
 	Array<char32_t> result = { .allocator = allocator };
 	append(&result, str);
 	return result;
@@ -184,7 +184,7 @@ bool compare_ignore_case_ascii(Span<T> a, Span<U> b) {
 	if (len(a) != len(b)) {
 		return false;
 	}
-	for (auto i: range(len(a))) {
+	for (auto i: grd_range(len(a))) {
 		if (ascii_to_lower(a[i]) != ascii_to_lower(b[i])) {
 			return false;
 		}
@@ -194,7 +194,7 @@ bool compare_ignore_case_ascii(Span<T> a, Span<U> b) {
 
 template <StringChar T>
 Span<T> trim_start(Span<T> str) {
-	for (auto i: range(len(str))) {
+	for (auto i: grd_range(len(str))) {
 		if (!is_whitespace(str[i])) {
 			return str[i, len(str)];
 		}
@@ -204,7 +204,7 @@ Span<T> trim_start(Span<T> str) {
 
 template <StringChar T>
 Span<T> trim_end(Span<T> str) {
-	for (auto i: reverse(range(len(str)))) {
+	for (auto i: reverse(grd_range(len(str)))) {
 		if (!is_whitespace(str[i])) {
 			return str[0, i + 1];
 		}
@@ -224,7 +224,7 @@ Span<T> trim(Span<T> str) {
 
 template <StringChar T>
 Tuple<Span<T>, bool> take_until(Span<T> str, auto should_stop) {
-	for (auto i: range(len(str))) {
+	for (auto i: grd_range(len(str))) {
 		if (should_stop(str[i])) {
 			return { str[0, i], true };	
 		}
@@ -233,9 +233,9 @@ Tuple<Span<T>, bool> take_until(Span<T> str, auto should_stop) {
 }
 
 template <StringChar T>
-Generator<Span<T>> split(Span<T> str, auto predicate) {
+GrdGenerator<Span<T>> split(Span<T> str, auto predicate) {
 	s64 cursor = 0;
-	for (auto i: range(len(str))) {
+	for (auto i: grd_range(len(str))) {
 		if (predicate(str[i])) {
 			auto x = str[cursor, i];
 			co_yield x;
@@ -249,7 +249,7 @@ Generator<Span<T>> split(Span<T> str, auto predicate) {
 
 template <StringChar T>
 Tuple<Span<T>, Span<T>> split2(Span<T> str, auto predicate) {
-	for (auto i: range(len(str))) {
+	for (auto i: grd_range(len(str))) {
 		if (predicate(str[i])) {
 			return { str[0, i], str[i + 1, len(str)] };
 		}
@@ -273,7 +273,7 @@ s64 get_line_break_len(Span<T> str, s64 idx) {
 }
 
 template <StringChar T>
-Generator<Span<T>> iterate_lines(Span<T> str, bool include_line_breaks = true) {
+GrdGenerator<Span<T>> iterate_lines(Span<T> str, bool include_line_breaks = true) {
 	s64 cursor = 0;
 	s64 i = 0;
 	while (i < len(str)) {
@@ -314,7 +314,7 @@ s32 utf8_char_size(char32_t c) {
 
 s64 utf8_length(UnicodeString str) {
 	s64 length = 0;
-	for (auto i: range(len(str))) {
+	for (auto i: grd_range(len(str))) {
 		length += utf8_char_size(str[i]);
 	}
 	return length;
@@ -322,7 +322,7 @@ s64 utf8_length(UnicodeString str) {
 
 void encode_utf8(UnicodeString str, char* buf) {
 	char* ptr = buf;
-	for (auto i: range(len(str))) {
+	for (auto i: grd_range(len(str))) {
 		auto c = str[i];
 		auto char_size = utf8_char_size(c);
 
@@ -375,7 +375,7 @@ s32 utf16_char_size(char32_t c) {
 Array<char16_t> encode_utf16(Allocator allocator, UnicodeString str, CodeLocation loc = caller_loc()) {
 	
 	s64 length = 0;
-	for (auto i: range(len(str))) {
+	for (auto i: grd_range(len(str))) {
 		length += utf16_char_size(str[i]);
 	}
 
@@ -384,7 +384,7 @@ Array<char16_t> encode_utf16(Allocator allocator, UnicodeString str, CodeLocatio
 	data[length] = '\0';
 
 	auto ptr = data;
-	for (auto i: range(len(str))) {
+	for (auto i: grd_range(len(str))) {
 		auto c = str[i];
 		auto char_size = utf16_char_size(c);
 		if (char_size > 1) {
@@ -465,7 +465,7 @@ AllocatedUnicodeString decode_utf8(Allocator allocator, String utf8, CodeLocatio
 }
 
 AllocatedUnicodeString decode_utf8(Allocator allocator, const char* c_str, CodeLocation loc = caller_loc()) {
-	return decode_utf8(allocator, make_string(c_str), loc);
+	return decode_utf8(allocator, grd_make_string(c_str), loc);
 }
 
 AllocatedUnicodeString decode_utf8(const char* c_str, CodeLocation loc = caller_loc()) {
@@ -492,7 +492,7 @@ AllocatedUnicodeString decode_utf16(Allocator allocator, const char16_t* str, s6
 	assert(bo.has_value);
 
 	s64 result_length = 0;
-	for (auto i: range(length)) {
+	for (auto i: grd_range(length)) {
 		auto c = str[i];
 		if (bo != BYTE_ORDER_LITTLE_ENDIAN) {
 			swap_endianness(&c);

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "base.h"
+#include "grd_base.h"
 #include "span.h"
 #include "range.h"
 
@@ -46,7 +46,7 @@ void sort(auto arr) {
 }
 
 bool is_sorted(auto arr, s64 start, s64 length, auto less) {
-	for (auto i: range(length - 1)) {
+	for (auto i: grd_range(length - 1)) {
 		if (less(arr, i + 1, i)) {
 			return false;
 		}

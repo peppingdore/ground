@@ -1,9 +1,9 @@
 #pragma once
 
-#include "base.h"
+#include "grd_base.h"
 
 template <auto tag = []{}>
-struct CTCounter {
+struct GrdCompileTimeCounter {
 	// Stolen from: https://mc-deltat.github.io/articles/stateful-metaprogramming-cpp20
 	template <u64 N>
 	struct CounterReader { 

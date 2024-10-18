@@ -1,23 +1,23 @@
 #include "preprocess.h"
-#include "../testing.h"
+#include "../grd_testing.h"
 
 Tuple<Error*, Prep*> simple_preprocess(UnicodeString str, Span<Tuple<UnicodeString, UnicodeString>> files) {
-	auto prep = make_prep();
+	auto prep = grd_make_prep();
 	prep->aux_data = &files;
 	prep->load_file_hook = [](Prep* p, UnicodeString fullpath) -> PrepFileSource* {
 		for (auto [name, content]: *(decltype(files)*) p->aux_data) {
 			if (name == fullpath) {
-				auto file = make_mem_prep_file(p, content, fullpath);
+				auto file = grd_make_mem_prep_file(p, content, fullpath);
 				return file;
 			}
 		}
 		return NULL;
 	};
-	auto root = make_mem_prep_file(prep, str, U"<root_file>"_b);
+	auto root = grd_make_mem_prep_file(prep, str, U"<root_file>"_b);
 	return { preprocess_file(prep, root), prep };
 }
 
-// TEST(include_add_missing_line_breaks) {
+// GRD_TEST(include_add_missing_line_breaks) {
 // 	Array<Tuple<UnicodeString, UnicodeString>> files;
 // 	add(&files, { U"file.txt"_b, U"FILE_CONTENT"_b });
 // 	auto [e, prep] = simple_preprocess(U"#include \"file.txt\""_b, files);
@@ -35,7 +35,7 @@ Tuple<Error*, Prep*> simple_preprocess(UnicodeString str, Span<Tuple<UnicodeStri
 // 	EXPECT(prep_str(prep) == U"FILE_CONTENT\n\n"_b);
 // }
 
-// TEST(include_computed_include) {
+// GRD_TEST(include_computed_include) {
 //     Array<Tuple<UnicodeString, UnicodeString>> files;
 //     // Add test files with content
 //     add(&files, { U"computed_include.txt"_b, U"COMPUTED_CONTENT"_b });
@@ -54,7 +54,7 @@ Tuple<Error*, Prep*> simple_preprocess(UnicodeString str, Span<Tuple<UnicodeStri
 // }
 
 
-TEST(error_gen) {
+GRD_TEST(error_gen) {
 	// auto [e, prep] = simple_preprocess(U"#define MACRO(a, b) a##b\n MACRO(2, \"a\")"_b, {});
 	auto [e, prep] = simple_preprocess(U"#define MACRO(a, b) a##b\n MACRO(2, \"a\")"_b, {});
 	if (e) {

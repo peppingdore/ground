@@ -19,12 +19,12 @@ struct Mutex {
 	}
 };
 
-void make_mutex(Mutex* out_mutex) {
+void grd_make_mutex(Mutex* out_mutex) {
 	os_mutex_create(&out_mutex->os_mutex);
 }
 
-Mutex* make_mutex() {
-	auto x = make<Mutex>();
-	make_mutex(x);
+Mutex* grd_make_mutex() {
+	auto x = grd_make<Mutex>();
+	grd_make_mutex(x);
 	return x;
 }

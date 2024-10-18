@@ -9,18 +9,18 @@ struct Array: Span<T> {
 	using Span<T>::count;
 
 	s64          capacity  = 0;
-	Allocator    allocator = c_allocator;
-	CodeLocation loc       = caller_loc();
+	GrdAllocator    allocator = c_allocator;
+	GrdCodeLoc loc       = grd_caller_loc();
 
-	Array copy(Allocator cp_allocator = c_allocator, CodeLocation loc = caller_loc()) {
+	Array copy(GrdAllocator cp_allocator = c_allocator, GrdCodeLoc loc = grd_caller_loc()) {
 		Array result = { .allocator = cp_allocator };
 		add(&result, *this, loc);
 		return result;
 	}
 
-	void free(CodeLocation loc = caller_loc()) {
+	void free(GrdCodeLoc loc = grd_caller_loc()) {
 		if (data) {
-			Free(allocator, data, loc);
+			GrdFree(allocator, data, loc);
 			data  = NULL;
 			count = 0;
 		}
@@ -28,7 +28,7 @@ struct Array: Span<T> {
 };
 
 template <typename T>
-T* reserve(Array<T>* arr, s64 length, s64 index = -1, CodeLocation loc = caller_loc()) {
+T* reserve(Array<T>* arr, s64 length, s64 index = -1, GrdCodeLoc loc = grd_caller_loc()) {
 	if (index < 0) {
 		index += len(*arr) + 1;
 	}
@@ -59,7 +59,7 @@ T* reserve(Array<T>* arr, s64 length, s64 index = -1, CodeLocation loc = caller_
 		s64 old_capacity = arr->capacity;
 		assert(old_capacity > 0);
 		arr->capacity = max_s64(old_capacity * 2, target_capacity);
-		arr->data     = (T*) Realloc(arr->allocator, arr->data, old_capacity * sizeof(T), arr->capacity * sizeof(T), loc);
+		arr->data     = (T*) GrdRealloc(arr->allocator, arr->data, old_capacity * sizeof(T), arr->capacity * sizeof(T), loc);
 	}
 
 	memmove(arr->data + index + length, arr->data + index, (len(*arr) - index) * sizeof(T));
@@ -68,56 +68,56 @@ T* reserve(Array<T>* arr, s64 length, s64 index = -1, CodeLocation loc = caller_
 }
 
 template <typename T>
-T* add(Array<T>* arr, std::type_identity_t<T> item, s64 index = -1, CodeLocation loc = caller_loc()) {
+T* add(Array<T>* arr, std::type_identity_t<T> item, s64 index = -1, GrdCodeLoc loc = grd_caller_loc()) {
 	T* ptr = reserve(arr, 1, index, loc);
 	*ptr = item;
 	return ptr;
 }
 
 template <typename T>
-T* add(Array<T>* arr, T* src, s64 length, s64 index = -1, CodeLocation loc = caller_loc()) {
+T* add(Array<T>* arr, T* src, s64 length, s64 index = -1, GrdCodeLoc loc = grd_caller_loc()) {
 	T* ptr = reserve(arr, length, index, loc);
-	for (auto i: range(length)) {
+	for (auto i: grd_range(length)) {
 		ptr[i] = src[i];
 	}
 	return ptr;
 }
 
 template <typename T>
-T* add(Array<T>* arr, Span<T> src, s64 index = -1, CodeLocation loc = caller_loc()) {
+T* add(Array<T>* arr, Span<T> src, s64 index = -1, GrdCodeLoc loc = grd_caller_loc()) {
 	return add(arr, src.data, src.count, index, loc);
 }
 
 // add initializer list
 template <typename T>
-T* add(Array<T>* arr, std::initializer_list<std::type_identity_t<T>> list, s64 index = -1, CodeLocation loc = caller_loc()) {
+T* add(Array<T>* arr, std::initializer_list<std::type_identity_t<T>> list, s64 index = -1, GrdCodeLoc loc = grd_caller_loc()) {
 	return add(arr, (T*) list.begin(), list.size(), index, loc);
 }
 
 template <typename T, s64 N>
-T* add(Array<T>* arr, const T (&src)[N], s64 index = -1, CodeLocation loc = caller_loc()) {
+T* add(Array<T>* arr, const T (&src)[N], s64 index = -1, GrdCodeLoc loc = grd_caller_loc()) {
 	return add(arr, (T*) src, N, index, loc);	
 }
 
 template <typename T>
-void clear(Array<T>* arr, CodeLocation loc = caller_loc()) {
+void clear(Array<T>* arr, GrdCodeLoc loc = grd_caller_loc()) {
 	arr->count = 0;
 }
 
 template <typename T>
-Array<T> copy_array(Allocator allocator, Span<T> src, CodeLocation loc = caller_loc()) {
+Array<T> copy_array(GrdAllocator allocator, Span<T> src, GrdCodeLoc loc = grd_caller_loc()) {
 	Array<T> result = { .allocator = allocator };
 	add(&result, src, -1, loc);
 	return result;
 }
 
 template <typename T>
-Array<T> copy_array(Span<T> src, CodeLocation loc = caller_loc()) {
+Array<T> copy_array(Span<T> src, GrdCodeLoc loc = grd_caller_loc()) {
 	return copy_array(c_allocator, src, loc);
 }
 
 template <typename T>
-Array<T> to_array(Allocator allocator, Generator<T>&& generator) {
+Array<T> to_array(GrdAllocator allocator, GrdGenerator<T>&& generator) {
 	Array<T> arr = { .allocator = allocator };
 	for (auto it: generator) {
 		add(&arr, it);
@@ -126,7 +126,7 @@ Array<T> to_array(Allocator allocator, Generator<T>&& generator) {
 }
 
 template <typename T>
-Array<T> to_array(Generator<T>&& generator) {
+Array<T> to_array(GrdGenerator<T>&& generator) {
 	return to_array(c_allocator, std::move(generator));
 }
 
@@ -137,8 +137,8 @@ struct ArrayType: SpanType {
 
 template <typename T>
 ArrayType* reflect_type(Array<T>* x, ArrayType* type) {
-	type->inner = reflect_type_of<T>();
-	type->name = heap_sprintf("Array<%s>", type->inner->name);
+	type->inner = grd_reflect_type_of<T>();
+	type->name = grd_heap_sprintf("Array<%s>", type->inner->name);
 	type->subkind = "array";
 	type->get_count = [](void* arr) {
 		auto casted = (Array<int>*) arr;
@@ -150,7 +150,7 @@ ArrayType* reflect_type(Array<T>* x, ArrayType* type) {
 	};
 	type->get_item = [](void* arr, s64 index) {
 		auto casted = (Array<int>*) arr;
-		void* item = ptr_add(casted->data, sizeof(T) * index);
+		void* item = grd_ptr_add(casted->data, sizeof(T) * index);
 		return item;
 	};
 	return type;

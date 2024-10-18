@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../string.h"
-#include "../scoped.h"
+#include "../grd_scoped.h"
 #include "../math/vector.h"
 #include "../error.h"
 #include "event.h"
@@ -21,25 +21,25 @@ struct Window {
 struct WindowEvent: Event {
 	f64 time_from_system_start = 0;
 };
-REFLECT(WindowEvent) {
-	BASE_TYPE(Event);
-	MEMBER(time_from_system_start);
+GRD_REFLECT(WindowEvent) {
+	GRD_BASE_TYPE(Event);
+	GRD_MEMBER(time_from_system_start);
 }
 
 struct FocusEvent: WindowEvent {
 	bool have_focus = false;
 };
-REFLECT(FocusEvent) {
-	BASE_TYPE(WindowEvent);
-	MEMBER(have_focus);
+GRD_REFLECT(FocusEvent) {
+	GRD_BASE_TYPE(WindowEvent);
+	GRD_MEMBER(have_focus);
 }
 
 struct CharEvent: WindowEvent {
 	char32_t character;
 };
-REFLECT(CharEvent) {
-	BASE_TYPE(WindowEvent);
-	MEMBER(character);
+GRD_REFLECT(CharEvent) {
+	GRD_BASE_TYPE(WindowEvent);
+	GRD_MEMBER(character);
 }
 
 enum class KeyAction {
@@ -48,11 +48,11 @@ enum class KeyAction {
 	Down    = 2,
 	Hold    = 3,
 };
-REFLECT(KeyAction) {
-	ENUM_VALUE(Unknown);
-	ENUM_VALUE(Up);
-	ENUM_VALUE(Down);
-	ENUM_VALUE(Hold);
+GRD_REFLECT(KeyAction) {
+	GRD_ENUM_VALUE(Unknown);
+	GRD_ENUM_VALUE(Up);
+	GRD_ENUM_VALUE(Down);
+	GRD_ENUM_VALUE(Hold);
 }
 
 struct KeyEvent: WindowEvent {
@@ -60,16 +60,16 @@ struct KeyEvent: WindowEvent {
 	Key       key;
 	u32       os_key_code;
 };
-REFLECT(KeyEvent) {
-	BASE_TYPE(WindowEvent);
-	MEMBER(action);
-	MEMBER(key);
-	MEMBER(os_key_code);
+GRD_REFLECT(KeyEvent) {
+	GRD_BASE_TYPE(WindowEvent);
+	GRD_MEMBER(action);
+	GRD_MEMBER(key);
+	GRD_MEMBER(os_key_code);
 }
 
 struct WindowCloseEvent: WindowEvent {
 
 };
-REFLECT(WindowCloseEvent) {
-	BASE_TYPE(WindowEvent);
+GRD_REFLECT(WindowCloseEvent) {
+	GRD_BASE_TYPE(WindowEvent);
 }

@@ -11,7 +11,7 @@ int main() {
 	}
 	)XXXX"_b;
 
-	auto prep = make_preprocessor(c_allocator);
+	auto prep = grd_make_preprocessor(c_allocator);
 	auto e = prep_file(prep, prog, U"xxx.cpp"_b);
 	if (e) {
 		print_parser_error(e);

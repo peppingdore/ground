@@ -6,13 +6,13 @@
 struct Event {
 	Type* type = NULL;
 };
-REFLECT(Event) {
-	MEMBER(type); TAG(RealTypeMember{});
+GRD_REFLECT(Event) {
+	GRD_MEMBER(type); GRD_TAG(GrdRealTypeMember{});
 }
 
 template <typename T>
-T* make_event() {
-	auto event = make<T>();
-	event->type = reflect_type_of<T>();
+T* grd_make_event() {
+	auto event = grd_make<T>();
+	event->type = grd_reflect_type_of<T>();
 	return event;
 }

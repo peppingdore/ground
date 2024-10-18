@@ -15,13 +15,13 @@ int main() {
 	Array<s64> values;
 
 	s64 COUNT = 1000000;
-	for (auto i: range(COUNT)) {
+	for (auto i: grd_range(COUNT)) {
 		add(&keys, rand_s64());
 		add(&values, rand_s64());
 	}
 
-	Stopwatch w = make_stopwatch();
-	for (auto i: range(COUNT)) {
+	Stopwatch w = grd_make_stopwatch();
+	for (auto i: grd_range(COUNT)) {
 		if (i % 65536 == 0) {
 			println("insert %, %", keys[i], values[i]);
 		}
@@ -33,7 +33,7 @@ int main() {
 	println("Avg insert time: % ns", f64(time) / f64(COUNT));
 
 	reset(&w);
-	for (auto i: range(COUNT)) {
+	for (auto i: grd_range(COUNT)) {
 		get(&map, keys[i]);
 	}
 	time = nanos_elapsed_s64(&w);

@@ -26,10 +26,10 @@ struct AstOperator {
 	s32           prec;
 	s32           flags = 0;
 
-	REFLECT(AstOperator) {
-		MEMBER(op);
-		MEMBER(prec);
-		MEMBER(flags);
+	GRD_REFLECT(AstOperator) {
+		GRD_MEMBER(op);
+		GRD_MEMBER(prec);
+		GRD_MEMBER(flags);
 	}
 };
 
@@ -92,9 +92,9 @@ struct ProgramTextRegion {
 	s64 start  = 0;
 	s64 end    = 0;
 
-	REFLECT(ProgramTextRegion) {
-		MEMBER(start);
-		MEMBER(end);
+	GRD_REFLECT(ProgramTextRegion) {
+		GRD_MEMBER(start);
+		GRD_MEMBER(end);
 	}
 };
 
@@ -106,12 +106,12 @@ struct Token {
 
 struct CLikeProgram;
 struct AstNode;
-struct AstPrimitiveType;
+struct AstGrdPrimitiveType;
 struct AstStructType;
 struct AstType;
 
 struct CLikeParser {
-	Allocator            allocator;
+	GrdAllocator            allocator;
 	CLikeProgram*        program;
 	Array<AstNode*>      scope;
 	UnicodeString        str;
@@ -120,18 +120,18 @@ struct CLikeParser {
 	Array<UnicodeString> op_tokens_sorted;
 	HashMap<AstType*, AstType*> ptr_types;
 
-	AstPrimitiveType*    void_tp = NULL;
-	AstPrimitiveType*    bool_tp = NULL;
-	AstPrimitiveType*    s8_tp = NULL;
-	AstPrimitiveType*    u8_tp = NULL;
-	AstPrimitiveType*    s16_tp = NULL;
-	AstPrimitiveType*    u16_tp = NULL;
-	AstPrimitiveType*    s32_tp = NULL;
-	AstPrimitiveType*    u32_tp = NULL;
-	AstPrimitiveType*    s64_tp = NULL;
-	AstPrimitiveType*    u64_tp = NULL;
-	AstPrimitiveType*    f32_tp = NULL;
-	AstPrimitiveType*    f64_tp = NULL;
+	AstGrdPrimitiveType*    void_tp = NULL;
+	AstGrdPrimitiveType*    bool_tp = NULL;
+	AstGrdPrimitiveType*    s8_tp = NULL;
+	AstGrdPrimitiveType*    u8_tp = NULL;
+	AstGrdPrimitiveType*    s16_tp = NULL;
+	AstGrdPrimitiveType*    u16_tp = NULL;
+	AstGrdPrimitiveType*    s32_tp = NULL;
+	AstGrdPrimitiveType*    u32_tp = NULL;
+	AstGrdPrimitiveType*    s64_tp = NULL;
+	AstGrdPrimitiveType*    u64_tp = NULL;
+	AstGrdPrimitiveType*    f32_tp = NULL;
+	AstGrdPrimitiveType*    f64_tp = NULL;
 
 	AstStructType*       float2_tp = NULL;
 	AstStructType*       float3_tp = NULL;
@@ -143,18 +143,18 @@ struct AstNode {
 	CLikeParser*                p = NULL;
 	Optional<ProgramTextRegion> text_region;
 
-	REFLECT(AstNode) {
-		MEMBER(p);
-		MEMBER(type);
-			TAG(RealTypeMember{});
-		MEMBER(text_region);
+	GRD_REFLECT(AstNode) {
+		GRD_MEMBER(p);
+		GRD_MEMBER(type);
+			GRD_TAG(GrdRealTypeMember{});
+		GRD_MEMBER(text_region);
 	}
 };
 
 template <typename T>
-T* make_ast_node(CLikeParser* p, Optional<ProgramTextRegion> text_region) {
-	auto x = make<T>(p->allocator);
-	x->type = reflect_type_of<T>();
+T* grd_make_ast_node(CLikeParser* p, Optional<ProgramTextRegion> text_region) {
+	auto x = grd_make<T>(p->allocator);
+	x->type = grd_reflect_type_of<T>();
 	x->p = p;
 	x->text_region = text_region;
 	return x;
@@ -164,10 +164,10 @@ struct AstSymbol: AstNode {
 	UnicodeString name;
 	bool          is_global = false;
 
-	REFLECT(AstSymbol) {
-		BASE_TYPE(AstNode);
-		MEMBER(name);
-		MEMBER(is_global);
+	GRD_REFLECT(AstSymbol) {
+		GRD_BASE_TYPE(AstNode);
+		GRD_MEMBER(name);
+		GRD_MEMBER(is_global);
 	}
 };
 
@@ -175,10 +175,10 @@ struct AstType: AstSymbol {
 	u64 size = 0;
 	u64 alignment = 0;
 
-	REFLECT(AstType) {
-		BASE_TYPE(AstSymbol);
-		MEMBER(size);
-		MEMBER(alignment);
+	GRD_REFLECT(AstType) {
+		GRD_BASE_TYPE(AstSymbol);
+		GRD_MEMBER(size);
+		GRD_MEMBER(alignment);
 	}
 };
 
@@ -192,15 +192,15 @@ enum class MetalAddrSpace {
 	// RayData = 5,
 	// ObjectData = 6,
 };
-REFLECT(MetalAddrSpace) {
-	ENUM_VALUE(Unspecified);
-	ENUM_VALUE(Device);
-	ENUM_VALUE(Constant);
-	ENUM_VALUE(Thread);
-	ENUM_VALUE(Threadgroup);
-	// ENUM_VALUE(ThreadgroupImageblock);
-	// ENUM_VALUE(RayData);
-	// ENUM_VALUE(ObjectData);
+GRD_REFLECT(MetalAddrSpace) {
+	GRD_ENUM_VALUE(Unspecified);
+	GRD_ENUM_VALUE(Device);
+	GRD_ENUM_VALUE(Constant);
+	GRD_ENUM_VALUE(Thread);
+	GRD_ENUM_VALUE(Threadgroup);
+	// GRD_ENUM_VALUE(ThreadgroupImageblock);
+	// GRD_ENUM_VALUE(RayData);
+	// GRD_ENUM_VALUE(ObjectData);
 }
 
 enum class VulkanStorageClass {
@@ -210,22 +210,22 @@ enum class VulkanStorageClass {
 	Input = 3,
 	PushConstant = 4,
 };
-REFLECT(VulkanStorageClass) {
-	ENUM_VALUE(Unspecified);
-	ENUM_VALUE(Private);
-	ENUM_VALUE(Uniform);
-	ENUM_VALUE(Input);
-	ENUM_VALUE(PushConstant);
+GRD_REFLECT(VulkanStorageClass) {
+	GRD_ENUM_VALUE(Unspecified);
+	GRD_ENUM_VALUE(Private);
+	GRD_ENUM_VALUE(Uniform);
+	GRD_ENUM_VALUE(Input);
+	GRD_ENUM_VALUE(PushConstant);
 }
 
 struct AstExpr: AstNode {
 	AstType* expr_type = NULL;
 	bool     is_lvalue = false;
 
-	REFLECT(AstExpr) {
-		BASE_TYPE(AstNode);
-		MEMBER(expr_type);
-		MEMBER(is_lvalue);
+	GRD_REFLECT(AstExpr) {
+		GRD_BASE_TYPE(AstNode);
+		GRD_MEMBER(expr_type);
+		GRD_MEMBER(is_lvalue);
 	}
 };
 
@@ -233,8 +233,8 @@ constexpr bool AST_EXPR_LVALUE = true;
 constexpr bool AST_EXPR_RVALUE = false;
 
 template <typename T>
-T* make_ast_expr(CLikeParser* p, AstType* expr_type, bool is_lvalue, Optional<ProgramTextRegion> text_region) {
-	auto x = make_ast_node<T>(p, text_region);
+T* grd_make_ast_expr(CLikeParser* p, AstType* expr_type, bool is_lvalue, Optional<ProgramTextRegion> text_region) {
+	auto x = grd_make_ast_node<T>(p, text_region);
 	if (!expr_type) {
 		panic("expr_type must be non-null");
 	}
@@ -246,9 +246,9 @@ T* make_ast_expr(CLikeParser* p, AstType* expr_type, bool is_lvalue, Optional<Pr
 struct AstBlock: AstNode {
 	Array<AstNode*> statements;
 
-	REFLECT(AstBlock) {
-		BASE_TYPE(AstNode);
-		MEMBER(statements);
+	GRD_REFLECT(AstBlock) {
+		GRD_BASE_TYPE(AstNode);
+		GRD_MEMBER(statements);
 	}
 };
 
@@ -257,21 +257,21 @@ struct CLikeProgram: AstNode {
 	Array<AstNode*>   globals; // Main diff between globals and global_syms is var decl groups vs var decls.
 	Array<AstSymbol*> global_syms;
 
-	REFLECT(CLikeProgram) {
-		BASE_TYPE(AstNode);
-		MEMBER(globals);
-		MEMBER(global_syms);
+	GRD_REFLECT(CLikeProgram) {
+		GRD_BASE_TYPE(AstNode);
+		GRD_MEMBER(globals);
+		GRD_MEMBER(global_syms);
 	}
 };
 
-struct AstPrimitiveType: AstType {
-	PrimitiveType* c_tp = NULL;
+struct AstGrdPrimitiveType: AstType {
+	GrdPrimitiveType* c_tp = NULL;
 	bool           is_signed = false;
 
-	REFLECT(AstPrimitiveType) {
-		BASE_TYPE(AstType);
-		MEMBER(c_tp);
-		MEMBER(is_signed);
+	GRD_REFLECT(AstGrdPrimitiveType) {
+		GRD_BASE_TYPE(AstType);
+		GRD_MEMBER(c_tp);
+		GRD_MEMBER(is_signed);
 	}
 };
 
@@ -281,16 +281,16 @@ struct AstTypeSite;
 struct AstVar: AstSymbol {
 	AstTypeSite* var_ts = NULL;
 	
-	REFLECT(AstVar) {
-		BASE_TYPE(AstSymbol);
-		MEMBER(var_ts);
+	GRD_REFLECT(AstVar) {
+		GRD_BASE_TYPE(AstSymbol);
+		GRD_MEMBER(var_ts);
 	}
 };
 
 struct ShaderIntrinVar: AstVar {
 
-	REFLECT(ShaderIntrinVar) {
-		BASE_TYPE(AstVar);
+	GRD_REFLECT(ShaderIntrinVar) {
+		GRD_BASE_TYPE(AstVar);
 	}
 };
 
@@ -299,9 +299,9 @@ struct AstAttr;
 struct AstFunctionArg: AstVar {
 	Array<AstAttr*> attrs;
 
-	REFLECT(AstFunctionArg) {
-		BASE_TYPE(AstVar);
-		MEMBER(attrs);
+	GRD_REFLECT(AstFunctionArg) {
+		GRD_BASE_TYPE(AstVar);
+		GRD_MEMBER(attrs);
 	}
 };
 
@@ -310,10 +310,10 @@ enum class AstFunctionKind {
 	Vertex = 2,
 	Fragment = 3,
 };
-REFLECT(AstFunctionKind) {
-	ENUM_VALUE(Plain);
-	ENUM_VALUE(Vertex);
-	ENUM_VALUE(Fragment);
+GRD_REFLECT(AstFunctionKind) {
+	GRD_ENUM_VALUE(Plain);
+	GRD_ENUM_VALUE(Vertex);
+	GRD_ENUM_VALUE(Fragment);
 }
 
 struct MtlBufferIdxAttr;
@@ -329,22 +329,22 @@ struct AstFunction: AstSymbol {
 	Array<MtlBufferIdxAttr*> mtl_buffers;
 	Array<VkSetBindingAttr*> vk_set_bindings;
 
-	REFLECT(AstFunction) {
-		BASE_TYPE(AstSymbol);
-		MEMBER(return_ts);
-		MEMBER(args);
-		MEMBER(attrs);
-		MEMBER(kind);
-		MEMBER(block);
-		MEMBER(stage_in_arg);
-		MEMBER(mtl_buffers);
-		MEMBER(vk_set_bindings);
+	GRD_REFLECT(AstFunction) {
+		GRD_BASE_TYPE(AstSymbol);
+		GRD_MEMBER(return_ts);
+		GRD_MEMBER(args);
+		GRD_MEMBER(attrs);
+		GRD_MEMBER(kind);
+		GRD_MEMBER(block);
+		GRD_MEMBER(stage_in_arg);
+		GRD_MEMBER(mtl_buffers);
+		GRD_MEMBER(vk_set_bindings);
 	}
 };
 
 template <typename T>
-T* make_ast_symbol(CLikeParser* p, UnicodeString name, Optional<ProgramTextRegion> text_region) {
-	auto node = make_ast_node<T>(p, text_region);
+T* grd_make_ast_symbol(CLikeParser* p, UnicodeString name, Optional<ProgramTextRegion> text_region) {
+	auto node = grd_make_ast_node<T>(p, text_region);
 	node->name = name;
 	return node;
 }
@@ -353,19 +353,19 @@ struct AstUnaryExpr: AstExpr {
 	AstExpr*      expr;
 	AstOperator*  op;
 
-	REFLECT(AstUnaryExpr) {
-		BASE_TYPE(AstExpr);
-		MEMBER(expr);
-		MEMBER(op);
+	GRD_REFLECT(AstUnaryExpr) {
+		GRD_BASE_TYPE(AstExpr);
+		GRD_MEMBER(expr);
+		GRD_MEMBER(op);
 	}
 };
 
 struct AstDerefExpr: AstExpr {
 	AstExpr* lhs;
 
-	REFLECT(AstDerefExpr) {
-		BASE_TYPE(AstExpr);
-		MEMBER(lhs);
+	GRD_REFLECT(AstDerefExpr) {
+		GRD_BASE_TYPE(AstExpr);
+		GRD_MEMBER(lhs);
 	}
 };
 
@@ -375,21 +375,21 @@ struct AstBinaryExpr: AstExpr {
 	AstOperator*  op = NULL;
 	AstOperator*  pure_op = NULL;
 
-	REFLECT(AstBinaryExpr) {
-		BASE_TYPE(AstExpr);
-		MEMBER(lhs);
-		MEMBER(rhs);
-		MEMBER(op);
-		MEMBER(pure_op);
+	GRD_REFLECT(AstBinaryExpr) {
+		GRD_BASE_TYPE(AstExpr);
+		GRD_MEMBER(lhs);
+		GRD_MEMBER(rhs);
+		GRD_MEMBER(op);
+		GRD_MEMBER(pure_op);
 	}
 };
 
 struct AstVarDecl: AstVar { 
 	AstExpr*      init = NULL;
 
-	REFLECT(AstVarDecl) {
-		BASE_TYPE(AstVar);
-		MEMBER(init);
+	GRD_REFLECT(AstVarDecl) {
+		GRD_BASE_TYPE(AstVar);
+		GRD_MEMBER(init);
 	}
 };
 
@@ -397,9 +397,9 @@ struct AstVarDecl: AstVar {
 struct AstVarDeclGroup: AstNode {
 	Array<AstVarDecl*> var_decls;
 
-	REFLECT(AstVarDeclGroup) {
-		BASE_TYPE(AstNode);
-		MEMBER(var_decls);
+	GRD_REFLECT(AstVarDeclGroup) {
+		GRD_BASE_TYPE(AstNode);
+		GRD_MEMBER(var_decls);
 	}
 };
 
@@ -413,22 +413,22 @@ struct AstStructMember: AstNode {
 	s64             offset = 0;
 	Array<AstAttr*> attrs;
 
-	REFLECT(AstStructMember) {
-		BASE_TYPE(AstNode);
-		MEMBER(struct_type);
-		MEMBER(member_ts);
-		MEMBER(name);
-		MEMBER(offset);
-		MEMBER(attrs);
+	GRD_REFLECT(AstStructMember) {
+		GRD_BASE_TYPE(AstNode);
+		GRD_MEMBER(struct_type);
+		GRD_MEMBER(member_ts);
+		GRD_MEMBER(name);
+		GRD_MEMBER(offset);
+		GRD_MEMBER(attrs);
 	}
 };
 
 struct AstStructType: AstType {
 	Array<AstStructMember*> members;
 
-	REFLECT(AstStructType) {
-		BASE_TYPE(AstType);
-		MEMBER(members);
+	GRD_REFLECT(AstStructType) {
+		GRD_BASE_TYPE(AstType);
+		GRD_MEMBER(members);
 	}
 };
 
@@ -436,10 +436,10 @@ struct AstVarMemberAccess: AstExpr {
 	AstExpr*         lhs;
 	AstStructMember* member;
 
-	REFLECT(AstVarMemberAccess) {
-		BASE_TYPE(AstExpr);
-		MEMBER(lhs);
-		MEMBER(member);
+	GRD_REFLECT(AstVarMemberAccess) {
+		GRD_BASE_TYPE(AstExpr);
+		GRD_MEMBER(lhs);
+		GRD_MEMBER(member);
 	}
 };
 
@@ -447,16 +447,16 @@ struct AstArrayAccess: AstExpr {
 	AstExpr*      lhs;
 	AstExpr*      index;
 
-	REFLECT(AstArrayAccess) {
-		BASE_TYPE(AstExpr);
-		MEMBER(lhs);
-		MEMBER(index);
+	GRD_REFLECT(AstArrayAccess) {
+		GRD_BASE_TYPE(AstExpr);
+		GRD_MEMBER(lhs);
+		GRD_MEMBER(index);
 	}
 };
 
 struct AstLiteralExpr: AstExpr {
-	PrimitiveType* lit_type = NULL;
-	PrimitiveValue lit_value = {};
+	GrdPrimitiveType* lit_type = NULL;
+	GrdPrimitiveValue lit_value = {};
 };
 
 struct AstAttr: AstNode {
@@ -464,16 +464,16 @@ struct AstAttr: AstNode {
 	Array<AstExpr*> args;
 	bool            is_used = false;
 
-	REFLECT(AstAttr) {
-		BASE_TYPE(AstNode);
-		MEMBER(name);
-		MEMBER(args);
-		MEMBER(is_used);
+	GRD_REFLECT(AstAttr) {
+		GRD_BASE_TYPE(AstNode);
+		GRD_MEMBER(name);
+		GRD_MEMBER(args);
+		GRD_MEMBER(is_used);
 	}
 };
 
 Token set_current_token(CLikeParser* p, s64 end, u32 flags = 0) {
-	defer { p->cursor = end; };
+	grd_defer { p->cursor = end; };
 	Token tok = {
 		.str = p->str[p->cursor, end],
 		.reg = { .start = p->cursor, .end = end },
@@ -635,9 +635,9 @@ struct PrepComment {
 	s64 start = 0;
 	s64 end   = 0;
 
-	REFLECT(PrepComment) {
-		MEMBER(start);
-		MEMBER(end);
+	GRD_REFLECT(PrepComment) {
+		GRD_MEMBER(start);
+		GRD_MEMBER(end);
 	}
 };
 
@@ -648,17 +648,17 @@ struct PrepNode {
 	Preprocessor* pp = NULL;
 	PrepNode*     parent = NULL;
 
-	REFLECT(PrepNode) {
-		MEMBER(type); TAG(RealTypeMember{});
-		MEMBER(pp);
-		MEMBER(parent);
+	GRD_REFLECT(PrepNode) {
+		GRD_MEMBER(type); GRD_TAG(GrdRealTypeMember{});
+		GRD_MEMBER(pp);
+		GRD_MEMBER(parent);
 	}
 };
 
 template <typename T>
-T* make_prep_node(Preprocessor* pp) {
-	auto node = make<T>(pp->allocator);
-	node->type = reflect_type_of<T>();
+T* grd_make_prep_node(Preprocessor* pp) {
+	auto node = grd_make<T>(pp->allocator);
+	node->type = grd_reflect_type_of<T>();
 	node->pp = pp;
 	return node;
 }
@@ -672,10 +672,10 @@ struct PrepFileNode: PrepNode {
 	PrepFile* file = NULL;
 	s64       file_offset = 0;
 
-	REFLECT(PrepFileNode) {
-		BASE_TYPE(PrepNode);
-		MEMBER(file);
-		MEMBER(file_offset);
+	GRD_REFLECT(PrepFileNode) {
+		GRD_BASE_TYPE(PrepNode);
+		GRD_MEMBER(file);
+		GRD_MEMBER(file_offset);
 	}
 };
 
@@ -686,7 +686,7 @@ struct PrepNodeReg {
 };
 
 struct Preprocessor {
-	Allocator              allocator;
+	GrdAllocator              allocator;
 	AllocatedUnicodeString pr;
 	Array<PrepNode*>       scope;
 	Array<PrepFile*>       files;
@@ -697,7 +697,7 @@ void push_reg(Preprocessor* pp) {
 	if (len(pp->scope) == 0) {
 		return;
 	}
-	auto reg = make<PrepNodeReg>(pp->allocator);
+	auto reg = grd_make<PrepNodeReg>(pp->allocator);
 	reg->node = pp->scope[-1];
 	reg->start = len(pp->pr);
 	while (len(pp->regs) > 0) {
@@ -727,12 +727,12 @@ void pop_scope(Preprocessor* pp) {
 }
 
 Error* prep_file(Preprocessor* pp, UnicodeString str, UnicodeString path) {
-	auto file = make<PrepFile>(pp->allocator);
+	auto file = grd_make<PrepFile>(pp->allocator);
 	file->path = path;
 	file->str = str;
 	add(&pp->files, file);
 
-	auto node = make_prep_node<PrepFileNode>(pp);
+	auto node = grd_make_prep_node<PrepFileNode>(pp);
 	node->file = file;
 	node->file_offset = 0;
 	push_scope(pp, node);
@@ -751,13 +751,13 @@ Error* prep_file(Preprocessor* pp, UnicodeString str, UnicodeString path) {
 			}
 			cursor = end;
 			pop_scope(pp);
-			auto comment_node = make_prep_node<PrepFileNode>(pp);
+			auto comment_node = grd_make_prep_node<PrepFileNode>(pp);
 			comment_node->file = file;
 			comment_node->file_offset = start;
 			push_scope(pp, comment_node);
 			add(&pp->pr, ' ');
 			pop_scope(pp);
-			auto new_node = make_prep_node<PrepFileNode>(pp);
+			auto new_node = grd_make_prep_node<PrepFileNode>(pp);
 			new_node->file = file;
 			new_node->file_offset = end;
 			push_scope(pp, new_node);
@@ -795,8 +795,8 @@ Error* prep_file(Preprocessor* pp, UnicodeString str, UnicodeString path) {
 	return NULL;
 }
 
-Preprocessor* make_preprocessor(Allocator allocator) {
-	auto pp = make<Preprocessor>(allocator);
+Preprocessor* grd_make_preprocessor(GrdAllocator allocator) {
+	auto pp = grd_make<Preprocessor>(allocator);
 	pp->allocator = allocator;
 	pp->pr.allocator = allocator;
 	pp->files.allocator = allocator;
@@ -805,12 +805,12 @@ Preprocessor* make_preprocessor(Allocator allocator) {
 	return pp;
 }
 
-Generator<AstSymbol*> resolve_symbols(AstNode* node) {
-	if (auto sym = reflect_cast<AstSymbol>(node)) {
+GrdGenerator<AstSymbol*> resolve_symbols(AstNode* node) {
+	if (auto sym = grd_reflect_cast<AstSymbol>(node)) {
 		co_yield sym;
 		co_return;
 	}
-	if (auto var_decl_group = reflect_cast<AstVarDeclGroup>(node)) {
+	if (auto var_decl_group = grd_reflect_cast<AstVarDeclGroup>(node)) {
 		for (auto it: var_decl_group->var_decls) {
 			auto gen = resolve_symbols(it);
 			for (auto sym: gen) {
@@ -821,9 +821,9 @@ Generator<AstSymbol*> resolve_symbols(AstNode* node) {
 }
 
 AstNode* lookup_symbol(CLikeParser* p, UnicodeString name) {
-	for (auto i: reverse(range(len(p->scope)))) { 
+	for (auto i: reverse(grd_range(len(p->scope)))) { 
 		auto scope = p->scope[i];
-		if (auto program = reflect_cast<CLikeProgram>(scope)) {
+		if (auto program = grd_reflect_cast<CLikeProgram>(scope)) {
 			for (auto child: program->globals) {
 				for (auto sym: resolve_symbols(child)) {
 					if (sym->name == name) {
@@ -832,7 +832,7 @@ AstNode* lookup_symbol(CLikeParser* p, UnicodeString name) {
 				}
 			}
 		}
-		if (auto block = reflect_cast<AstBlock>(scope)) {
+		if (auto block = grd_reflect_cast<AstBlock>(scope)) {
 			for (auto child: block->statements) {
 				for (auto sym: resolve_symbols(child)) {
 					if (sym->name == name) {
@@ -841,7 +841,7 @@ AstNode* lookup_symbol(CLikeParser* p, UnicodeString name) {
 				}
 			}
 		}
-		if (auto f = reflect_cast<AstFunction>(scope)) {
+		if (auto f = grd_reflect_cast<AstFunction>(scope)) {
 			for (auto arg: f->args) {
 				if (arg->name == name) {
 					return arg;
@@ -856,7 +856,7 @@ Error* add_global(CLikeParser* p, AstNode* s) {
 	for (auto sym: resolve_symbols(s)) {
 		auto found = lookup_symbol(p, sym->name);
 		if (found) {
-			auto e = make_parser_error(p, current_loc(), "Duplicate global variable '%'"_b, sym->name);
+			auto e = grd_make_parser_error(p, grd_current_loc(), "Duplicate global variable '%'"_b, sym->name);
 			add_site(p, e, CParserErrorToken{ .reg = sym->text_region.value, .color = CPARSER_ERROR_TOKEN_COLOR_REGULAR_RED });
 			if (found->text_region.has_value) {
 				add_text(p, e, U"Previous definition was here:"_b);
@@ -883,41 +883,41 @@ AstType* find_type(CLikeParser* p, UnicodeString name) {
 
 	auto symbol = lookup_symbol(p, name);
 	if (symbol) {
-		if (auto tp = reflect_cast<AstType>(symbol)) {
+		if (auto tp = grd_reflect_cast<AstType>(symbol)) {
 			return tp;
 		}
 	}
 	return NULL;
 }
 
-struct AstPointerType: AstType {
+struct AstGrdPointerType: AstType {
 	AstType*           pointee = NULL;
 	VulkanStorageClass ptr_vk = VulkanStorageClass::Unspecified;
 	MetalAddrSpace     ptr_mtl = MetalAddrSpace::Unspecified;
 
-	REFLECT(AstPointerType) {
-		BASE_TYPE(AstType);
-		MEMBER(pointee);
-		MEMBER(ptr_mtl);
-		MEMBER(ptr_vk);
+	GRD_REFLECT(AstGrdPointerType) {
+		GRD_BASE_TYPE(AstType);
+		GRD_MEMBER(pointee);
+		GRD_MEMBER(ptr_mtl);
+		GRD_MEMBER(ptr_vk);
 	}
 };
 
 struct AstTypeSite: AstNode {
 	AstType* tp = NULL;
 
-	REFLECT(AstTypeSite) {
-		BASE_TYPE(AstNode);
-		MEMBER(tp);
+	GRD_REFLECT(AstTypeSite) {
+		GRD_BASE_TYPE(AstNode);
+		GRD_MEMBER(tp);
 	}
 };
 
-struct AstPointerTypeSite: AstTypeSite {
-	AstPointerTypeSite* pointee = NULL;
+struct AstGrdPointerTypeSite: AstTypeSite {
+	AstGrdPointerTypeSite* pointee = NULL;
 
-	REFLECT(AstPointerTypeSite) {
-		BASE_TYPE(AstTypeSite);
-		MEMBER(pointee);
+	GRD_REFLECT(AstGrdPointerTypeSite) {
+		GRD_BASE_TYPE(AstTypeSite);
+		GRD_MEMBER(pointee);
 	}
 };
 
@@ -927,7 +927,7 @@ struct AstPointerTypeSite: AstTypeSite {
 // 		return *found;
 // 	}
 // 	auto name = sprint_unicode(p->allocator, U"%(*)*"_b, type->name);
-// 	auto ptr = make_ast_symbol<AstPointerType>(p, name, {});
+// 	auto ptr = grd_make_ast_symbol<AstGrdPointerType>(p, name, {});
 // 	ptr->pointee = type;
 // 	put(&p->ptr_types, type, ptr);
 // 	return ptr;
@@ -942,10 +942,10 @@ struct PreType {
 Tuple<PreType, Error*> parse_pre_type(CLikeParser* p) {
 	auto tok = peek(p);
 	auto c_str = encode_utf8(tok.str);
-	defer { c_str.free(); };
+	grd_defer { c_str.free(); };
 	AstType* type = find_type(p, tok.str);
 	if (!type) {
-		return { {}, simple_parser_error(p, current_loc(), tok.reg, U"Could not find type."_b) };
+		return { {}, simple_parser_error(p, grd_current_loc(), tok.reg, U"Could not find type."_b) };
 	}
 	PreType pt = { .t = type };
 	pt.reg = { tok.reg.start, tok.reg.end };
@@ -963,8 +963,8 @@ Tuple<PreType, Error*> parse_pre_type(CLikeParser* p) {
 	return { pt, NULL };
 }
 
-AstPointerType* get_pointer_type(CLikeParser* p, AstType* tp, VulkanStorageClass st_class, MetalAddrSpace mtl_space) {
-	auto ptr = make_ast_node<AstPointerType>(p, tp->text_region);
+AstGrdPointerType* get_pointer_type(CLikeParser* p, AstType* tp, VulkanStorageClass st_class, MetalAddrSpace mtl_space) {
+	auto ptr = grd_make_ast_node<AstGrdPointerType>(p, tp->text_region);
 	ptr->name = sprint_unicode(p->allocator, U"%(*)*"_b, tp->name);
 	ptr->pointee = tp;
 	ptr->size = 8;
@@ -980,7 +980,7 @@ Tuple<AstTypeSite*, Error*> finalize_type(CLikeParser* p, PreType pt, Span<AstAt
 		for (auto attr: attrs) {
 			if (attr->name == "vk_uniform") {
 				if (st_class != VulkanStorageClass::Unspecified) {
-					auto e = make_parser_error(p, current_loc(), "Vulkan storage class must be specified for pointer type only once"_b);
+					auto e = grd_make_parser_error(p, grd_current_loc(), "Vulkan storage class must be specified for pointer type only once"_b);
 					add_site(p, e,
 						CParserErrorToken{
 							.reg = pt.reg,
@@ -993,21 +993,21 @@ Tuple<AstTypeSite*, Error*> finalize_type(CLikeParser* p, PreType pt, Span<AstAt
 			}
 		}
 		if (st_class == VulkanStorageClass::Unspecified) {
-			return { {}, simple_parser_error(p, current_loc(), pt.reg, U"Vulkan storage class must be specified for pointer type."_b) };
+			return { {}, simple_parser_error(p, grd_current_loc(), pt.reg, U"Vulkan storage class must be specified for pointer type."_b) };
 		}
 		// @TODO: implement MetalAddrSpace
 		auto tp = get_pointer_type(p, pt.t, st_class, MetalAddrSpace::Unspecified);
-		auto qt = make_ast_node<AstPointerTypeSite>(p, pt.reg);
+		auto qt = grd_make_ast_node<AstGrdPointerTypeSite>(p, pt.reg);
 		qt->tp = tp;
-		for (auto i: range(pt.pointer_indir_level - 1)) {
-			auto sub = make_ast_node<AstPointerTypeSite>(p, pt.reg);
+		for (auto i: grd_range(pt.pointer_indir_level - 1)) {
+			auto sub = grd_make_ast_node<AstGrdPointerTypeSite>(p, pt.reg);
 			auto sub_tp = get_pointer_type(p, qt->tp, st_class, MetalAddrSpace::Unspecified);
 			sub->tp = sub_tp;
 			qt = sub;
 		}
 		return { qt, NULL };
 	} else {
-		auto qt = make_ast_node<AstPointerTypeSite>(p, pt.reg);
+		auto qt = grd_make_ast_node<AstGrdPointerTypeSite>(p, pt.reg);
 		qt->tp = pt.t;
 		return { qt, NULL };
 	}
@@ -1016,14 +1016,14 @@ Tuple<AstTypeSite*, Error*> finalize_type(CLikeParser* p, PreType pt, Span<AstAt
 Tuple<Token, Error*> parse_ident(CLikeParser* p) {
 	auto tok = peek(p);
 	if (len(tok.str) == 0) {
-		return { {}, simple_parser_error(p, current_loc(), tok.reg, U"Expected an identifier."_b) };
+		return { {}, simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected an identifier."_b) };
 	}
 	if ((tok.str[0] < 'a' || tok.str[0] > 'z') && (tok.str[0] < 'A' || tok.str[0] > 'Z')) {
-		return { {}, simple_parser_error(p, current_loc(), tok.reg, U"First letter of an identifier must be a letter."_b) };
+		return { {}, simple_parser_error(p, grd_current_loc(), tok.reg, U"First letter of an identifier must be a letter."_b) };
 	}
 	for (auto c: tok.str) {
 		if ((c < 'a' || c > 'z') && (c < 'A' || c > 'Z') && (c < '0' || c > '9') && c != '_') {
-			return { {}, simple_parser_error(p, current_loc(), tok.reg, U"Only letters, numbers, and underscores are allowed in identifiers."_b) };
+			return { {}, simple_parser_error(p, grd_current_loc(), tok.reg, U"Only letters, numbers, and underscores are allowed in identifiers."_b) };
 		}
 	}
 	next(p);
@@ -1034,7 +1034,7 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p);
 Tuple<AstExpr*, Error*> parse_expr(CLikeParser* p, s32 min_prec);
 Tuple<Array<AstAttr*>, Error*> parse_attrs(CLikeParser* p);
 
-Error* check_if_attrs_used(CLikeParser* p, Array<AstAttr*> attrs, CodeLocation loc = caller_loc()) {
+Error* check_if_attrs_used(CLikeParser* p, Array<AstAttr*> attrs, GrdCodeLoc loc = grd_caller_loc()) {
 	for (auto attr: attrs) {
 		if (!attr->is_used) {
 			auto e = simple_parser_error(p, loc, attr->text_region, "Attribute '%' is not used."_b, attr->name);
@@ -1046,14 +1046,14 @@ Error* check_if_attrs_used(CLikeParser* p, Array<AstAttr*> attrs, CodeLocation l
 
 Tuple<AstVarDeclGroup*, Error*> parse_var_decl(CLikeParser* p, PreType pt, Token ident_tok, bool is_global) {
 	Array<AstVarDecl*> var_decls = { .allocator = p->allocator };
-	defer { var_decls.free(); };
+	grd_defer { var_decls.free(); };
 
 	auto val_decl_attrs = [&](auto* p, Array<AstAttr*> attrs) -> Error* {
 		for (auto attr: attrs) {
 			if (is_global) {
-				return simple_parser_error(p, current_loc(), attr->text_region, "Global variables cannot have attributes"_b);
+				return simple_parser_error(p, grd_current_loc(), attr->text_region, "Global variables cannot have attributes"_b);
 			} else {
-				return simple_parser_error(p, current_loc(), attr->text_region, "Local variables cannot have attributes"_b);
+				return simple_parser_error(p, grd_current_loc(), attr->text_region, "Local variables cannot have attributes"_b);
 			}
 		}
 		return NULL;
@@ -1072,7 +1072,7 @@ Tuple<AstVarDeclGroup*, Error*> parse_var_decl(CLikeParser* p, PreType pt, Token
 	}
 	auto current_ident = ident_tok;
 	while (true) {
-		auto node = make_ast_node<AstVarDecl>(p, {});
+		auto node = grd_make_ast_node<AstVarDecl>(p, {});
 		node->var_ts = ts;
 		node->name = current_ident.str;
 		node->is_global = is_global;
@@ -1098,7 +1098,7 @@ Tuple<AstVarDeclGroup*, Error*> parse_var_decl(CLikeParser* p, PreType pt, Token
 			return { NULL, e };
 		}
 		if (expr->expr_type != ts->tp) {
-			return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Initializer type mismatch, expected '%' but got '%'.", ts->tp->name, expr->expr_type->name) };
+			return { NULL, simple_parser_error(p, grd_current_loc(), tok.reg, U"Initializer type mismatch, expected '%' but got '%'.", ts->tp->name, expr->expr_type->name) };
 		}
 		for (auto it: var_decls) {
 			it->init = (AstExpr*) expr;
@@ -1107,7 +1107,7 @@ Tuple<AstVarDeclGroup*, Error*> parse_var_decl(CLikeParser* p, PreType pt, Token
 
 	tok = peek(p);
 	if (tok.str != U";"_b) {
-		return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Expected , or ;"_b) };
+		return { NULL, simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected , or ;"_b) };
 	}
 
 	ProgramTextRegion text_region = { pt.reg.start, tok.reg.end };
@@ -1115,7 +1115,7 @@ Tuple<AstVarDeclGroup*, Error*> parse_var_decl(CLikeParser* p, PreType pt, Token
 		it->text_region = text_region;
 	}
 
-	auto node = make_ast_node<AstVarDeclGroup>(p, text_region);
+	auto node = grd_make_ast_node<AstVarDeclGroup>(p, text_region);
 	node->var_decls = var_decls;
 	var_decls = {};
 	return { node, NULL };
@@ -1125,9 +1125,9 @@ struct AstFunctionCall: AstExpr {
 	AstNode*        f;
 	Array<AstExpr*> args;
 
-	REFLECT(AstFunctionCall) {
-		BASE_TYPE(AstExpr);
-		MEMBER(args);
+	GRD_REFLECT(AstFunctionCall) {
+		GRD_BASE_TYPE(AstExpr);
+		GRD_MEMBER(args);
 	}
 };
 
@@ -1162,9 +1162,9 @@ AstOperator* find_postfix_unary_operator(CLikeParser* p, UnicodeString op) {
 Tuple<AstExpr*, Error*> parse_function_call(CLikeParser* p, Token func_token, AstFunction* func) {
 	auto tok = peek(p);
 	if (tok.str != "("_b) {
-		return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Expected ("_b) };
+		return { NULL, simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected ("_b) };
 	}
-	auto call = make_ast_expr<AstFunctionCall>(p, func->return_ts->tp, AST_EXPR_RVALUE, {});
+	auto call = grd_make_ast_expr<AstFunctionCall>(p, func->return_ts->tp, AST_EXPR_RVALUE, {});
 	call->args.allocator = p->allocator;
 	call->f = func;
 	next(p);
@@ -1193,11 +1193,11 @@ struct AstTernary: AstExpr {
 	AstExpr* then;
 	AstExpr* else_;
 
-	REFLECT(AstTernary) {
-		BASE_TYPE(AstExpr);
-		MEMBER(cond);
-		MEMBER(then);
-		MEMBER(else_);
+	GRD_REFLECT(AstTernary) {
+		GRD_BASE_TYPE(AstExpr);
+		GRD_MEMBER(cond);
+		GRD_MEMBER(then);
+		GRD_MEMBER(else_);
 	}
 };
 
@@ -1207,12 +1207,12 @@ struct AstIf: AstNode {
 	AstBlock* else_block = NULL;
 	AstIf*    else_if = NULL;
 
-	REFLECT(AstIf) {
-		BASE_TYPE(AstNode);
-		MEMBER(cond);
-		MEMBER(then);
-		MEMBER(else_block);
-		MEMBER(else_if);
+	GRD_REFLECT(AstIf) {
+		GRD_BASE_TYPE(AstNode);
+		GRD_MEMBER(cond);
+		GRD_MEMBER(then);
+		GRD_MEMBER(else_block);
+		GRD_MEMBER(else_if);
 	}
 };
 
@@ -1253,7 +1253,7 @@ bool is_numeric(AstType* type) {
 
 bool is_pointer(AstType* type) {
 	type = resolve_type_alias(type);
-	if (auto ptr = reflect_cast<AstPointerType>(type)) {
+	if (auto ptr = grd_reflect_cast<AstGrdPointerType>(type)) {
 		return true;
 	}
 	return false;
@@ -1265,7 +1265,7 @@ bool is_array(AstType* type) {
 }
 
 AstType* get_element_type(AstType* type) {
-	if (auto ptr = reflect_cast<AstPointerType>(type)) {
+	if (auto ptr = grd_reflect_cast<AstGrdPointerType>(type)) {
 		return ptr->pointee;
 	}
 	return NULL;
@@ -1274,15 +1274,15 @@ AstType* get_element_type(AstType* type) {
 struct AstVariableAccess: AstExpr {
 	AstVar* var = NULL;
 
-	REFLECT(AstVariableAccess) {
-		BASE_TYPE(AstExpr);
-		MEMBER(var);
+	GRD_REFLECT(AstVariableAccess) {
+		GRD_BASE_TYPE(AstExpr);
+		GRD_MEMBER(var);
 	}
 };
 
 bool is_struct(AstType* type) {
 	type = resolve_type_alias(type);
-	return reflect_cast<AstStructType>(type) != NULL;
+	return grd_reflect_cast<AstStructType>(type) != NULL;
 }
 
 bool is_bool(AstType* type) {
@@ -1304,11 +1304,11 @@ struct AstSwizzleExpr: AstExpr {
 	s32      swizzle[4];
 	s32      swizzle_len = 0;
 
-	REFLECT(AstSwizzleExpr) {
-		BASE_TYPE(AstExpr);
-		MEMBER(lhs);
-		MEMBER(swizzle);
-		MEMBER(swizzle_len);
+	GRD_REFLECT(AstSwizzleExpr) {
+		GRD_BASE_TYPE(AstExpr);
+		GRD_MEMBER(lhs);
+		GRD_MEMBER(swizzle);
+		GRD_MEMBER(swizzle_len);
 	}
 };
 
@@ -1318,7 +1318,7 @@ bool parse_swizzle_ident(CLikeParser* p, UnicodeString ident, s32* swizzle, s32 
 		return false;
 	}
 	bool did_fail = false;
-	for (auto i: range(ident_len)) {
+	for (auto i: grd_range(ident_len)) {
 		if (ident[i] == 'x') {
 			swizzle[i] = 0;
 		} else if (src_len >= 2 && ident[i] == 'y') {
@@ -1335,7 +1335,7 @@ bool parse_swizzle_ident(CLikeParser* p, UnicodeString ident, s32* swizzle, s32 
 	if (!did_fail) {
 		return true;
 	}
-	for (auto i: range(ident_len)) {
+	for (auto i: grd_range(ident_len)) {
 		if (ident[i] == 'r') {
 			swizzle[i] = 0;
 		} else if (src_len >= 2 && ident[i] == 'g') {
@@ -1373,7 +1373,7 @@ Tuple<AstExpr*, Error*> try_parse_swizzle_expr(CLikeParser* p, AstExpr* lhs, Ast
 	}
 
 	int swizzle_len = 0;
-	for (auto i: range(4)) {
+	for (auto i: grd_range(4)) {
 		if (swizzle_idx[i] == -1) {
 			break;
 		}
@@ -1399,19 +1399,19 @@ Tuple<AstExpr*, Error*> try_parse_swizzle_expr(CLikeParser* p, AstExpr* lhs, Ast
 	}
 
 	if (swizzle_len == 1) {
-		auto expr = make_ast_expr<AstVarMemberAccess>(p, swizzle_type, lhs->is_lvalue, text_region);
+		auto expr = grd_make_ast_expr<AstVarMemberAccess>(p, swizzle_type, lhs->is_lvalue, text_region);
 		expr->lhs = lhs;
 		auto member = find_struct_member(p, struct_tp, ident.str);
 		if (!member) {
-			return { NULL, simple_parser_error(p, current_loc(), ident.reg, U"Member '%' not found in struct '%'.", ident.str, lhs->expr_type->name) };
+			return { NULL, simple_parser_error(p, grd_current_loc(), ident.reg, U"Member '%' not found in struct '%'.", ident.str, lhs->expr_type->name) };
 		}
 		expr->member = member;
 		return { expr, NULL };
 	}
 
 	bool is_unique = true;
-	int unique_check[static_array_count(swizzle_idx)] = {};
-	for (auto i: range(swizzle_len)) {
+	int unique_check[grd_static_array_count(swizzle_idx)] = {};
+	for (auto i: grd_range(swizzle_len)) {
 		auto idx = swizzle_idx[i];
 		unique_check[idx]++;
 		if (unique_check[idx] > 1) {
@@ -1419,7 +1419,7 @@ Tuple<AstExpr*, Error*> try_parse_swizzle_expr(CLikeParser* p, AstExpr* lhs, Ast
 		}
 	}
 
-	auto expr = make_ast_expr<AstSwizzleExpr>(p, swizzle_type, lhs->is_lvalue && is_unique, text_region);
+	auto expr = grd_make_ast_expr<AstSwizzleExpr>(p, swizzle_type, lhs->is_lvalue && is_unique, text_region);
 	expr->lhs = lhs;
 	expr->swizzle[0] = swizzle_idx[0];
 	expr->swizzle[1] = swizzle_idx[1];
@@ -1438,10 +1438,10 @@ struct AstStructInitializer: AstExpr {
 	AstType*                   struct_type = NULL;
 	Array<AstStructInitMember> members;
 
-	REFLECT(AstStructInitializer) {
-		BASE_TYPE(AstExpr);
-		MEMBER(struct_type);
-		MEMBER(members);
+	GRD_REFLECT(AstStructInitializer) {
+		GRD_BASE_TYPE(AstExpr);
+		GRD_MEMBER(struct_type);
+		GRD_MEMBER(members);
 	}
 };
 
@@ -1469,7 +1469,7 @@ Tuple<AstExpr*, Error*> typecheck_binary_expr(CLikeParser* p, AstExpr* lhs, AstE
 	}
 
 	if (op->op == ",") {
-		auto node = make_ast_expr<AstBinaryExpr>(p, rhs->expr_type, AST_EXPR_RVALUE, text_region);
+		auto node = grd_make_ast_expr<AstBinaryExpr>(p, rhs->expr_type, AST_EXPR_RVALUE, text_region);
 		node->lhs = lhs;
 		node->rhs = rhs;
 		node->op = op;
@@ -1484,11 +1484,11 @@ Tuple<AstExpr*, Error*> typecheck_binary_expr(CLikeParser* p, AstExpr* lhs, AstE
 			pure_op = find_binary_operator(p, op->op[0, len(op->op) - 1]);
 		}
 		if (!lhs->is_lvalue) {
-			return { NULL, simple_parser_error(p, current_loc(), op_tok.reg, U"Left side of '%' must be an lvalue.", op->op) };
+			return { NULL, simple_parser_error(p, grd_current_loc(), op_tok.reg, U"Left side of '%' must be an lvalue.", op->op) };
 		}
 	}
 	if (lhs->expr_type == find_type(p, U"void"_b)) {
-		return { NULL, simple_parser_error(p, current_loc(), op_tok.reg, U"Cannot apply operator '%' to void", op->op) };
+		return { NULL, simple_parser_error(p, grd_current_loc(), op_tok.reg, U"Cannot apply operator '%' to void", op->op) };
 	}
 	if (is_vector_type(lhs->expr_type)) {
 		if (pure_op->op == "*" ||
@@ -1500,11 +1500,11 @@ Tuple<AstExpr*, Error*> typecheck_binary_expr(CLikeParser* p, AstExpr* lhs, AstE
 			if (rhs->expr_type != find_type(p, U"float"_b) && 
 				rhs->expr_type != find_type(p, U"double"_b) &&
 				lhs->expr_type != rhs->expr_type) {
-				return { NULL, simple_parser_error(p, current_loc(), op_tok.reg, U"Operator '%' for vector requires rhs to be float or double or matching vector type, got '%'. lhs type = '%'", op->op, rhs->expr_type->name, lhs->expr_type->name) };
+				return { NULL, simple_parser_error(p, grd_current_loc(), op_tok.reg, U"Operator '%' for vector requires rhs to be float or double or matching vector type, got '%'. lhs type = '%'", op->op, rhs->expr_type->name, lhs->expr_type->name) };
 			}
 			expr_result_type = lhs->expr_type;
 		} else {
-			auto e = make_parser_error(p, current_loc(), "Operator '%' cannot be applied to '%'.", op->op, lhs->expr_type->name);
+			auto e = grd_make_parser_error(p, grd_current_loc(), "Operator '%' cannot be applied to '%'.", op->op, lhs->expr_type->name);
 
 			add_site(p, e,
 				CParserErrorToken{
@@ -1526,26 +1526,26 @@ Tuple<AstExpr*, Error*> typecheck_binary_expr(CLikeParser* p, AstExpr* lhs, AstE
 	} else {
 		if (pure_op->flags & AST_OP_FLAG_BOOL) {
 			if (!is_bool(lhs->expr_type)) {
-				return { NULL, simple_parser_error(p, current_loc(), op_tok.reg, U"Operator '%' can only be applied to bool types, got '%'.", op->op, lhs->expr_type->name) };
+				return { NULL, simple_parser_error(p, grd_current_loc(), op_tok.reg, U"Operator '%' can only be applied to bool types, got '%'.", op->op, lhs->expr_type->name) };
 			}
 		}
 		if (pure_op->flags & AST_OP_FLAG_INT) {
 			if (!is_integer(lhs->expr_type)) {
-				return { NULL, simple_parser_error(p, current_loc(), op_tok.reg, U"Operator '%' can only be applied to integer types, got '%'.", op->op, lhs->expr_type->name) };
+				return { NULL, simple_parser_error(p, grd_current_loc(), op_tok.reg, U"Operator '%' can only be applied to integer types, got '%'.", op->op, lhs->expr_type->name) };
 			}
 		}
 		if (pure_op->flags & AST_OP_FLAG_PRIMITIVE) {
 			if (!is_primitive(lhs->expr_type)) {
-				return { NULL, simple_parser_error(p, current_loc(), op_tok.reg, U"Operator '%' can only be applied to primitive types, got '%'.", op->op, lhs->expr_type->name) };
+				return { NULL, simple_parser_error(p, grd_current_loc(), op_tok.reg, U"Operator '%' can only be applied to primitive types, got '%'.", op->op, lhs->expr_type->name) };
 			}
 		}
 		if (pure_op->flags & AST_OP_FLAG_NUMERIC) {
 			if (!is_numeric(lhs->expr_type)) {
-				return { NULL, simple_parser_error(p, current_loc(), op_tok.reg, U"Operator '%' can only be applied to numeric types, got '%'.", op->op, lhs->expr_type->name) };
+				return { NULL, simple_parser_error(p, grd_current_loc(), op_tok.reg, U"Operator '%' can only be applied to numeric types, got '%'.", op->op, lhs->expr_type->name) };
 			}
 		}
 		if (lhs->expr_type != rhs->expr_type) {
-			auto e = make_parser_error(p, current_loc(), "Binary expression type mismatch, expected '%' but got '%'", lhs->expr_type->name, rhs->expr_type->name);
+			auto e = grd_make_parser_error(p, grd_current_loc(), "Binary expression type mismatch, expected '%' but got '%'", lhs->expr_type->name, rhs->expr_type->name);
 
 			add_site(p, e,
 				CParserErrorToken{
@@ -1575,9 +1575,9 @@ Tuple<AstExpr*, Error*> typecheck_binary_expr(CLikeParser* p, AstExpr* lhs, AstE
 		}
 	}
 	if (!expr_result_type) {
-		return { NULL, simple_parser_error(p, current_loc(), op_tok.reg, U"Unexpected error: could not determine result type of binary expression '%'.", op->op) };
+		return { NULL, simple_parser_error(p, grd_current_loc(), op_tok.reg, U"Unexpected error: could not determine result type of binary expression '%'.", op->op) };
 	}
-	auto node = make_ast_expr<AstBinaryExpr>(p, expr_result_type, AST_EXPR_RVALUE, text_region);
+	auto node = grd_make_ast_expr<AstBinaryExpr>(p, expr_result_type, AST_EXPR_RVALUE, text_region);
 	node->lhs = lhs;
 	node->rhs = rhs;
 	node->op = op;
@@ -1601,23 +1601,23 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 			}
 		}
 
-		PrimitiveValue lit_value;
-		PrimitiveType* lit_type = NULL;
+		GrdPrimitiveValue lit_value;
+		GrdPrimitiveType* lit_type = NULL;
 		f64 float_val;
 		f64 double_val;
 
 		bool ok = false;
 		if (parse_as_float) {
 			ok = parse_float(lit, &lit_value.f32_value);
-			lit_type = reflect_type_of<f32>()->as<PrimitiveType>();
+			lit_type = grd_reflect_type_of<f32>()->as<GrdPrimitiveType>();
 		} else {
 			ok = parse_float(lit, &lit_value.f64_value);
-			lit_type = reflect_type_of<f64>()->as<PrimitiveType>();
+			lit_type = grd_reflect_type_of<f64>()->as<GrdPrimitiveType>();
 		}
 		if (!ok) {
-			return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Could not parse floating point literal."_b) };
+			return { NULL, simple_parser_error(p, grd_current_loc(), tok.reg, U"Could not parse floating point literal."_b) };
 		}
-		auto literal = make_ast_expr<AstLiteralExpr>(p, find_type(p, parse_as_float ? U"float"_b : U"double"_b), AST_EXPR_RVALUE, tok.reg);
+		auto literal = grd_make_ast_expr<AstLiteralExpr>(p, find_type(p, parse_as_float ? U"float"_b : U"double"_b), AST_EXPR_RVALUE, tok.reg);
 		literal->lit_type = lit_type;
 		literal->lit_value = lit_value;
 		next(p);
@@ -1628,11 +1628,11 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 		s64 u;
 		bool ok = parse_integer(tok.str, &u);
 		if (!ok) {
-			return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Could not parse integer literal."_b) };
+			return { NULL, simple_parser_error(p, grd_current_loc(), tok.reg, U"Could not parse integer literal."_b) };
 		}
-		auto literal = make_ast_expr<AstLiteralExpr>(p, find_type(p, U"int"_b), AST_EXPR_RVALUE, tok.reg);
+		auto literal = grd_make_ast_expr<AstLiteralExpr>(p, find_type(p, U"int"_b), AST_EXPR_RVALUE, tok.reg);
 		literal->lit_value.s64_value = u;
-		literal->lit_type = reflect_type_of(u)->as<PrimitiveType>();
+		literal->lit_type = grd_reflect_type_of(u)->as<GrdPrimitiveType>();
 		next(p);
 		return { literal, NULL };
 	}
@@ -1646,20 +1646,20 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 			return { NULL, e };
 		}
 		if (tok.str == "*") {
-			auto ptr_tp = reflect_cast<AstPointerType>(expr->expr_type);
+			auto ptr_tp = grd_reflect_cast<AstGrdPointerType>(expr->expr_type);
 			if (ptr_tp == NULL) {
-				return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Operator '*' can only be applied to pointer types, got '%'"_b, expr->expr_type->name) };
+				return { NULL, simple_parser_error(p, grd_current_loc(), tok.reg, U"Operator '*' can only be applied to pointer types, got '%'"_b, expr->expr_type->name) };
 			}
-			auto deref = make_ast_expr<AstDerefExpr>(p, ptr_tp->pointee, AST_EXPR_LVALUE, tok.reg);
+			auto deref = grd_make_ast_expr<AstDerefExpr>(p, ptr_tp->pointee, AST_EXPR_LVALUE, tok.reg);
 			deref->lhs = expr;
 			return { deref, NULL };
 		}
 		if (tok.str == "&") {
 			if (!expr->is_lvalue) {
-				return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Operator '&' can only be applied to lvalues.", op.str) };
+				return { NULL, simple_parser_error(p, grd_current_loc(), tok.reg, U"Operator '&' can only be applied to lvalues.", op.str) };
 			}
-			if (reflect_cast<AstSwizzleExpr>(expr)) {
-				auto e = make_parser_error(p, current_loc(), U"Cannot take an address of a swizzle"_b, expr->expr_type->name);
+			if (grd_reflect_cast<AstSwizzleExpr>(expr)) {
+				auto e = grd_make_parser_error(p, grd_current_loc(), U"Cannot take an address of a swizzle"_b, expr->expr_type->name);
 				add_site(p, e,
 					CParserErrorToken{ .reg = tok.reg, .color = CPARSER_ERROR_TOKEN_COLOR_REGULAR_RED },
 					CParserErrorToken{ .reg = expr->text_region, .color = CPARSER_ERROR_TOKEN_COLOR_REGULAR_GREEN }
@@ -1669,19 +1669,19 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 		}
 		if (tok.str == "++" || tok.str == "--") {
 			if (!expr->is_lvalue) {
-				return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Operator '%' can only be applied to lvalues.", op.str) };
+				return { NULL, simple_parser_error(p, grd_current_loc(), tok.reg, U"Operator '%' can only be applied to lvalues.", op.str) };
 			}
 		}
 		if (tok.str == "!" || tok.str == "~") {
 			if (!is_integer(expr->expr_type)) {
-				return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Operator '%' can only be applied to integer types.", op.str) };
+				return { NULL, simple_parser_error(p, grd_current_loc(), tok.reg, U"Operator '%' can only be applied to integer types.", op.str) };
 			}
 		}
 		if (!is_numeric(expr->expr_type)) {
-			return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Operator '%' can only be applied to numeric types, got '%'.", op.str, expr->expr_type->name) };
+			return { NULL, simple_parser_error(p, grd_current_loc(), tok.reg, U"Operator '%' can only be applied to numeric types, got '%'.", op.str, expr->expr_type->name) };
 		}
 		ProgramTextRegion text_region = { op.reg.start, peek(p).reg.start };
-		auto unary = make_ast_expr<AstUnaryExpr>(p, expr->expr_type, AST_EXPR_RVALUE, text_region);
+		auto unary = grd_make_ast_expr<AstUnaryExpr>(p, expr->expr_type, AST_EXPR_RVALUE, text_region);
 		unary->expr = expr;
 		unary->op = unary_op;
 		return { unary, NULL };
@@ -1694,7 +1694,7 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 			return { NULL, e };
 		}
 		if (peek(p).str != ")"_b) {
-			return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Expected ')'.", tok) };
+			return { NULL, simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected ')'.", tok) };
 		}
 		next(p);
 		return { expr, NULL };
@@ -1702,29 +1702,29 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 
 	AstNode* sym = lookup_symbol(p, tok.str);
 	if (!sym) {
-		return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Unknown identifier.") };
+		return { NULL, simple_parser_error(p, grd_current_loc(), tok.reg, U"Unknown identifier.") };
 	}
 	AstExpr* lhs = NULL;
-	if (auto type = reflect_cast<AstType>(sym)) {
+	if (auto type = grd_reflect_cast<AstType>(sym)) {
 		auto initializer_reg_start = tok.reg.start;
 		next(p);
 		if (peek(p).str == "("_b) {
 			next(p);
-			auto struct_tp = reflect_cast<AstStructType>(type);
+			auto struct_tp = grd_reflect_cast<AstStructType>(type);
 			if (!struct_tp) {
-				return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Expected struct type but got '%'"_b, type->name) };
+				return { NULL, simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected struct type but got '%'"_b, type->name) };
 			}
 			s64 member_index = 0;
 			Array<AstExpr*> args = { .allocator = p->allocator };
-			defer { args.free(); };
+			grd_defer { args.free(); };
 			while (true) {
 				auto tok = peek(p);
 				if (tok.str == ")"_b) {
 					if (len(args) != len(struct_tp->members)) {
-						return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Expected % arguments in initializer but got '%'.", len(struct_tp->members), len(args)) };
+						return { NULL, simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected % arguments in initializer but got '%'.", len(struct_tp->members), len(args)) };
 					}
 					ProgramTextRegion text_region = { initializer_reg_start, tok.reg.end };
-					auto node = make_ast_expr<AstStructInitializer>(p, type, AST_EXPR_RVALUE, text_region);
+					auto node = grd_make_ast_expr<AstStructInitializer>(p, type, AST_EXPR_RVALUE, text_region);
 					node->struct_type = type;
 					node->members.allocator = p->allocator;
 					s64 idx = 0;
@@ -1748,11 +1748,11 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 					return { NULL, e };
 				}
 				if (member_index >= len(struct_tp->members)) {
-					return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Exceeded arguments count in initializer, struct '%' has % members.", type->name, len(struct_tp->members)) };
+					return { NULL, simple_parser_error(p, grd_current_loc(), tok.reg, U"Exceeded arguments count in initializer, struct '%' has % members.", type->name, len(struct_tp->members)) };
 				}
 				auto member = struct_tp->members[member_index];
 				if (member->member_ts->tp != expr->expr_type) {
-					return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Initializer type mismatch, expected '%' but got '%'.", member->member_ts->tp->name, expr->expr_type->name) };
+					return { NULL, simple_parser_error(p, grd_current_loc(), tok.reg, U"Initializer type mismatch, expected '%' but got '%'.", member->member_ts->tp->name, expr->expr_type->name) };
 				}
 				add(&args, expr);
 				member_index += 1;
@@ -1761,15 +1761,15 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 				}
 			}
 		} else {
-			return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Expected struct initializer, got '%'.", tok.str) };
+			return { NULL, simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected struct initializer, got '%'.", tok.str) };
 		}
-	} else if (auto var = reflect_cast<AstVar>(sym)) {
+	} else if (auto var = grd_reflect_cast<AstVar>(sym)) {
 		auto reg = tok.reg;
 		next(p);
-		auto expr = make_ast_expr<AstVariableAccess>(p, var->var_ts->tp, AST_EXPR_LVALUE, reg);
+		auto expr = grd_make_ast_expr<AstVariableAccess>(p, var->var_ts->tp, AST_EXPR_LVALUE, reg);
 		expr->var = var;
 		lhs = expr;
-	} else if (auto func = reflect_cast<AstFunction>(sym)) {
+	} else if (auto func = grd_reflect_cast<AstFunction>(sym)) {
 		next(p);
 		auto [call, e] = parse_function_call(p, tok, func);
 		if (e) {
@@ -1777,7 +1777,7 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 		}
 		lhs = call;
 	} else {
-		return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Expected type or variable"_b) };
+		return { NULL, simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected type or variable"_b) };
 	}
 
 	while (true) {
@@ -1787,10 +1787,10 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 		if (postfix_op) {
 			if (tok.str == "++"_b || tok.str == "--"_b) {
 				if (!is_numeric(lhs->expr_type)) {
-					return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Operator '%' can only be applied to numeric types. Got '%'.", tok.str, lhs->expr_type->name) };
+					return { NULL, simple_parser_error(p, grd_current_loc(), tok.reg, U"Operator '%' can only be applied to numeric types. Got '%'.", tok.str, lhs->expr_type->name) };
 				}
 				if (!lhs->is_lvalue) {
-					return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Operator '%' can only be applied to lvalues.", tok.str) };
+					return { NULL, simple_parser_error(p, grd_current_loc(), tok.reg, U"Operator '%' can only be applied to lvalues.", tok.str) };
 				}
 			}
 			next(p);
@@ -1798,7 +1798,7 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 			if (lhs->text_region.has_value) {
 				text_region.start = lhs->text_region.value.start;
 			}
-			auto node = make_ast_expr<AstUnaryExpr>(p, lhs->expr_type, AST_EXPR_RVALUE, text_region);
+			auto node = grd_make_ast_expr<AstUnaryExpr>(p, lhs->expr_type, AST_EXPR_RVALUE, text_region);
 			node->expr = lhs;
 			node->op = postfix_op;
 			lhs = node;
@@ -1806,9 +1806,9 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 		}
 		if (tok.str == "("_b) {
 			// @TODO: support calling on function pointers.
-			auto func = reflect_cast<AstFunction>(lhs);
+			auto func = grd_reflect_cast<AstFunction>(lhs);
 			if (!func) {
-				return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Expected a function, got '%'"_b, lhs->type->name) };
+				return { NULL, simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected a function, got '%'"_b, lhs->type->name) };
 			}
 			auto [call, e] = parse_function_call(p, tok, func);
 			if (e) {
@@ -1819,16 +1819,16 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 		}
 		if (tok.str == "."_b) {
 			AstStructType* access_tp = NULL;
-			if (auto struct_tp = reflect_cast<AstStructType>(lhs->expr_type)) {
+			if (auto struct_tp = grd_reflect_cast<AstStructType>(lhs->expr_type)) {
 				access_tp = struct_tp;
-			} else if (auto ptr_tp = reflect_cast<AstPointerType>(lhs->expr_type)) {
-				if (auto struct_tp = reflect_cast<AstStructType>(ptr_tp->pointee)) {
+			} else if (auto ptr_tp = grd_reflect_cast<AstGrdPointerType>(lhs->expr_type)) {
+				if (auto struct_tp = grd_reflect_cast<AstStructType>(ptr_tp->pointee)) {
 					access_tp = struct_tp;
 				} else {
-					return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Expected struct type but got '%'"_b, ptr_tp->pointee->name) };
+					return { NULL, simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected struct type but got '%'"_b, ptr_tp->pointee->name) };
 				}
 			} else {
-				return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Expected a struct, got '%'"_b, lhs->expr_type->name) };
+				return { NULL, simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected a struct, got '%'"_b, lhs->expr_type->name) };
 			}
 			next(p);
 			auto [ident, e] = parse_ident(p);
@@ -1847,13 +1847,13 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 
 			auto member = find_struct_member(p, access_tp, ident.str);
 			if (!member) {
-				return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Member '%' not found in struct '%'.", ident.str, lhs->expr_type->name) };
+				return { NULL, simple_parser_error(p, grd_current_loc(), tok.reg, U"Member '%' not found in struct '%'.", ident.str, lhs->expr_type->name) };
 			}
 			ProgramTextRegion text_region = { ident.reg.start, ident.reg.end };
 			if (lhs->text_region.has_value) {
 				text_region.start = lhs->text_region.value.start;
 			}
-			auto node = make_ast_expr<AstVarMemberAccess>(p, member->member_ts->tp, lhs->is_lvalue, text_region);
+			auto node = grd_make_ast_expr<AstVarMemberAccess>(p, member->member_ts->tp, lhs->is_lvalue, text_region);
 			node->lhs = lhs;
 			node->member = member;
 			lhs = node;
@@ -1862,7 +1862,7 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 		if (tok.str == "["_b) {
 			bool ok = is_pointer(lhs->expr_type) || is_array(lhs->expr_type);
 			if (!ok) {
-				return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Expected an array or pointer, got '%'"_b, lhs->expr_type->name) };
+				return { NULL, simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected an array or pointer, got '%'"_b, lhs->expr_type->name) };
 			}
 			next(p);
 			auto [expr, e] = parse_expr(p, 0);
@@ -1870,10 +1870,10 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 				return { NULL, e };
 			}
 			if (!is_integer(expr->expr_type)) {
-				return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Array index must be an integer, got '%'"_b, expr->expr_type->name) };
+				return { NULL, simple_parser_error(p, grd_current_loc(), tok.reg, U"Array index must be an integer, got '%'"_b, expr->expr_type->name) };
 			}
 			if (peek(p).str != "]"_b) {
-				return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Expected a ]"_b) };
+				return { NULL, simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected a ]"_b) };
 			}
 			next(p);
 			auto element_type = get_element_type(lhs->expr_type);
@@ -1884,7 +1884,7 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 			if (lhs->text_region.has_value) {
 				text_region.start = lhs->text_region.value.start;
 			}
-			auto node = make_ast_expr<AstArrayAccess>(p, element_type, AST_EXPR_LVALUE, text_region);
+			auto node = grd_make_ast_expr<AstArrayAccess>(p, element_type, AST_EXPR_LVALUE, text_region);
 			node->lhs = lhs;
 			node->index = expr;
 			lhs = node;
@@ -1919,7 +1919,7 @@ Tuple<AstExpr*, Error*> parse_expr(CLikeParser* p, s32 min_prec) {
 			}
 			auto tok = peek(p);
 			if (tok.str != ":"_b) {
-				return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Expected :"_b) };
+				return { NULL, simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected :"_b) };
 			}
 			next(p);
 			auto [else_expr, e3] = parse_expr(p, (op->flags & AST_OP_FLAG_LEFT_ASSOC) ? op->prec + 1 : op->prec);
@@ -1927,7 +1927,7 @@ Tuple<AstExpr*, Error*> parse_expr(CLikeParser* p, s32 min_prec) {
 				return { NULL, e3 };
 			}
 			if (lhs->expr_type != else_expr->expr_type) {
-				return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Ternary expression type mismatch, expected '%' but got '%'.", lhs->expr_type->name, else_expr->expr_type->name) };
+				return { NULL, simple_parser_error(p, grd_current_loc(), tok.reg, U"Ternary expression type mismatch, expected '%' but got '%'.", lhs->expr_type->name, else_expr->expr_type->name) };
 			}
 			ProgramTextRegion text_region = { tok.reg.start, peek(p).reg.end };
 			if (lhs->text_region.has_value) {
@@ -1939,7 +1939,7 @@ Tuple<AstExpr*, Error*> parse_expr(CLikeParser* p, s32 min_prec) {
 			if (else_expr->text_region.has_value) {
 				text_region.end = else_expr->text_region.value.end;
 			}
-			auto node = make_ast_expr<AstTernary>(p, lhs->expr_type, AST_EXPR_RVALUE, text_region);
+			auto node = grd_make_ast_expr<AstTernary>(p, lhs->expr_type, AST_EXPR_RVALUE, text_region);
 			node->cond = lhs;
 			node->then = then_expr;
 			node->else_ = else_expr;
@@ -1967,15 +1967,15 @@ Tuple<AstBlock*, Error*> parse_block_or_one_stmt(CLikeParser* p);
 
 Tuple<s64, Error*> eval_const_int_inner(AstExpr* expr) {
 	auto p = expr->p;
-	if (auto i = reflect_cast<AstLiteralExpr>(expr)) {
-		if (i->lit_type == reflect_type_of<s64>()) {
+	if (auto i = grd_reflect_cast<AstLiteralExpr>(expr)) {
+		if (i->lit_type == grd_reflect_type_of<s64>()) {
 			return { i->lit_value.s64_value, NULL };
-		} else if (i->lit_type == reflect_type_of<s32>()) {
+		} else if (i->lit_type == grd_reflect_type_of<s32>()) {
 			return { i->lit_value.s32_value, NULL };
 		} else {
-			return { 0, simple_parser_error(p, current_loc(), expr->text_region, "Expected s32 or s64 literal, got '%*'", i->lit_type->name) };
+			return { 0, simple_parser_error(p, grd_current_loc(), expr->text_region, "Expected s32 or s64 literal, got '%*'", i->lit_type->name) };
 		}
-	} else if (auto i = reflect_cast<AstUnaryExpr>(expr)) {
+	} else if (auto i = grd_reflect_cast<AstUnaryExpr>(expr)) {
 		if (i->op->op == "-"_b) {
 			auto [v, e] = eval_const_int_inner(i->expr);
 			if (e) {
@@ -1983,10 +1983,10 @@ Tuple<s64, Error*> eval_const_int_inner(AstExpr* expr) {
 			}
 			return { -v, NULL };
 		} else {
-			return { 0, simple_parser_error(p, current_loc(), expr->text_region, "Unexpected unary operator '%*'", i->op->op) };
+			return { 0, simple_parser_error(p, grd_current_loc(), expr->text_region, "Unexpected unary operator '%*'", i->op->op) };
 		}
 	} else {
-		return { 0, simple_parser_error(p, current_loc(), expr->text_region, "Expected literal, got '%*'", expr->type->name) };
+		return { 0, simple_parser_error(p, grd_current_loc(), expr->text_region, "Expected literal, got '%*'", expr->type->name) };
 	}
 }
 
@@ -1996,10 +1996,10 @@ Tuple<s64, Error*> eval_const_int(AstExpr* expr, s64 min, s64 max_inclusive) {
 		return { 0, e };
 	}
 	if (v < min) {
-		return { 0, simple_parser_error(expr->p, current_loc(), expr->text_region, "Expected >= %, got %.", min, v) };
+		return { 0, simple_parser_error(expr->p, grd_current_loc(), expr->text_region, "Expected >= %, got %.", min, v) };
 	}
 	if (v > max_inclusive) {
-		return { 0, simple_parser_error(expr->p, current_loc(), expr->text_region, "Expected <= %, got %.", max_inclusive, v) };
+		return { 0, simple_parser_error(expr->p, grd_current_loc(), expr->text_region, "Expected <= %, got %.", max_inclusive, v) };
 	}
 	return { v, NULL };
 }
@@ -2007,21 +2007,21 @@ Tuple<s64, Error*> eval_const_int(AstExpr* expr, s64 min, s64 max_inclusive) {
 struct MtlBufferIdxAttr: AstAttr {
 	s64 index = 0;
 
-	REFLECT(MtlBufferIdxAttr) {
-		BASE_TYPE(AstAttr);
-		MEMBER(index);
+	GRD_REFLECT(MtlBufferIdxAttr) {
+		GRD_BASE_TYPE(AstAttr);
+		GRD_MEMBER(index);
 	}
 };
 
 struct MtlBufferAttr: MtlBufferIdxAttr {
-	REFLECT(MtlBufferAttr) {
-		BASE_TYPE(MtlBufferIdxAttr);
+	GRD_REFLECT(MtlBufferAttr) {
+		GRD_BASE_TYPE(MtlBufferIdxAttr);
 	}
 };
 
 struct MtlConstantAttr: MtlBufferIdxAttr {
-	REFLECT(MtlConstantAttr) {
-		BASE_TYPE(MtlBufferIdxAttr);
+	GRD_REFLECT(MtlConstantAttr) {
+		GRD_BASE_TYPE(MtlBufferIdxAttr);
 	}
 };
 
@@ -2029,56 +2029,56 @@ struct VkSetBindingAttr: AstAttr {
 	s64 set = 0;
 	s64 binding = 0;
 
-	REFLECT(VkSetBindingAttr) {
-		BASE_TYPE(AstAttr);
-		MEMBER(set);
-		MEMBER(binding);
+	GRD_REFLECT(VkSetBindingAttr) {
+		GRD_BASE_TYPE(AstAttr);
+		GRD_MEMBER(set);
+		GRD_MEMBER(binding);
 	}
 };
 
 struct VkUniformAttr: VkSetBindingAttr {
-	REFLECT(VkUniformAttr) {
-		BASE_TYPE(VkSetBindingAttr);
+	GRD_REFLECT(VkUniformAttr) {
+		GRD_BASE_TYPE(VkSetBindingAttr);
 	}
 };
 
 
 struct PositionAttr: AstAttr {
-	REFLECT(PositionAttr) {
-		BASE_TYPE(AstAttr);
+	GRD_REFLECT(PositionAttr) {
+		GRD_BASE_TYPE(AstAttr);
 	}
 };
 
 struct FragmentAttr: AstAttr {
-	REFLECT(FragmentAttr) {
-		BASE_TYPE(AstAttr);
+	GRD_REFLECT(FragmentAttr) {
+		GRD_BASE_TYPE(AstAttr);
 	}
 };
 
 struct VertexAttr: AstAttr {
-	REFLECT(VertexAttr) {
-		BASE_TYPE(AstAttr);
+	GRD_REFLECT(VertexAttr) {
+		GRD_BASE_TYPE(AstAttr);
 	}
 };
 
 struct StageInAttr: AstAttr {
-	REFLECT(StageInAttr) {
-		BASE_TYPE(AstAttr);
+	GRD_REFLECT(StageInAttr) {
+		GRD_BASE_TYPE(AstAttr);
 	}
 };
 
 struct ColorAttr: AstAttr {
 	s64 idx = 0;
 
-	REFLECT(ColorAttr) {
-		BASE_TYPE(AstAttr);
-		MEMBER(idx);
+	GRD_REFLECT(ColorAttr) {
+		GRD_BASE_TYPE(AstAttr);
+		GRD_MEMBER(idx);
 	}
 };
 
 template <typename T>
-T* make_ast_attr(CLikeParser* p, Token name, Array<AstExpr*> args, ProgramTextRegion reg) {
-	auto node = make_ast_node<T>(p, reg);
+T* grd_make_ast_attr(CLikeParser* p, Token name, Array<AstExpr*> args, ProgramTextRegion reg) {
+	auto node = grd_make_ast_node<T>(p, reg);
 	node->name = name.str;
 	node->args = args;
 	return node;
@@ -2086,7 +2086,7 @@ T* make_ast_attr(CLikeParser* p, Token name, Array<AstExpr*> args, ProgramTextRe
 
 Tuple<AstAttr*, Error*> parse_attr(CLikeParser* p, Token name, Array<AstExpr*> args, ProgramTextRegion reg) {
 	if (name.str == "vk_uniform") {
-		auto attr = make_ast_attr<VkUniformAttr>(p, name, args, reg);
+		auto attr = grd_make_ast_attr<VkUniformAttr>(p, name, args, reg);
 		if (len(args) == 0) {
 
 		} else if (len(args) == 1) {
@@ -2107,11 +2107,11 @@ Tuple<AstAttr*, Error*> parse_attr(CLikeParser* p, Token name, Array<AstExpr*> a
 			}
 			attr->binding = v2;
 		} else {
-			return { NULL, simple_parser_error(p, current_loc(), reg, "Expected (set, binding) or (set).") };
+			return { NULL, simple_parser_error(p, grd_current_loc(), reg, "Expected (set, binding) or (set).") };
 		}
 		return { attr, NULL };
 	} else if (name.str == "mtl_buffer") {
-		auto attr = make_ast_attr<MtlBufferAttr>(p, name, args, reg);
+		auto attr = grd_make_ast_attr<MtlBufferAttr>(p, name, args, reg);
 		if (len(args) == 0) {
 
 		} else if (len(args) == 1) {
@@ -2121,11 +2121,11 @@ Tuple<AstAttr*, Error*> parse_attr(CLikeParser* p, Token name, Array<AstExpr*> a
 			}
 			attr->index = v;
 		} else {
-			return { NULL, simple_parser_error(p, current_loc(), reg, "Expected (index).") };
+			return { NULL, simple_parser_error(p, grd_current_loc(), reg, "Expected (index).") };
 		}
 		return { attr, NULL };
 	} else if (name.str == "mtl_constant") {
-		auto attr = make_ast_attr<MtlConstantAttr>(p, name, args, reg);
+		auto attr = grd_make_ast_attr<MtlConstantAttr>(p, name, args, reg);
 		if (len(args) == 0) {
 
 		} else if (len(args) == 1) {
@@ -2135,40 +2135,40 @@ Tuple<AstAttr*, Error*> parse_attr(CLikeParser* p, Token name, Array<AstExpr*> a
 			}
 			attr->index = v;
 		} else {
-			return { NULL, simple_parser_error(p, current_loc(), reg, "Expected (index).") };
+			return { NULL, simple_parser_error(p, grd_current_loc(), reg, "Expected (index).") };
 		}
 		return { attr, NULL };
 	} else if (name.str == "position") {
 		if (len(args) != 0) {
-			return { NULL, simple_parser_error(p, current_loc(), name.reg, "Expected 0 arguments for position attribute, got %"_b, len(args)) };
+			return { NULL, simple_parser_error(p, grd_current_loc(), name.reg, "Expected 0 arguments for position attribute, got %"_b, len(args)) };
 		}
-		auto attr = make_ast_attr<PositionAttr>(p, name, args, reg);
+		auto attr = grd_make_ast_attr<PositionAttr>(p, name, args, reg);
 		return { attr, NULL };
 	} else if (name.str == "fragment") {
 		if (len(args) != 0) {
-			return { NULL, simple_parser_error(p, current_loc(), name.reg, "Expected 0 arguments for fragment attribute, got %"_b, len(args)) };
+			return { NULL, simple_parser_error(p, grd_current_loc(), name.reg, "Expected 0 arguments for fragment attribute, got %"_b, len(args)) };
 		}
-		auto attr = make_ast_attr<FragmentAttr>(p, name, args, reg);
+		auto attr = grd_make_ast_attr<FragmentAttr>(p, name, args, reg);
 		return { attr, NULL };
 	} else if (name.str == "stage_in") {
 		if (len(args) != 0) {
-			return { NULL, simple_parser_error(p, current_loc(), name.reg, "Expected 0 arguments for stage_in attribute, got %"_b, len(args)) };
+			return { NULL, simple_parser_error(p, grd_current_loc(), name.reg, "Expected 0 arguments for stage_in attribute, got %"_b, len(args)) };
 		}
-		auto attr = make_ast_attr<StageInAttr>(p, name, args, reg);
+		auto attr = grd_make_ast_attr<StageInAttr>(p, name, args, reg);
 		return { attr, NULL };
 	} else if (name.str == "color") {
 		if (len(args) != 1) {
-			return { NULL, simple_parser_error(p, current_loc(), name.reg, "Expected 1 argument for color attribute, got %"_b, len(args)) };
+			return { NULL, simple_parser_error(p, grd_current_loc(), name.reg, "Expected 1 argument for color attribute, got %"_b, len(args)) };
 		}
 		auto [v, e] = eval_const_int(args[0], 0, s64_max);
 		if (e) {
 			return { NULL, e };
 		}
-		auto attr = make_ast_attr<ColorAttr>(p, name, args, reg);
+		auto attr = grd_make_ast_attr<ColorAttr>(p, name, args, reg);
 		attr->idx = v;
 		return { attr, NULL };
 	} else {
-		return { NULL, simple_parser_error(p, current_loc(), name.reg, "Unknown attribute") };
+		return { NULL, simple_parser_error(p, grd_current_loc(), name.reg, "Unknown attribute") };
 	}
 }
 
@@ -2197,7 +2197,7 @@ Tuple<Array<AstAttr*>, Error*> parse_attrs(CLikeParser* p) {
 				}
 				if (len(args) > 0) {
 					if (tok.str != ",") {
-						return { {}, simple_parser_error(p, current_loc(), tok.reg, U"Expected ','"_b) };
+						return { {}, simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected ','"_b) };
 					}
 					next(p);
 				}
@@ -2211,7 +2211,7 @@ Tuple<Array<AstAttr*>, Error*> parse_attrs(CLikeParser* p) {
 		}
 		auto end_tok = peek(p);
 		if (end_tok.str != "]]") {
-			return { {}, simple_parser_error(p, current_loc(), tok.reg, U"Expected ]]"_b) };
+			return { {}, simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected ]]"_b) };
 		}
 		next(p);
 		ProgramTextRegion reg = { start_tok.reg.start, end_tok.reg.end };
@@ -2226,7 +2226,7 @@ Tuple<Array<AstAttr*>, Error*> parse_attrs(CLikeParser* p) {
 
 Tuple<AstIf*, Error*> parse_if(CLikeParser* p, Token if_tok) {
 	if (peek(p).str != "("_b) {
-		return { NULL, simple_parser_error(p, current_loc(), peek(p).reg, U"Expected ("_b) };
+		return { NULL, simple_parser_error(p, grd_current_loc(), peek(p).reg, U"Expected ("_b) };
 	}
 	next(p);
 	auto [cond, e] = parse_expr(p, 0);
@@ -2238,10 +2238,10 @@ Tuple<AstIf*, Error*> parse_if(CLikeParser* p, Token if_tok) {
 		if (cond->text_region.has_value) {
 			error_reg = cond->text_region.value;
 		}
-		return { NULL, simple_parser_error(p, current_loc(), error_reg, U"Condition must be bool, but it's '%'"_b, cond->expr_type->name) };
+		return { NULL, simple_parser_error(p, grd_current_loc(), error_reg, U"Condition must be bool, but it's '%'"_b, cond->expr_type->name) };
 	}
 	if (peek(p).str != ")"_b) {
-		return { NULL, simple_parser_error(p, current_loc(), peek(p).reg, U"Expected )"_b) };
+		return { NULL, simple_parser_error(p, grd_current_loc(), peek(p).reg, U"Expected )"_b) };
 	}
 	next(p);
 	auto [then, e2] = parse_block_or_one_stmt(p);
@@ -2252,7 +2252,7 @@ Tuple<AstIf*, Error*> parse_if(CLikeParser* p, Token if_tok) {
 	if (then->text_region.has_value) {
 		reg.end = then->text_region.value.end;
 	}
-	auto node = make_ast_node<AstIf>(p, reg);
+	auto node = grd_make_ast_node<AstIf>(p, reg);
 	node->cond = cond;
 	node->then = then;
 	auto tok = peek(p);
@@ -2294,11 +2294,11 @@ Tuple<AstBlock*, Error*> parse_block_or_one_stmt(CLikeParser* p) {
 		}
 		if (!semicolon_opt) {
 			if (peek(p).str != U";"_b) {
-				return { NULL, simple_parser_error(p, current_loc(), peek(p).reg, U"Expected ;"_b) };
+				return { NULL, simple_parser_error(p, grd_current_loc(), peek(p).reg, U"Expected ;"_b) };
 			}
 			next(p);
 		}
-		auto block = make_ast_node<AstBlock>(p, stmt->text_region);
+		auto block = grd_make_ast_node<AstBlock>(p, stmt->text_region);
 		add(&block->statements, stmt);
 		return { block, NULL };
 	}
@@ -2310,18 +2310,18 @@ struct AstFor: AstNode {
 	AstExpr*  incr_expr = NULL;
 	AstBlock* body = NULL;
 
-	REFLECT(AstFor) {
-		BASE_TYPE(AstNode);
-		MEMBER(init_expr);
-		MEMBER(cond_expr);
-		MEMBER(incr_expr);
-		MEMBER(body);
+	GRD_REFLECT(AstFor) {
+		GRD_BASE_TYPE(AstNode);
+		GRD_MEMBER(init_expr);
+		GRD_MEMBER(cond_expr);
+		GRD_MEMBER(incr_expr);
+		GRD_MEMBER(body);
 	}
 };
 
 Tuple<AstNode*, Error*> parse_for(CLikeParser* p, Token for_tok) {
 	if (peek(p).str != "("_b) {
-		return { NULL, simple_parser_error(p, current_loc(), peek(p).reg, U"Expected ("_b) };
+		return { NULL, simple_parser_error(p, grd_current_loc(), peek(p).reg, U"Expected ("_b) };
 	}
 	next(p);
 	auto [init_expr, e] = parse_expr(p, 0);
@@ -2329,7 +2329,7 @@ Tuple<AstNode*, Error*> parse_for(CLikeParser* p, Token for_tok) {
 		return { NULL, e };
 	}
 	if (peek(p).str != ";"_b) {
-		return { NULL, simple_parser_error(p, current_loc(), peek(p).reg, U"Expected ;"_b) };
+		return { NULL, simple_parser_error(p, grd_current_loc(), peek(p).reg, U"Expected ;"_b) };
 	}
 	next(p);
 	auto [cond_expr, e2] = parse_expr(p, 0);
@@ -2337,7 +2337,7 @@ Tuple<AstNode*, Error*> parse_for(CLikeParser* p, Token for_tok) {
 		return { NULL, e2 };
 	}
 	if (peek(p).str != ";"_b) {
-		return { NULL, simple_parser_error(p, current_loc(), peek(p).reg, U"Expected ;"_b) };
+		return { NULL, simple_parser_error(p, grd_current_loc(), peek(p).reg, U"Expected ;"_b) };
 	}
 	next(p);
 	auto [incr_expr, e3] = parse_expr(p, 0);
@@ -2345,7 +2345,7 @@ Tuple<AstNode*, Error*> parse_for(CLikeParser* p, Token for_tok) {
 		return { NULL, e3 };
 	}
 	if (peek(p).str != ")"_b) {
-		return { NULL, simple_parser_error(p, current_loc(), peek(p).reg, U"Expected )"_b) };
+		return { NULL, simple_parser_error(p, grd_current_loc(), peek(p).reg, U"Expected )"_b) };
 	}
 	next(p);
 	auto [body, e4] = parse_block_or_one_stmt(p);
@@ -2356,7 +2356,7 @@ Tuple<AstNode*, Error*> parse_for(CLikeParser* p, Token for_tok) {
 	if (body->text_region.has_value) {
 		text_region.end = body->text_region.value.end;
 	}
-	auto node = make_ast_node<AstFor>(p, text_region);
+	auto node = grd_make_ast_node<AstFor>(p, text_region);
 	node->init_expr = init_expr;
 	node->cond_expr = cond_expr;
 	node->incr_expr = incr_expr;
@@ -2365,9 +2365,9 @@ Tuple<AstNode*, Error*> parse_for(CLikeParser* p, Token for_tok) {
 }
 
 AstFunction* get_current_function(CLikeParser* p) {
-	for (auto i: reverse(range(len(p->scope)))) { 
+	for (auto i: reverse(grd_range(len(p->scope)))) { 
 		auto scope = p->scope[i];
-		if (auto f = reflect_cast<AstFunction>(scope)) {
+		if (auto f = grd_reflect_cast<AstFunction>(scope)) {
 			return f;
 		}
 	}
@@ -2377,9 +2377,9 @@ AstFunction* get_current_function(CLikeParser* p) {
 struct AstReturn: AstNode {
 	AstExpr* rhs = NULL;
 
-	REFLECT(AstReturn) {
-		BASE_TYPE(AstNode);
-		MEMBER(rhs);
+	GRD_REFLECT(AstReturn) {
+		GRD_BASE_TYPE(AstNode);
+		GRD_MEMBER(rhs);
 	}
 };
 
@@ -2402,7 +2402,7 @@ Tuple<AstNode*, Error*, bool> parse_stmt(CLikeParser* p) {
 	} else if (type_tok.str == "return"_b) {
 		auto f = get_current_function(p);
 		if (!f) {
-			return { NULL, simple_parser_error(p, current_loc(), type_tok.reg, U"return must be inside a function"_b) };
+			return { NULL, simple_parser_error(p, grd_current_loc(), type_tok.reg, U"return must be inside a function"_b) };
 		}
 		next(p);
 
@@ -2414,14 +2414,14 @@ Tuple<AstNode*, Error*, bool> parse_stmt(CLikeParser* p) {
 			}
 			rhs = expr;
 			if (f->return_ts->tp != rhs->expr_type) {
-				return { NULL, simple_parser_error(p, current_loc(), rhs->text_region, U"Expected return type '%' but got '%'"_b, f->return_ts->tp->name, rhs->expr_type->name) };
+				return { NULL, simple_parser_error(p, grd_current_loc(), rhs->text_region, U"Expected return type '%' but got '%'"_b, f->return_ts->tp->name, rhs->expr_type->name) };
 			}
 		}
 		ProgramTextRegion reg = type_tok.reg;
 		if (rhs->text_region.has_value) {
 			reg.end = rhs->text_region.value.end;
 		}
-		auto node = make_ast_node<AstReturn>(p, reg);
+		auto node = grd_make_ast_node<AstReturn>(p, reg);
 		node->rhs = rhs;
 		return { node, NULL };
 	}
@@ -2449,13 +2449,13 @@ Tuple<AstNode*, Error*, bool> parse_stmt(CLikeParser* p) {
 Tuple<AstBlock*, Error*> parse_block(CLikeParser* p) {
 	auto tok = peek(p);
 	if (tok.str != U"{"_b) {
-		return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Expected {"_b) };
+		return { NULL, simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected {"_b) };
 	}
 	next(p);
-	auto block = make_ast_node<AstBlock>(p, {});
+	auto block = grd_make_ast_node<AstBlock>(p, {});
 	block->statements.allocator = p->allocator;
 	add(&p->scope, block);
-	defer { pop(&p->scope); };
+	grd_defer { pop(&p->scope); };
 
 	s64 region_end = -1;
 	
@@ -2472,7 +2472,7 @@ Tuple<AstBlock*, Error*> parse_block(CLikeParser* p) {
 		}
 		if (!semicolon_opt) {
 			if (peek(p).str != U";"_b) {
-				return { NULL, simple_parser_error(p, current_loc(), peek(p).reg, U"Expected ;"_b) };
+				return { NULL, simple_parser_error(p, grd_current_loc(), peek(p).reg, U"Expected ;"_b) };
 			}
 			next(p);
 		}
@@ -2484,8 +2484,8 @@ Tuple<AstBlock*, Error*> parse_block(CLikeParser* p) {
 	return { block, NULL };
 }
 
-Error* make_double_site_error(CLikeParser* p, CodeLocation loc, Optional<ProgramTextRegion> reg, Optional<ProgramTextRegion> reg2, auto... args) {
-	auto error = make_parser_error(p, loc, args...);
+Error* grd_make_double_site_error(CLikeParser* p, GrdCodeLoc loc, Optional<ProgramTextRegion> reg, Optional<ProgramTextRegion> reg2, auto... args) {
+	auto error = grd_make_parser_error(p, loc, args...);
 	add_site(p, error,
 		CParserErrorToken{ .reg = reg, .color = CPARSER_ERROR_TOKEN_COLOR_REGULAR_GREEN },
 		CParserErrorToken{ .reg = reg2, .color = CPARSER_ERROR_TOKEN_COLOR_REGULAR_RED }
@@ -2498,15 +2498,15 @@ Tuple<AstFunctionKind, Error*> resolve_function_kind(CLikeParser* p, AstFunction
 	AstAttr* kind_attr = NULL;
 	for (auto attr: f->attrs) {
 		AstFunctionKind new_kind = AstFunctionKind::Plain;
-		if (auto m = reflect_cast<FragmentAttr>(attr)) {
+		if (auto m = grd_reflect_cast<FragmentAttr>(attr)) {
 			new_kind = AstFunctionKind::Fragment;
 		}
-		if (auto m = reflect_cast<VertexAttr>(attr)) {
+		if (auto m = grd_reflect_cast<VertexAttr>(attr)) {
 			new_kind = AstFunctionKind::Vertex;
 		}
 		if (new_kind != AstFunctionKind::Plain) {
 			if (kind != AstFunctionKind::Plain) {
-				return { {}, make_double_site_error(p, current_loc(), kind_attr->text_region, attr->text_region, "Function kind already defined."_b) };
+				return { {}, grd_make_double_site_error(p, grd_current_loc(), kind_attr->text_region, attr->text_region, "Function kind already defined."_b) };
 			}
 			kind = new_kind;
 		}
@@ -2525,67 +2525,67 @@ Error* handle_entry_point_arg(CLikeParser* p, AstFunction* f, s64 idx) {
 	EntryPointArgKind kind = EntryPointArgKind::Undefined;
 
 	for (auto attr: arg->attrs) {
-		if (auto m = reflect_cast<StageInAttr>(attr)) {
+		if (auto m = grd_reflect_cast<StageInAttr>(attr)) {
 			m->is_used = true;
 			kind = EntryPointArgKind::StageIn;
 			break;
 		}
-		if (auto m = reflect_cast<MtlBufferAttr>(attr)) {
+		if (auto m = grd_reflect_cast<MtlBufferAttr>(attr)) {
 			kind = EntryPointArgKind::Buffer;
 			break;
 		}
-		if (auto m = reflect_cast<MtlConstantAttr>(attr)) {
+		if (auto m = grd_reflect_cast<MtlConstantAttr>(attr)) {
 			kind = EntryPointArgKind::Buffer;
 			break;
 		}
-		if (auto m = reflect_cast<VkUniformAttr>(attr)) {
+		if (auto m = grd_reflect_cast<VkUniformAttr>(attr)) {
 			kind = EntryPointArgKind::Buffer;
 			break;
 		}
 	}
 	if (kind == EntryPointArgKind::Undefined) {
-		return simple_parser_error(p, current_loc(), arg->text_region, "Unexpected entry point argument."_b);
+		return simple_parser_error(p, grd_current_loc(), arg->text_region, "Unexpected entry point argument."_b);
 	}
 	if (kind == EntryPointArgKind::Buffer) {
 		if (!is_pointer(arg->var_ts->tp)) {
-			return simple_parser_error(p, current_loc(), arg->text_region, "Expected pointer type for a buffer."_b);
+			return simple_parser_error(p, grd_current_loc(), arg->text_region, "Expected pointer type for a buffer."_b);
 		}
 		VkUniformAttr* vk_attr = NULL;
 		MtlBufferIdxAttr* mtl_attr = NULL;
 		for (auto attr: arg->attrs) {
-			if (auto m = reflect_cast<VkUniformAttr>(attr)) {
+			if (auto m = grd_reflect_cast<VkUniformAttr>(attr)) {
 				if (vk_attr) {
-					return make_double_site_error(p, current_loc(), vk_attr->text_region, attr->text_region, "Vk uniform attribute is already specified."_b);
+					return grd_make_double_site_error(p, grd_current_loc(), vk_attr->text_region, attr->text_region, "Vk uniform attribute is already specified."_b);
 				}
 				vk_attr = m;
-			} else if (auto m = reflect_cast<MtlBufferAttr>(attr)) {
+			} else if (auto m = grd_reflect_cast<MtlBufferAttr>(attr)) {
 				if (mtl_attr) {
-					return make_double_site_error(p, current_loc(), mtl_attr->text_region, attr->text_region, "Metal buffer attribute is already specified."_b);
+					return grd_make_double_site_error(p, grd_current_loc(), mtl_attr->text_region, attr->text_region, "Metal buffer attribute is already specified."_b);
 				}
 				mtl_attr = m;
-			} else if (auto m = reflect_cast<MtlConstantAttr>(attr)) {
+			} else if (auto m = grd_reflect_cast<MtlConstantAttr>(attr)) {
 				if (mtl_attr) {
-					return make_double_site_error(p, current_loc(), mtl_attr->text_region, attr->text_region, "Metal constant attribute is already specified."_b);
+					return grd_make_double_site_error(p, grd_current_loc(), mtl_attr->text_region, attr->text_region, "Metal constant attribute is already specified."_b);
 				}
 				mtl_attr = m;
 			} else {
-				return simple_parser_error(p, current_loc(), attr->text_region, "Unexpected attribute."_b);
+				return simple_parser_error(p, grd_current_loc(), attr->text_region, "Unexpected attribute."_b);
 			}
 		}
 		if (!vk_attr) {
-			return simple_parser_error(p, current_loc(), arg->text_region, "Vk uniform attribute must be specified."_b);
+			return simple_parser_error(p, grd_current_loc(), arg->text_region, "Vk uniform attribute must be specified."_b);
 		}
 		if (!mtl_attr) {
-			return simple_parser_error(p, current_loc(), arg->text_region, "Metal buffer attribute must be specified."_b);
+			return simple_parser_error(p, grd_current_loc(), arg->text_region, "Metal buffer attribute must be specified."_b);
 		}
 		for (auto it: f->mtl_buffers) {
 			if (it->index == mtl_attr->index) {
-				return make_double_site_error(p, current_loc(), it->text_region, mtl_attr->text_region, "Metal buffer index (%) is already used."_b, mtl_attr->index);
+				return grd_make_double_site_error(p, grd_current_loc(), it->text_region, mtl_attr->text_region, "Metal buffer index (%) is already used."_b, mtl_attr->index);
 			}
 		}
 		for (auto it: f->vk_set_bindings) {
 			if (it->set == vk_attr->set && it->binding == vk_attr->binding) {
-				return make_double_site_error(p, current_loc(), it->text_region, vk_attr->text_region, "Vulkan set/binding (%, %) is already used."_b, vk_attr->set, vk_attr->binding);
+				return grd_make_double_site_error(p, grd_current_loc(), it->text_region, vk_attr->text_region, "Vulkan set/binding (%, %) is already used."_b, vk_attr->set, vk_attr->binding);
 			}
 		}
 		mtl_attr->is_used = true;
@@ -2595,10 +2595,10 @@ Error* handle_entry_point_arg(CLikeParser* p, AstFunction* f, s64 idx) {
 	}
 	if (kind == EntryPointArgKind::StageIn) {
 		if (!is_struct(arg->var_ts->tp)) {
-			return simple_parser_error(p, current_loc(), arg->text_region, "Expected struct type for a stage_in argument."_b);
+			return simple_parser_error(p, grd_current_loc(), arg->text_region, "Expected struct type for a stage_in argument."_b);
 		}
 		if (f->stage_in_arg) {
-			return make_double_site_error(p, current_loc(), f->stage_in_arg->text_region, arg->text_region, "Stage_in argument is already specified."_b);
+			return grd_make_double_site_error(p, grd_current_loc(), f->stage_in_arg->text_region, arg->text_region, "Stage_in argument is already specified."_b);
 		}
 		f->stage_in_arg = arg;
 	}
@@ -2606,7 +2606,7 @@ Error* handle_entry_point_arg(CLikeParser* p, AstFunction* f, s64 idx) {
 }
 
 Error* handle_entry_point_args(CLikeParser* p, AstFunction* f) {
-	for (auto i: range(len(f->args))) {
+	for (auto i: grd_range(len(f->args))) {
 		if (f->kind != AstFunctionKind::Plain) {
 			auto e = handle_entry_point_arg(p, f, i);
 			if (e) {
@@ -2626,16 +2626,16 @@ Error* ensure_function_has_return(CLikeParser* p, AstFunction* f) {
 		return NULL;
 	}
 	if (!f->block) {
-		return simple_parser_error(p, current_loc(), f->text_region, "Function % has no body", f->name);
+		return simple_parser_error(p, grd_current_loc(), f->text_region, "Function % has no body", f->name);
 	}
 	if (len(f->block->statements) == 0) {
 		// Expected return statement.
-		return simple_parser_error(p, current_loc(), f->block->text_region, "Expected return statement");
+		return simple_parser_error(p, grd_current_loc(), f->block->text_region, "Expected return statement");
 	}
 	auto last = f->block->statements[-1];
-	auto ret = reflect_cast<AstReturn>(last);
+	auto ret = grd_reflect_cast<AstReturn>(last);
 	if (!ret) {
-		return simple_parser_error(p, current_loc(), f->block->text_region, "Expected return statement");
+		return simple_parser_error(p, grd_current_loc(), f->block->text_region, "Expected return statement");
 	}
 	return NULL;
 }
@@ -2645,22 +2645,22 @@ Error* validate_fragment_output_struct(CLikeParser* p, AstStructType* tp) {
 	for (auto it: tp->members) {
 		ColorAttr* c_attr = NULL;
 		for (auto attr: it->attrs) {
-			if (auto m = reflect_cast<ColorAttr>(attr)) {
+			if (auto m = grd_reflect_cast<ColorAttr>(attr)) {
 				if (c_attr) {
-					return make_double_site_error(p, current_loc(), c_attr->text_region, attr->text_region, "Color attribute is already specified."_b);
+					return grd_make_double_site_error(p, grd_current_loc(), c_attr->text_region, attr->text_region, "Color attribute is already specified."_b);
 				}
 				c_attr = m;
 			}
 		}
 		if (c_attr == NULL) {
-			return simple_parser_error(p, current_loc(), it->text_region, "Color attribute must be specified."_b);
+			return simple_parser_error(p, grd_current_loc(), it->text_region, "Color attribute must be specified."_b);
 		}
-		for (auto i: range(idx)) {
+		for (auto i: grd_range(idx)) {
 			auto prev_m = tp->members[i];
 			for (auto attr: prev_m->attrs) {
-				if (auto m = reflect_cast<ColorAttr>(attr)) {
+				if (auto m = grd_reflect_cast<ColorAttr>(attr)) {
 					if (m->idx == c_attr->idx) {
-						return make_double_site_error(p, current_loc(), m->text_region, c_attr->text_region, "Color index (%) is already used."_b, c_attr->idx);
+						return grd_make_double_site_error(p, grd_current_loc(), m->text_region, c_attr->text_region, "Color index (%) is already used."_b, c_attr->idx);
 					}
 				}
 			}
@@ -2677,20 +2677,20 @@ Error* typecheck_function_return_value(CLikeParser* p, AstFunction* f) {
 		} else if (f->return_ts->tp == p->float4_tp) {
 
 		} else if (is_struct(f->return_ts->tp)) {
-			auto stp = reflect_cast<AstStructType>(f->return_ts->tp);
+			auto stp = grd_reflect_cast<AstStructType>(f->return_ts->tp);
 			if (!stp) {
-				return simple_parser_error(p, current_loc(), f->text_region, "Internal error: expected struct type.");
+				return simple_parser_error(p, grd_current_loc(), f->text_region, "Internal error: expected struct type.");
 			}
 			auto e = validate_fragment_output_struct(p, stp);
 			if (e) {
 				return e;
 			}
 		} else {
-			return simple_parser_error(p, current_loc(), f->text_region, "Fragment function must return void, float4, or struct."_b);
+			return simple_parser_error(p, grd_current_loc(), f->text_region, "Fragment function must return void, float4, or struct."_b);
 		}
 	} else if (f->kind == AstFunctionKind::Vertex) {
 		if (f->return_ts->tp != p->void_tp) {
-			return simple_parser_error(p, current_loc(), f->text_region, "Vertex function must return void."_b);
+			return simple_parser_error(p, grd_current_loc(), f->text_region, "Vertex function must return void."_b);
 		}
 	}
 	return NULL;
@@ -2698,7 +2698,7 @@ Error* typecheck_function_return_value(CLikeParser* p, AstFunction* f) {
 
 Tuple<AstSymbol*, Error*> parse_function(CLikeParser* p, PreType pre_type,  Array<AstAttr*> attrs, Token start_tok, Token ident) {
 	Array<AstFunctionArg*> args = { .allocator = p->allocator };
-	defer { args.free(); };
+	grd_defer { args.free(); };
 
 	next(p);
 
@@ -2725,7 +2725,7 @@ Tuple<AstSymbol*, Error*> parse_function(CLikeParser* p, PreType pre_type,  Arra
 		}
 		if (len(args) > 0) {
 			if (tok.str != U","_b) {
-				return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Expected ','"_b) };
+				return { NULL, simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected ','"_b) };
 			}
 			next(p);
 		}
@@ -2754,14 +2754,14 @@ Tuple<AstSymbol*, Error*> parse_function(CLikeParser* p, PreType pre_type,  Arra
 				text_region.end = last->text_region.value.end;
 			}
 		}
-		auto arg_node = make_ast_symbol<AstFunctionArg>(p, arg_name.str, text_region);
+		auto arg_node = grd_make_ast_symbol<AstFunctionArg>(p, arg_name.str, text_region);
 		arg_node->var_ts = ts;
 		arg_node->attrs = attrs;
 		add(&args, arg_node);
 	}
 
 	ProgramTextRegion text_region = { start_tok.reg.start, peek(p).reg.end };
-	auto f = make_ast_node<AstFunction>(p, text_region);
+	auto f = grd_make_ast_node<AstFunction>(p, text_region);
 	f->args.allocator = p->allocator;
 	f->return_ts = return_ts;
 	f->name = ident.str;
@@ -2771,7 +2771,7 @@ Tuple<AstSymbol*, Error*> parse_function(CLikeParser* p, PreType pre_type,  Arra
 	f->vk_set_bindings.allocator = p->allocator;
 
 	for (auto attr: attrs) {
-		if (reflect_cast<FragmentAttr>(attr)) {
+		if (grd_reflect_cast<FragmentAttr>(attr)) {
 			f->kind = AstFunctionKind::Fragment;
 			attr->is_used = true;
 			break;
@@ -2799,7 +2799,7 @@ Tuple<AstSymbol*, Error*> parse_function(CLikeParser* p, PreType pre_type,  Arra
 	}
 	if (tok.str == "{") {
 		add(&p->scope, f);
-		defer { pop(&p->scope); };
+		grd_defer { pop(&p->scope); };
 
 		auto [block, e] = parse_block(p);
 		if (e) {
@@ -2816,7 +2816,7 @@ Tuple<AstSymbol*, Error*> parse_function(CLikeParser* p, PreType pre_type,  Arra
 		return { f, NULL };
 	}
 
-	return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Expected ; or { after function header"_b) };
+	return { NULL, simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected ; or { after function header"_b) };
 }
 
 Tuple<AstStructType*, Error*> parse_struct(CLikeParser* p, Token start_tok) {
@@ -2826,12 +2826,12 @@ Tuple<AstStructType*, Error*> parse_struct(CLikeParser* p, Token start_tok) {
 	}
 	auto tok = peek(p);
 	if (tok.str != U"{"_b) {
-		return { NULL, simple_parser_error(p, current_loc(), tok.reg, U"Expected {"_b) };
+		return { NULL, simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected {"_b) };
 	}
 	next(p);
 
 	Array<AstStructMember*> members = { .allocator = p->allocator };
-	defer { members.free(); };
+	grd_defer { members.free(); };
 
 	ProgramTextRegion st_reg;
 	st_reg.start = start_tok.reg.start;
@@ -2873,7 +2873,7 @@ Tuple<AstStructType*, Error*> parse_struct(CLikeParser* p, Token start_tok) {
 			return { NULL, e4 };
 		}
 		if (peek(p).str != ";") {
-			return { NULL, simple_parser_error(p, current_loc(), peek(p).reg, U"Expected ;"_b) };
+			return { NULL, simple_parser_error(p, grd_current_loc(), peek(p).reg, U"Expected ;"_b) };
 		}
 		next(p);
 
@@ -2889,20 +2889,20 @@ Tuple<AstStructType*, Error*> parse_struct(CLikeParser* p, Token start_tok) {
 				reg.end = last->text_region.value.end;
 			}
 		}
-		auto member = make_ast_node<AstStructMember>(p, reg);
+		auto member = grd_make_ast_node<AstStructMember>(p, reg);
 		member->member_ts = ts;
 		member->name = name.str;
 		member->attrs = attrs;
 		add(&members, member);
 
 		for (auto attr: attrs) {
-			if (auto x = reflect_cast<PositionAttr>(attr)) {
+			if (auto x = grd_reflect_cast<PositionAttr>(attr)) {
 				if (pos_member) {
-					return { NULL, simple_parser_error(p, current_loc(), attr->text_region, "Position attribute can only be specified once."_b) };
+					return { NULL, simple_parser_error(p, grd_current_loc(), attr->text_region, "Position attribute can only be specified once."_b) };
 				}
 				pos_member = member;
 				if (member->member_ts->tp != p->float4_tp) {
-					return { NULL, simple_parser_error(p, current_loc(), attr->text_region, "Position attribute can only be specified for float4 member."_b) };
+					return { NULL, simple_parser_error(p, grd_current_loc(), attr->text_region, "Position attribute can only be specified for float4 member."_b) };
 				}
 				x->is_used = true;
 			}
@@ -2913,7 +2913,7 @@ Tuple<AstStructType*, Error*> parse_struct(CLikeParser* p, Token start_tok) {
 		}
 	}
 
-	auto st = make_ast_node<AstStructType>(p, st_reg);
+	auto st = grd_make_ast_node<AstStructType>(p, st_reg);
 	st->members = members;
 	st->name = ident.str;
 	members = {};
@@ -2980,17 +2980,17 @@ Error* parse_top_level(CLikeParser* p) {
 		}
 		return NULL;
 	} else {
-		return simple_parser_error(p, current_loc(), tok.reg, U"Expected ( or , or ; or ="_b);
+		return simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected ( or , or ; or ="_b);
 	}
 }
 
 template <typename T>
-AstPrimitiveType* push_prim_type(CLikeParser* p, UnicodeString name, u64 size, u64 alignment, bool is_signed) {
-	auto tp = make_ast_symbol<AstPrimitiveType>(p, name, {});
+AstGrdPrimitiveType* push_prim_type(CLikeParser* p, UnicodeString name, u64 size, u64 alignment, bool is_signed) {
+	auto tp = grd_make_ast_symbol<AstGrdPrimitiveType>(p, name, {});
 	tp->size = size;
 	tp->alignment = alignment;
 	tp->is_signed = is_signed;
-	tp->c_tp = reflect_type_of<T>()->template as<PrimitiveType>();
+	tp->c_tp = grd_reflect_type_of<T>()->template as<GrdPrimitiveType>();
 	assert(tp->c_tp);
 	auto e = add_global(p, tp);
 	if (e) {
@@ -3016,7 +3016,7 @@ u64 calc_struct_size(AstStructType* tp) {
 }
 
 void push_member(AstStructType* tp, UnicodeString name, AstTypeSite* ts) {
-	auto m = make_ast_node<AstStructMember>(tp->p, {});
+	auto m = grd_make_ast_node<AstStructMember>(tp->p, {});
 	m->struct_type = tp;
 	m->member_ts = ts;
 	m->name = name;
@@ -3025,8 +3025,8 @@ void push_member(AstStructType* tp, UnicodeString name, AstTypeSite* ts) {
 	add(&tp->members, m);
 }
 
-AstTypeSite* make_siteless_type_site(CLikeParser* p, AstType* tp) {
-	auto ts = make_ast_node<AstTypeSite>(p, {});
+AstTypeSite* grd_make_siteless_type_site(CLikeParser* p, AstType* tp) {
+	auto ts = grd_make_ast_node<AstTypeSite>(p, {});
 	ts->tp = tp;
 	return ts;
 }
@@ -3045,9 +3045,9 @@ void push_base_types(CLikeParser* p) {
 	p->f32_tp = push_prim_type<f32>(p, U"f32"_b, 4, 4, true);
 	p->f64_tp = push_prim_type<f64>(p, U"f64"_b, 8, 8, true);
 
-	auto f32_ts = make_siteless_type_site(p, p->f32_tp);
+	auto f32_ts = grd_make_siteless_type_site(p, p->f32_tp);
 
-	p->float2_tp = make_ast_symbol<AstStructType>(p, U"float2"_b, {});
+	p->float2_tp = grd_make_ast_symbol<AstStructType>(p, U"float2"_b, {});
 	push_member(p->float2_tp, U"x"_b, f32_ts);
 	push_member(p->float2_tp, U"y"_b, f32_ts);
 	p->float2_tp->alignment = 8;
@@ -3057,7 +3057,7 @@ void push_base_types(CLikeParser* p) {
 		panic(e);
 	}
 
-	p->float3_tp = make_ast_symbol<AstStructType>(p, U"float3"_b, {});
+	p->float3_tp = grd_make_ast_symbol<AstStructType>(p, U"float3"_b, {});
 	push_member(p->float3_tp, U"x"_b, f32_ts);
 	push_member(p->float3_tp, U"y"_b, f32_ts);
 	push_member(p->float3_tp, U"z"_b, f32_ts);
@@ -3068,7 +3068,7 @@ void push_base_types(CLikeParser* p) {
 		panic(e);
 	}
 
-	p->float4_tp = make_ast_symbol<AstStructType>(p, U"float4"_b, {});
+	p->float4_tp = grd_make_ast_symbol<AstStructType>(p, U"float4"_b, {});
 	push_member(p->float4_tp, U"x"_b, f32_ts);
 	push_member(p->float4_tp, U"y"_b, f32_ts);
 	push_member(p->float4_tp, U"z"_b, f32_ts);
@@ -3084,8 +3084,8 @@ void push_base_types(CLikeParser* p) {
 
 struct ShaderIntrinFunc: AstFunction {
 
-	REFLECT(ShaderIntrinFunc) {
-		BASE_TYPE(AstFunction);
+	GRD_REFLECT(ShaderIntrinFunc) {
+		GRD_BASE_TYPE(AstFunction);
 	}
 };
 
@@ -3094,7 +3094,7 @@ void add_shader_intrinsic_var(CLikeParser* p, UnicodeString name, AstTypeSite* t
 	if (!ts) {
 		panic("No type for shader intrinsic var");
 	}
-	auto node = make_ast_symbol<ShaderIntrinVar>(p, name, {});
+	auto node = grd_make_ast_symbol<ShaderIntrinVar>(p, name, {});
 	node->var_ts = ts;
 	auto e = add_global(p, node);
 	if (e) {
@@ -3104,13 +3104,13 @@ void add_shader_intrinsic_var(CLikeParser* p, UnicodeString name, AstTypeSite* t
 
 void add_shader_intrinsic_func(CLikeParser* p, UnicodeString name, AstTypeSite* ret_ts, std::initializer_list<AstTypeSite*> args) {
 	// @TODO: check for duplicates
-	auto node = make_ast_symbol<ShaderIntrinFunc>(p, name, {});
+	auto node = grd_make_ast_symbol<ShaderIntrinFunc>(p, name, {});
 	node->args.allocator = p->allocator;
 	node->return_ts = ret_ts;
 	s64 i = 0;
 	for (auto arg: args) {
 		auto name = sprint_unicode(p->allocator, U"arg_%"_b, i);
-		auto arg_node = make_ast_symbol<AstFunctionArg>(p, name, {});
+		auto arg_node = grd_make_ast_symbol<AstFunctionArg>(p, name, {});
 		arg_node->var_ts = arg;
 		add(&node->args, arg_node);
 		i += 1;
@@ -3122,10 +3122,10 @@ void add_shader_intrinsic_func(CLikeParser* p, UnicodeString name, AstTypeSite* 
 }
 
 Tuple<CLikeProgram*, Error*> parse_c_like(UnicodeString str) {
-	auto allocator = make_arena_allocator();
-	auto p = make<CLikeParser>(allocator);
+	auto allocator = grd_make_arena_allocator();
+	auto p = grd_make<CLikeParser>(allocator);
 	p->allocator = allocator;
-	p->program = make_ast_node<CLikeProgram>(p, {});
+	p->program = grd_make_ast_node<CLikeProgram>(p, {});
 	p->program->globals.allocator = p->allocator;
 	p->str = str;
 	add(&p->scope, p->program);
@@ -3144,8 +3144,8 @@ Tuple<CLikeProgram*, Error*> parse_c_like(UnicodeString str) {
 
 	push_base_types(p);
 
-	auto f32_ts = make_siteless_type_site(p, p->f32_tp);
-	auto float3_ts = make_siteless_type_site(p, p->float3_tp);
+	auto f32_ts = grd_make_siteless_type_site(p, p->f32_tp);
+	auto float3_ts = grd_make_siteless_type_site(p, p->float3_tp);
 
 	add_shader_intrinsic_func(p, U"hsv"_b, float3_ts, { f32_ts, f32_ts, f32_ts });
 	add_shader_intrinsic_func(p, U"log"_b, f32_ts, { f32_ts });

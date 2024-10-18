@@ -8,33 +8,33 @@
 #include "format.h"
 
 struct CallStackEntry {
-	CodeLocation loc;
+	GrdCodeLoc loc;
 	const char*  desc = NULL;
 };
 
 struct CallStack {
-	Allocator       allocator;
+	GrdAllocator       allocator;
 	CallStackEntry* entries = NULL;
 	s64             count = 0;
 };
 
 void free_callstack(CallStack st) {
-	for (auto i: range(st.count)) {
-		Free(st.allocator, (void*) st.entries[i].loc.file);
-		Free(st.allocator, (void*) st.entries[i].desc);
+	for (auto i: grd_range(st.count)) {
+		GrdFree(st.allocator, (void*) st.entries[i].loc.file);
+		GrdFree(st.allocator, (void*) st.entries[i].desc);
 	}
 }
 
-const char* callstack_copy_std_string(Allocator allocator, std::string&& str) {
+const char* callstack_copy_std_string(GrdAllocator allocator, std::string&& str) {
 	auto str_mem = Alloc<char>(allocator, str.size() + 1);
-	for (auto i: range(str.size())) {
+	for (auto i: grd_range(str.size())) {
 		str_mem[i] = str[i];
 	}
 	str_mem[str.size()] = '\0';
 	return str_mem;
 }
 
-CallStack get_callstack(Allocator allocator = c_allocator) {
+CallStack get_callstack(GrdAllocator allocator = c_allocator) {
 	CallStack st;
 	st.allocator = allocator;
 	#if __cpp_lib_stacktrace
@@ -45,7 +45,7 @@ CallStack get_callstack(Allocator allocator = c_allocator) {
 		for (auto i: range_from_to(1, st.count + 1)) {
 			auto& x = cpp_st[i];
 			auto f_str = callstack_copy_std_string(allocator, x.source_file());
-			st.entries[i - 1].loc = make_code_location(x.source_line(), f_str);
+			st.entries[i - 1].loc = grd_grd_make_code_loc(x.source_line(), f_str);
 			st.entries[i - 1].desc = callstack_copy_std_string(allocator, x.description());
 		}
 	#endif

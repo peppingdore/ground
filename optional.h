@@ -42,24 +42,24 @@ struct Optional {
 };
 
 template <typename T>
-auto make_optional() -> Optional<T> {
+auto grd_make_optional() -> Optional<T> {
 	return {};
 }
 
 template <typename T>
-auto make_optional(T value) -> Optional<T> {
+auto grd_make_optional(T value) -> Optional<T> {
 	return Optional<T>(value);
 }
 
 struct OptionalType: Type {
-	constexpr static auto KIND = make_type_kind("opt");
+	constexpr static auto KIND = grd_make_type_kind("opt");
 
 	Type* inner = NULL;
 };
 
 template <typename T>
 OptionalType* reflect_type(Optional<T>* x, OptionalType* type) {
-	type->inner = reflect_type_of<T>();
-	type->name = heap_sprintf("Optional<%s>", type->inner->name);
+	type->inner = grd_reflect_type_of<T>();
+	type->name = grd_heap_sprintf("Optional<%s>", type->inner->name);
 	return type;
 }

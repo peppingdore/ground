@@ -1,22 +1,22 @@
 #pragma once
 
-#include "../../base.h"
+#include "../../grd_base.h"
 #include <Windows.h>
 
-using ThreadId = DWORD;
+using GrdThreadId = DWORD;
 
-void os_sleep(u32 ms) {
+void grd_os_sleep(u32 ms) {
 	Sleep(ms);
 }
 
-ThreadId current_thread_id() {
-	return (ThreadId) GetCurrentThreadId();
+GrdThreadId current_thread_id() {
+	return (GrdThreadId) GetCurrentThreadId();
 }
 
-using OsThread = HANDLE;
-using OsThreadReturnType = DWORD;
+using GrdOsThread = HANDLE;
+using GrdOsThreadReturnType = DWORD;
 
-bool os_thread_start(OsThread* thread, OsThreadReturnType (WINAPI *proc)(void*), void* data) {
+bool os_thread_start(GrdOsThread* thread, GrdOsThreadReturnType (WINAPI *proc)(void*), void* data) {
 	DWORD thread_id;
 	HANDLE handle = CreateThread(0, 0, (LPTHREAD_START_ROUTINE) proc, data, 0, &thread_id);
 	if (!handle) {
@@ -26,10 +26,10 @@ bool os_thread_start(OsThread* thread, OsThreadReturnType (WINAPI *proc)(void*),
 	return true;
 }
 
-void os_thread_join(OsThread* thread) {
+void grd_os_thread_join(GrdOsThread* thread) {
 	WaitForSingleObject(*thread, INFINITE);
 }
 
-ThreadId os_thread_get_id(OsThread* thread) {
+GrdThreadId grd_os_thread_get_id(GrdOsThread* thread) {
 	return GetThreadId(*thread);
 }

@@ -1,47 +1,47 @@
 #pragma once
 
-#include "testing.h"
+#include "grd_testing.h"
 #include "reflect.h"
 #include "format.h"
 
 struct A {
 	int a;
 	int b;
-	REFLECT(A) {
-		MEMBER(a); TAG("a");
-		MEMBER(b);
+	GRD_REFLECT(A) {
+		GRD_MEMBER(a); GRD_TAG("a");
+		GRD_MEMBER(b);
 	}
 };
 
 struct B {
 	int c;
 	int d;
-	REFLECT(B) {
-		MEMBER(c);
-		MEMBER(d);
+	GRD_REFLECT(B) {
+		GRD_MEMBER(c);
+		GRD_MEMBER(d);
 	}
 };
 
 struct C: A, B {
 	int e;
-	REFLECT(C) {
-		BASE_TYPE(A);
-		BASE_TYPE(B);
-		MEMBER(e);
+	GRD_REFLECT(C) {
+		GRD_BASE_TYPE(A);
+		GRD_BASE_TYPE(B);
+		GRD_MEMBER(e);
 	}
 };
 
-TEST(reflect_struct_offset) {
-	auto type = reflect_type_of<C>();
+GRD_TEST(reflect_struct_offset) {
+	auto type = grd_reflect_type_of<C>();
 	EXPECT(type->kind == StructType::KIND);
 	auto casted = (StructType*) type;
 	EXPECT(casted->unflattened_members.count == 3);
 	EXPECT(casted->unflattened_members[0]->offset == 0);
 	EXPECT(casted->unflattened_members[1]->offset == sizeof(int) * 2);
 	EXPECT(casted->unflattened_members[2]->offset == sizeof(int) * 4);
-	EXPECT(casted->unflattened_members[0]->kind == STRUCT_MEMBER_KIND_BASE);
-	EXPECT(casted->unflattened_members[1]->kind == STRUCT_MEMBER_KIND_BASE);
-	EXPECT(casted->unflattened_members[2]->kind == STRUCT_MEMBER_KIND_PLAIN);
+	EXPECT(casted->unflattened_members[0]->kind == STRUCT_GRD_MEMBER_KIND_BASE);
+	EXPECT(casted->unflattened_members[1]->kind == STRUCT_GRD_MEMBER_KIND_BASE);
+	EXPECT(casted->unflattened_members[2]->kind == STRUCT_GRD_MEMBER_KIND_PLAIN);
 	EXPECT(casted->members.count == 5);
 	EXPECT(casted->members[0]->offset == 0);
 	EXPECT(casted->members[1]->offset == sizeof(int) * 1);
@@ -54,24 +54,24 @@ TEST(reflect_struct_offset) {
 struct Base {
 	Type* type;
 
-	REFLECT(Base) {
-		MEMBER(type); TAG(RealTypeMember{});
+	GRD_REFLECT(Base) {
+		GRD_MEMBER(type); GRD_TAG(GrdRealTypeMember{});
 	}
 };
 
 struct Derived: Base {
 
-	REFLECT(Derived) {
-		BASE_TYPE(Base);
+	GRD_REFLECT(Derived) {
+		GRD_BASE_TYPE(Base);
 	}
 };
 
-TEST(reflect_real_type_test) {
+GRD_TEST(reflect_real_type_test) {
 	Derived d;
-	d.type = reflect_type_of<decltype(d)>();
+	d.type = grd_reflect_type_of<decltype(d)>();
 
 	Base* b = &d;
 
-	auto type = get_real_type(reflect_type_of(*b), b);
-	EXPECT(type == reflect_type_of<Derived>());
+	auto type = grd_get_real_type(grd_reflect_type_of(*b), b);
+	EXPECT(type == grd_reflect_type_of<Derived>());
 }

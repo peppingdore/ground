@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../base.h"
+#include "../grd_base.h"
 #include "../range.h"
 #include "../reflect.h"
 
@@ -11,9 +11,9 @@ struct Vector_Members1 {
 		T components[1];
 	};
 
-	REFLECT(Vector_Members1) {
-		type->name = heap_sprintf("Vector1<%s>", reflect_type_of<T>()->name);
-		MEMBER(x);
+	GRD_REFLECT(Vector_Members1) {
+		type->name = grd_heap_sprintf("Vector1<%s>", grd_reflect_type_of<T>()->name);
+		GRD_MEMBER(x);
 	}
 };
 
@@ -27,10 +27,10 @@ struct Vector_Members2 {
 		T components[2];
 	};
 
-	REFLECT(Vector_Members2) {
-		type->name = heap_sprintf("Vector2<%s>", reflect_type_of<T>()->name);
-		MEMBER(x);
-		MEMBER(y);
+	GRD_REFLECT(Vector_Members2) {
+		type->name = grd_heap_sprintf("Vector2<%s>", grd_reflect_type_of<T>()->name);
+		GRD_MEMBER(x);
+		GRD_MEMBER(y);
 	}
 };
 
@@ -50,11 +50,11 @@ struct Vector_Members3 {
 		T components[3];
 	};
 
-	REFLECT(Vector_Members3) {
-		type->name = heap_sprintf("Vector3<%s>", reflect_type_of<T>()->name);
-		MEMBER(x);
-		MEMBER(y);
-		MEMBER(z);
+	GRD_REFLECT(Vector_Members3) {
+		type->name = grd_heap_sprintf("Vector3<%s>", grd_reflect_type_of<T>()->name);
+		GRD_MEMBER(x);
+		GRD_MEMBER(y);
+		GRD_MEMBER(z);
 	}
 };
 
@@ -80,12 +80,12 @@ struct Vector_Members4 {
 		T components[N];
 	};
 
-	REFLECT(Vector_Members4) {
-		type->name = heap_sprintf("Vector4<%s>", reflect_type_of<T>()->name);
-		MEMBER(x);
-		MEMBER(y);
-		MEMBER(z);
-		MEMBER(w);
+	GRD_REFLECT(Vector_Members4) {
+		type->name = grd_heap_sprintf("Vector4<%s>", grd_reflect_type_of<T>()->name);
+		GRD_MEMBER(x);
+		GRD_MEMBER(y);
+		GRD_MEMBER(z);
+		GRD_MEMBER(w);
 	}
 };
 
@@ -112,10 +112,10 @@ struct BaseVector: Vector_Members<N, T> {
 	}
 
 	template <typename... Pack>
-	static BaseVector make(Pack... args) {
+	static BaseVector grd_make(Pack... args) {
 		T arr[N] = { (T) args... };
 		BaseVector vec;
-		for (auto i: range(N)) {
+		for (auto i: grd_range(N)) {
 			vec.components[i] = arr[i];
 		}
 		return vec;
@@ -124,10 +124,10 @@ struct BaseVector: Vector_Members<N, T> {
 	template <typename Thing> requires
 		std::is_integral_v<T> &&
 		std::is_floating_point_v<decltype(Thing().components[0])> 
-	static BaseVector make(Thing thing) {
+	static BaseVector grd_make(Thing thing) {
 		static_assert(N == array_count(thing.components));
 		BaseVector result;
-		for (auto i: range(N)) {
+		for (auto i: grd_range(N)) {
 			result.components[i] = round(thing.components[i]);
 		}
 		return result;
@@ -145,7 +145,7 @@ struct BaseVector: Vector_Members<N, T> {
 
 	auto operator-(BaseVector rhs) {
 		auto result = *this;
-		for (auto i: range(N)) {
+		for (auto i: grd_range(N)) {
 			result.components[i] -= rhs.components[i];
 		}
 		return result;
@@ -153,7 +153,7 @@ struct BaseVector: Vector_Members<N, T> {
 
 	auto operator+(BaseVector rhs) {
 		auto result = *this;
-		for (auto i: range(N)) {
+		for (auto i: grd_range(N)) {
 			result.components[i] += rhs.components[i];
 		}
 		return result;
@@ -161,7 +161,7 @@ struct BaseVector: Vector_Members<N, T> {
 
 	auto operator*(T x) {
 		auto result = *this;
-		for (auto i: range(N)) {
+		for (auto i: grd_range(N)) {
 			result.components[i] *= x;
 		}
 		return result;
@@ -169,7 +169,7 @@ struct BaseVector: Vector_Members<N, T> {
 
 	auto operator/(T x) {
 		auto result = *this;
-		for (auto i: range(N)) {
+		for (auto i: grd_range(N)) {
 			result.components[i] *= x;
 		}
 		return result;
@@ -177,14 +177,14 @@ struct BaseVector: Vector_Members<N, T> {
 
 	auto operator-() {
 		auto result = *this;
-		for (auto i: range(N)) {
+		for (auto i: grd_range(N)) {
 			result.components[i] = -result.components[i];
 		}
 		return result;
 	}
 
 	bool operator==(BaseVector rhs) {
-		for (auto i: range(N)) {
+		for (auto i: grd_range(N)) {
 			if (components[i] != rhs.components[i]) {
 				return false;
 			}
@@ -227,20 +227,20 @@ using Vector3i = Vector3_s64;
 using Vector4i = Vector4_s64;
 
 
-auto make_vector2(auto x, auto y) {
-	return Vector2::make(x, y);	
+auto grd_make_vector2(auto x, auto y) {
+	return Vector2::grd_make(x, y);	
 }
-auto make_vector3(auto x, auto y, auto z) {
-	return Vector3::make(x, y, z);	
+auto grd_make_vector3(auto x, auto y, auto z) {
+	return Vector3::grd_make(x, y, z);	
 }
-auto make_vector4(auto x, auto y, auto z, auto w) {
-	return Vector4::make(x, y, z, w);	
+auto grd_make_vector4(auto x, auto y, auto z, auto w) {
+	return Vector4::grd_make(x, y, z, w);	
 }
 
 template <int N, typename T>
 auto dot(BaseVector<N, T> a, BaseVector<N, T> b) {
 	T sum = 0;
-	for (auto i: range(static_array_count(a.components))) {
+	for (auto i: grd_range(static_array_count(a.components))) {
 		sum += a[i] * b[i];
 	}
 	return sum;
@@ -256,7 +256,7 @@ auto project(BaseVector<N, T> line_start, BaseVector<N, T> line_end, BaseVector<
 template <int N, typename T>
 auto magnitude_squared(BaseVector<N, T> v) {
 	T sum = 0;
-	for (auto i: range(N)) {
+	for (auto i: grd_range(N)) {
 		sum += v.components[i] * v.components[i];
 	}
 	return sum;

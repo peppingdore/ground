@@ -1,6 +1,6 @@
 #pragma once
 
-#include "coroutine.h"
+#include "grd_coroutine.h"
 #include "function.h"
 #include "string.h"
 
@@ -42,10 +42,10 @@ UnicodeString path_ext(UnicodeString path) {
 	return index >= 2 ? last : UnicodeString{};
 }
 
-AllocatedUnicodeString path_join(Allocator allocator, auto... args) {
+AllocatedUnicodeString path_join(GrdAllocator allocator, auto... args) {
 	Array<char32_t> result = { .allocator = allocator };
-	auto pieces = { make_string(args)... };
-	for (auto idx: range(pieces.size())) {
+	auto pieces = { grd_make_string(args)... };
+	for (auto idx: grd_range(pieces.size())) {
 		auto it = *pieces[idx];
 		if (idx > 0) {
 			if (it.length > 0 && is_path_sep(it[0])) {
@@ -61,7 +61,7 @@ AllocatedUnicodeString path_join(Allocator allocator, auto... args) {
 	return result;
 }
 
-Generator<UnicodeString> path_segments(UnicodeString path) {
+GrdGenerator<UnicodeString> path_segments(UnicodeString path) {
 	return split(path, is_path_sep);
 }
 

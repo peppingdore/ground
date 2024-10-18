@@ -1,15 +1,15 @@
 #pragma once
 
 #include "string.h"
-#include "code_location.h"
+#include "grd_code_location.h"
 #include "number_string_conversion.h"
-#include "code_location.h"
+#include "grd_code_location.h"
 #include "format.h"
 
 struct Error {
 	AllocatedString text;
 	Type*           type;
-	CodeLocation    loc;
+	GrdCodeLoc    loc;
 	void          (*on_free)(Error*) = NULL;
 	Error*          prev = NULL;
 
@@ -21,7 +21,7 @@ struct Error {
 			on_free(this);
 		}
 		text.free();
-		Free(this);
+		GrdFree(this);
 	}
 
 	Error* because(Error* error) {
@@ -51,63 +51,63 @@ inline void type_format(Formatter* formatter, Error* e, String spec) {
 	}
 }
 
-REFLECT(Error) {
-	MEMBER(text);
-	MEMBER(type);
-	MEMBER(loc);
-	MEMBER(prev);
+GRD_REFLECT(Error) {
+	GRD_MEMBER(text);
+	GRD_MEMBER(type);
+	GRD_MEMBER(loc);
+	GRD_MEMBER(prev);
 }
 
 template <typename T = Error>
-T* make_error(AllocatedString text, CodeLocation loc = caller_loc()) {
-	auto e = make<T>();
+T* grd_make_error(AllocatedString text, GrdCodeLoc loc = grd_caller_loc()) {
+	auto e = grd_make<T>();
 	e->text = text;
-	e->type = reflect_type_of<T>();
+	e->type = grd_reflect_type_of<T>();
 	e->loc  = loc;
 	return e;
 }
 
 template <typename T = Error>
-T* make_error(const char* str, CodeLocation loc = caller_loc()) {
-	return make_error<T>(copy_string(make_string(str)), loc); 
+T* grd_make_error(const char* str, GrdCodeLoc loc = grd_caller_loc()) {
+	return grd_make_error<T>(copy_string(grd_make_string(str)), loc); 
 }
 
 template <typename T = Error>
-T* format_error(CodeLocation loc, auto... args) {
+T* format_error(GrdCodeLoc loc, auto... args) {
 	AllocatedString str = sprint<char>(c_allocator, args...);
-	return make_error<T>(str, loc);
+	return grd_make_error<T>(str, loc);
 }
 
-// We can't use loc = caller_loc() if we have parameter pack.
+// We can't use loc = grd_caller_loc() if we have parameter pack.
 //   These macro help us with that situation.
-#define format_error(...)      format_error(   current_loc(), __VA_ARGS__)
-#define format_error_t(T, ...) format_error<T>(current_loc(), __VA_ARGS__)
+#define format_error(...)      format_error(   grd_current_loc(), __VA_ARGS__)
+#define format_error_t(T, ...) format_error<T>(grd_current_loc(), __VA_ARGS__)
 
 
-#if OS_WINDOWS
+#if GRD_OS_WINDOWS
 
 struct Windows_Error: Error {
 	DWORD code;
 };
-REFLECT(Windows_Error) {
-	BASE_TYPE(Error);
-	MEMBER(code);
+GRD_REFLECT(Windows_Error) {
+	GRD_BASE_TYPE(Error);
+	GRD_MEMBER(code);
 }
 
-Windows_Error* windows_error(CodeLocation loc = caller_loc()) {
+Windows_Error* windows_error(GrdCodeLoc loc = grd_caller_loc()) {
 	auto code = GetLastError();
 	char buf[256];
 	FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
 		NULL, code, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-		buf, static_array_count(buf), NULL);
-	auto e = make_error<Windows_Error>(buf, loc);
+		buf, grd_static_array_count(buf), NULL);
+	auto e = grd_make_error<Windows_Error>(buf, loc);
 	e->code = code;
 	return e;
 }
 
 #endif
 
-#if IS_POSIX
+#if GRD_IS_POSIX
 
 #include <errno.h>
 
@@ -115,12 +115,12 @@ struct Posix_Error: Error {
 	int code;
 };
 
-Posix_Error* posix_error(CodeLocation loc = caller_loc()) {
+Posix_Error* posix_error(GrdCodeLoc loc = grd_caller_loc()) {
 	char buf[512];
 	u32  cursor = 0;
 	auto num_str = to_string(errno);
 	auto append = [&] (const char* str, u32 length) {
-		u32 copy_length = min_u32(length, static_array_count(buf) - cursor);
+		u32 copy_length = min_u32(length, grd_static_array_count(buf) - cursor);
 		memcpy(buf + cursor, str, copy_length);
 		cursor += copy_length;
 	};
@@ -130,8 +130,8 @@ Posix_Error* posix_error(CodeLocation loc = caller_loc()) {
 	append_c_str("Error ");
 	append(num_str.buf, num_str.length);
 	append_c_str(": ");
-	strerror_r(errno, buf + cursor, static_array_count(buf) - cursor);
-	auto e = make_error<Posix_Error>(copy_string(make_string(buf)), loc);
+	strerror_r(errno, buf + cursor, grd_static_array_count(buf) - cursor);
+	auto e = grd_make_error<Posix_Error>(copy_string(grd_make_string(buf)), loc);
 	e->code = errno;
 	return e;
 }

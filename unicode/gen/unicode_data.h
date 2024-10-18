@@ -35,37 +35,37 @@ enum class UnicodeGeneralCategory {
 	Co = 29
 /* %-end */
 };
-REFLECT(UnicodeGeneralCategory) {
+GRD_REFLECT(UnicodeGeneralCategory) {
 /* %-general_categories_reflect */
-	ENUM_VALUE(Cc);
-	ENUM_VALUE(Zs);
-	ENUM_VALUE(Po);
-	ENUM_VALUE(Sc);
-	ENUM_VALUE(Ps);
-	ENUM_VALUE(Pe);
-	ENUM_VALUE(Sm);
-	ENUM_VALUE(Pd);
-	ENUM_VALUE(Nd);
-	ENUM_VALUE(Lu);
-	ENUM_VALUE(Sk);
-	ENUM_VALUE(Pc);
-	ENUM_VALUE(Ll);
-	ENUM_VALUE(So);
-	ENUM_VALUE(Lo);
-	ENUM_VALUE(Pi);
-	ENUM_VALUE(Cf);
-	ENUM_VALUE(No);
-	ENUM_VALUE(Pf);
-	ENUM_VALUE(Lt);
-	ENUM_VALUE(Lm);
-	ENUM_VALUE(Mn);
-	ENUM_VALUE(Me);
-	ENUM_VALUE(Mc);
-	ENUM_VALUE(Nl);
-	ENUM_VALUE(Zl);
-	ENUM_VALUE(Zp);
-	ENUM_VALUE(Cs);
-	ENUM_VALUE(Co);
+	GRD_ENUM_VALUE(Cc);
+	GRD_ENUM_VALUE(Zs);
+	GRD_ENUM_VALUE(Po);
+	GRD_ENUM_VALUE(Sc);
+	GRD_ENUM_VALUE(Ps);
+	GRD_ENUM_VALUE(Pe);
+	GRD_ENUM_VALUE(Sm);
+	GRD_ENUM_VALUE(Pd);
+	GRD_ENUM_VALUE(Nd);
+	GRD_ENUM_VALUE(Lu);
+	GRD_ENUM_VALUE(Sk);
+	GRD_ENUM_VALUE(Pc);
+	GRD_ENUM_VALUE(Ll);
+	GRD_ENUM_VALUE(So);
+	GRD_ENUM_VALUE(Lo);
+	GRD_ENUM_VALUE(Pi);
+	GRD_ENUM_VALUE(Cf);
+	GRD_ENUM_VALUE(No);
+	GRD_ENUM_VALUE(Pf);
+	GRD_ENUM_VALUE(Lt);
+	GRD_ENUM_VALUE(Lm);
+	GRD_ENUM_VALUE(Mn);
+	GRD_ENUM_VALUE(Me);
+	GRD_ENUM_VALUE(Mc);
+	GRD_ENUM_VALUE(Nl);
+	GRD_ENUM_VALUE(Zl);
+	GRD_ENUM_VALUE(Zp);
+	GRD_ENUM_VALUE(Cs);
+	GRD_ENUM_VALUE(Co);
 /* %-end */
 };
 
@@ -96,31 +96,31 @@ enum class UnicodeBidiCategory {
 	PDI = 23
 /* %-end */
 };
-REFLECT(UnicodeBidiCategory) {
+GRD_REFLECT(UnicodeBidiCategory) {
 /* %-bidi_categories_reflect */
-	ENUM_VALUE(BN);
-	ENUM_VALUE(S);
-	ENUM_VALUE(B);
-	ENUM_VALUE(WS);
-	ENUM_VALUE(ON);
-	ENUM_VALUE(ET);
-	ENUM_VALUE(ES);
-	ENUM_VALUE(CS);
-	ENUM_VALUE(EN);
-	ENUM_VALUE(L);
-	ENUM_VALUE(NSM);
-	ENUM_VALUE(R);
-	ENUM_VALUE(AN);
-	ENUM_VALUE(AL);
-	ENUM_VALUE(LRE);
-	ENUM_VALUE(RLE);
-	ENUM_VALUE(PDF);
-	ENUM_VALUE(LRO);
-	ENUM_VALUE(RLO);
-	ENUM_VALUE(LRI);
-	ENUM_VALUE(RLI);
-	ENUM_VALUE(FSI);
-	ENUM_VALUE(PDI);
+	GRD_ENUM_VALUE(BN);
+	GRD_ENUM_VALUE(S);
+	GRD_ENUM_VALUE(B);
+	GRD_ENUM_VALUE(WS);
+	GRD_ENUM_VALUE(ON);
+	GRD_ENUM_VALUE(ET);
+	GRD_ENUM_VALUE(ES);
+	GRD_ENUM_VALUE(CS);
+	GRD_ENUM_VALUE(EN);
+	GRD_ENUM_VALUE(L);
+	GRD_ENUM_VALUE(NSM);
+	GRD_ENUM_VALUE(R);
+	GRD_ENUM_VALUE(AN);
+	GRD_ENUM_VALUE(AL);
+	GRD_ENUM_VALUE(LRE);
+	GRD_ENUM_VALUE(RLE);
+	GRD_ENUM_VALUE(PDF);
+	GRD_ENUM_VALUE(LRO);
+	GRD_ENUM_VALUE(RLO);
+	GRD_ENUM_VALUE(LRI);
+	GRD_ENUM_VALUE(RLI);
+	GRD_ENUM_VALUE(FSI);
+	GRD_ENUM_VALUE(PDI);
 /* %-end */
 };
 
@@ -146,24 +146,24 @@ enum class UnicodeDecompositionTag: unsigned int {
 	narrow = 0xffffffef
 /* %-end */
 };
-REFLECT(UnicodeDecompositionTag) {
+GRD_REFLECT(UnicodeDecompositionTag) {
 /* %-decomposition_tags_reflect */
-	ENUM_VALUE(noBreak);
-	ENUM_VALUE(compat);
-	ENUM_VALUE(super);
-	ENUM_VALUE(fraction);
-	ENUM_VALUE(sub);
-	ENUM_VALUE(font);
-	ENUM_VALUE(circle);
-	ENUM_VALUE(wide);
-	ENUM_VALUE(vertical);
-	ENUM_VALUE(square);
-	ENUM_VALUE(isolated);
-	ENUM_VALUE(final);
-	ENUM_VALUE(initial);
-	ENUM_VALUE(medial);
-	ENUM_VALUE(small);
-	ENUM_VALUE(narrow);
+	GRD_ENUM_VALUE(noBreak);
+	GRD_ENUM_VALUE(compat);
+	GRD_ENUM_VALUE(super);
+	GRD_ENUM_VALUE(fraction);
+	GRD_ENUM_VALUE(sub);
+	GRD_ENUM_VALUE(font);
+	GRD_ENUM_VALUE(circle);
+	GRD_ENUM_VALUE(wide);
+	GRD_ENUM_VALUE(vertical);
+	GRD_ENUM_VALUE(square);
+	GRD_ENUM_VALUE(isolated);
+	GRD_ENUM_VALUE(final);
+	GRD_ENUM_VALUE(initial);
+	GRD_ENUM_VALUE(medial);
+	GRD_ENUM_VALUE(small);
+	GRD_ENUM_VALUE(narrow);
 /* %-end */
 };
 
@@ -177,10 +177,10 @@ struct UnicodeCodepointRange {
 	unsigned int last_codepoint;
 	unsigned int codepoint_table_offset;
 };
-REFLECT(UnicodeCodepointRange) {
-	MEMBER(first_codepoint);
-	MEMBER(last_codepoint);
-	MEMBER(codepoint_table_offset);
+GRD_REFLECT(UnicodeCodepointRange) {
+	GRD_MEMBER(first_codepoint);
+	GRD_MEMBER(last_codepoint);
+	GRD_MEMBER(codepoint_table_offset);
 }
 
 const UnicodeCodepointRange UNICODE_UNIFORM_CODEPOINT_RANGES[] = {

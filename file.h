@@ -3,7 +3,7 @@
 #include "error.h"
 #include "io.h"
 
-#if IS_POSIX
+#if GRD_IS_POSIX
 	#include <fcntl.h>
 #endif
 
@@ -13,9 +13,9 @@ constexpr OpenFileFlag FILE_WRITE      = 1 << 1;
 constexpr OpenFileFlag FILE_CREATE_NEW = 1 << 3;
 constexpr OpenFileFlag FILE_APPEND     = 1 << 4;
 
-#if OS_WINDOWS
+#if GRD_OS_WINDOWS
 	using Native_File_Handle = HANDLE;
-#elif IS_POSIX
+#elif GRD_IS_POSIX
 	using Native_File_Handle = int;
 #else
 	PLATFORM_IS_NOT_SUPPORTED();
@@ -30,7 +30,7 @@ File file_from_native_handle(Native_File_Handle handle) {
 	return { .handle = handle };
 }
 
-#if OS_WINDOWS
+#if GRD_OS_WINDOWS
 Tuple<File, Error*> open_file(UnicodeString path, OpenFileFlag flags = FILE_READ, u32 unix_perm=0777/*ignored*/) {
 	int windows_flags = 0;
 	if (flags & FILE_READ) {
@@ -40,13 +40,13 @@ Tuple<File, Error*> open_file(UnicodeString path, OpenFileFlag flags = FILE_READ
 		windows_flags |= GENERIC_WRITE;
 	}
 	if (windows_flags == 0) {
-		return { {}, make_error("flags must contain at least one of FILE_READ/FILE_WRITE") };
+		return { {}, grd_make_error("flags must contain at least one of FILE_READ/FILE_WRITE") };
 	}
 
 	int creation_disposition = (flags & FILE_CREATE_NEW) ? CREATE_ALWAYS : OPEN_EXISTING;
 
 	auto wide = encode_utf16(path);
-	defer { wide.free(); };
+	grd_defer { wide.free(); };
 
 	HANDLE handle = CreateFileW((wchar_t*) wide.data, windows_flags, FILE_SHARE_READ, NULL, creation_disposition, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (handle == INVALID_HANDLE_VALUE) {
@@ -83,11 +83,11 @@ Tuple<s64, Error*> os_read_file(File* file, void* buf, s64 size) {
 	return { read, NULL };
 }
 
-#elif IS_POSIX
+#elif GRD_IS_POSIX
 
 Tuple<File, Error*> open_file(UnicodeString path, OpenFileFlag flags = FILE_READ, u32 unix_perm = 0777) {
 	AllocatedString utf8_path = encode_utf8(path);
-	defer { utf8_path.free(); };
+	grd_defer { utf8_path.free(); };
 
 	int o_flag;
 	if ((flags & (FILE_WRITE | FILE_READ)) == (FILE_WRITE | FILE_READ)) {
@@ -97,7 +97,7 @@ Tuple<File, Error*> open_file(UnicodeString path, OpenFileFlag flags = FILE_READ
 	} else if (flags & FILE_READ) {
 		o_flag = O_RDONLY;
 	} else {
-		return { {}, make_error("expecting any FILE_WRITE/FILE_READ in |flags|") };
+		return { {}, grd_make_error("expecting any FILE_WRITE/FILE_READ in |flags|") };
 	}
 
 	if (flags & FILE_CREATE_NEW) {
@@ -136,7 +136,7 @@ Tuple<s64, Error*> os_read_file(File* file, void* buf, s64 size) {
 Error* write_file(File* file, void* data, s64 size) {
 	s64 total_written = 0;
 	while (total_written < size) {
-		auto [written, e] = os_write_file(file, ptr_add(data, total_written), size - total_written);
+		auto [written, e] = os_write_file(file, grd_ptr_add(data, total_written), size - total_written);
 		if (e) {
 			return e;
 		}
@@ -148,7 +148,7 @@ Error* write_file(File* file, void* data, s64 size) {
 Tuple<s64, Error*> read_file(File* file, void* buf, s64 size) {
 	s64 total_read = 0;
 	while (total_read < size) {
-		auto [read, e] = os_read_file(file, ptr_add(buf, total_read), size - total_read);
+		auto [read, e] = os_read_file(file, grd_ptr_add(buf, total_read), size - total_read);
 		if (e) {
 			return { total_read, e };
 		}
@@ -180,7 +180,7 @@ Reader file_reader(File* file) {
 	return r;
 }
 
-Tuple<AllocatedString, Error*> read_text_at_path(Allocator allocator, UnicodeString path) {
+Tuple<AllocatedString, Error*> read_text_at_path(GrdAllocator allocator, UnicodeString path) {
 	auto [f, e] = open_file(path);
 	if (e) {
 		return { {}, e };

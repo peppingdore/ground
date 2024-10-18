@@ -1,44 +1,44 @@
 #pragma once
 
-#include "../../base.h"
+#include "../../grd_base.h"
 
 #include <Windows.h>
 
-using OsMutex = CRITICAL_SECTION;
+using GrdOsMutex = CRITICAL_SECTION;
 
-void os_mutex_create(OsMutex* mutex) {
+void grd_os_mutex_create(GrdOsMutex* mutex) {
 	*mutex = {};
 	InitializeCriticalSection(mutex);
 }
 
-void os_mutex_lock(OsMutex* mutex) {
+void grd_os_mutex_lock(GrdOsMutex* mutex) {
 	EnterCriticalSection(mutex);
 }
 
-void os_mutex_unlock(OsMutex* mutex) {
+void grd_os_mutex_unlock(GrdOsMutex* mutex) {
 	LeaveCriticalSection(mutex);
 }
 
-void os_mutex_destroy(OsMutex* mutex) {
+void grd_os_mutex_destroy(GrdOsMutex* mutex) {
 	DeleteCriticalSection(mutex);
 }
 
 
-using OsSemaphore = HANDLE;
+using GrdOsSemaphore = HANDLE;
 
-void os_semaphore_create(OsSemaphore* sem, u32 initial_value) {
+void grd_os_semaphore_create(GrdOsSemaphore* sem, u32 initial_value) {
 	*sem = CreateSemaphoreA(NULL, initial_value, LONG_MAX, NULL);
 }
 
-void os_semaphore_wait_and_decrement(OsSemaphore* sem) {
+void grd_os_semaphore_wait_and_decrement(GrdOsSemaphore* sem) {
 	WaitForSingleObject(*sem, INFINITE);
 }
 
-void os_semaphore_increment(OsSemaphore* sem) {
+void grd_os_semaphore_increment(GrdOsSemaphore* sem) {
 	long previous_count;
 	ReleaseSemaphore(*sem, 1, &previous_count);
 }
 
-void os_semaphore_destroy(OsSemaphore* sem) {
+void grd_os_semaphore_destroy(GrdOsSemaphore* sem) {
 	CloseHandle(*sem);
 }

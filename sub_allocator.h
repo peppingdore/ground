@@ -4,10 +4,10 @@
 #include "hash_map.h"
 #include "type_utils.h"
 #include "stopwatch.h"
-#include "defer.h"
+#include "grd_defer.h"
 
 struct SubAllocator {
-	Allocator                   parent;
+	GrdAllocator                   parent;
 	HashMap<void*, EmptyStruct> map;
 };
 
@@ -37,7 +37,7 @@ AllocatorProcResult sub_allocator_proc(void* allocator_data, AllocatorProcParams
 		case ALLOCATOR_VERB_FREE_ALLOCATOR: {
 			auto parent = x->parent;
 			x->map.free();
-			Free(x->parent, x);
+			GrdFree(x->parent, x);
 			free_allocator(parent);
 			return {};
 		}
@@ -47,8 +47,8 @@ AllocatorProcResult sub_allocator_proc(void* allocator_data, AllocatorProcParams
 	}
 }
 
-Allocator make_sub_allocator(Allocator parent) {
-	auto x = make<SubAllocator>(parent);
+GrdAllocator grd_make_sub_allocator(GrdAllocator parent) {
+	auto x = grd_make<SubAllocator>(parent);
 	x->parent = parent;
 	x->map.allocator = parent;
 	return { .proc = sub_allocator_proc, .data = x };

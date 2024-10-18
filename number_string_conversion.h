@@ -1,6 +1,6 @@
 #pragma once
 
-#include "base.h"
+#include "grd_base.h"
 #include "allocator.h"
 #include "string.h"
 #include "reflect.h"
@@ -37,7 +37,7 @@ void append(SmallString* res, char c) {
 
 void append(SmallString* res, const char* str) {
 	auto length = strlen(str);
-	for (auto i: range(length)) {
+	for (auto i: grd_range(length)) {
 		append(res, str[i]);
 	}
 }
@@ -259,7 +259,7 @@ inline SmallString to_string(T num, int max_decimal_digits = 99999999) {
 		print_integer_number_to_char_buffer_reversed(decimal_part, 10, false, res.buf, &res.length);
 
 		// Print zeros in zone marked by square brackets.  000.[000]323223
-		for (auto i: range(zeros_after_point)) {
+		for (auto i: grd_range(zeros_after_point)) {
 			append(&res, '0');
 		}
 		
@@ -311,7 +311,7 @@ inline bool parse_integer(Span<Char> str, T* result, ParseIntegerParams params =
 		return false;
 	}
 
-	using UnsignedT = typename std::make_unsigned<T>::type;
+	using UnsignedT = typename std::grd_make_unsigned<T>::type;
 
 	int base = 10;
 	int start = 0;
@@ -592,7 +592,7 @@ inline bool parse_float(Span<Char> str, f64* result, Float_Parsing_Params params
 
 		bool did_meet_dot = false;
 
-		for (auto i: range(len(significand_part))) {
+		for (auto i: grd_range(len(significand_part))) {
 			auto c = significand_part[i];
 
 			auto add_digit = [&](u8 digit) -> bool {
@@ -645,7 +645,7 @@ inline bool parse_float(Span<Char> str, f64* result, Float_Parsing_Params params
 		u64 significand = 0;
 		u64 exp = 1;
 		
-		for (auto i: reverse(range(digits_count))) {
+		for (auto i: reverse(grd_range(digits_count))) {
 			u8 digit = digits[i];
 			u64 new_number = significand + exp * digit;
 			assert(new_number >= significand);
@@ -675,7 +675,7 @@ inline bool parse_float(Span<Char> str, f64* result, Float_Parsing_Params params
 			return false;
 		}
 
-		for (auto i: reverse(range(len(exponent_string)))) {
+		for (auto i: reverse(grd_range(len(exponent_string)))) {
 
 			auto c = exponent_string[i];
 			if (c == '_') {

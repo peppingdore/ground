@@ -4,13 +4,13 @@
 #include <utility>
 
 template <typename T>
-struct Generator {
+struct GrdGenerator {
 	using ItemType = T;
 
 	struct promise_type {
 		T stored_value;
 
-		Generator get_return_object() {
+		GrdGenerator get_return_object() {
 			return { std::coroutine_handle<promise_type>::from_promise(*this) };
 		}
 
@@ -39,20 +39,20 @@ struct Generator {
 
 	std::coroutine_handle<promise_type> handle;
 
-	Generator(std::coroutine_handle<promise_type> h): handle(h) {};
-	Generator& operator=(const Generator&) = delete;
-	Generator (const Generator&) = delete;
-	Generator (Generator&& rhs): handle(rhs.handle) {
+	GrdGenerator(std::coroutine_handle<promise_type> h): handle(h) {};
+	GrdGenerator& operator=(const GrdGenerator&) = delete;
+	GrdGenerator (const GrdGenerator&) = delete;
+	GrdGenerator (GrdGenerator&& rhs): handle(rhs.handle) {
 		rhs.handle = {};
 	};
 
-	~Generator() {
+	~GrdGenerator() {
 		if (handle) {
 			handle.destroy();
 		}
 	}
 
-	Generator& operator=(Generator&& other) {
+	GrdGenerator& operator=(GrdGenerator&& other) {
 		if (this != &other) {
 			if (handle) {
 				handle.destroy();
@@ -73,7 +73,7 @@ struct Generator {
 	}
 
 	struct Range {
-		Generator* gen = NULL;
+		GrdGenerator* gen = NULL;
 
 		bool operator!=(int rhs /*ignored*/) {
 			return !gen->handle.done();
@@ -110,19 +110,19 @@ struct Generator {
 };
 
 template <typename T>
-struct IsGeneratorType: std::false_type {};
+struct IsGrdGeneratorType: std::false_type {};
 template <typename T>
-struct IsGeneratorType<Generator<T>>: std::true_type {};
+struct IsGrdGeneratorType<GrdGenerator<T>>: std::true_type {};
 
 template <typename T>
-concept HasGeneratorIterator = requires (T t) {
-	requires IsGeneratorType<decltype(t.iterate())>::value;
+concept HasGrdGeneratorIterator = requires (T t) {
+	requires IsGrdGeneratorType<decltype(t.iterate())>::value;
 };
 
-auto begin(HasGeneratorIterator auto t) {
+auto begin(HasGrdGeneratorIterator auto t) {
 	return t.iterate();
 }
 
-int end(HasGeneratorIterator auto t) {
+int end(HasGrdGeneratorIterator auto t) {
 	return 0;
 }

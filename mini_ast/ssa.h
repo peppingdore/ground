@@ -7,8 +7,8 @@ struct AstRunner {
 	CLikeProgram* program;
 };
 
-AstRunner* make_ast_runner(CLikeProgram* program) {
-	auto runner = make<AstRunner>();
+AstRunner* grd_make_ast_runner(CLikeProgram* program) {
+	auto runner = grd_make<AstRunner>();
 	runner->program = program;
 	return runner;
 }
@@ -20,12 +20,12 @@ struct SsaId {
 		return v == other.v;
 	}
 
-	REFLECT(SsaId) {
-		MEMBER(v);
+	GRD_REFLECT(SsaId) {
+		GRD_MEMBER(v);
 	}
 };
 
-Hash64 hash_key(SsaId id) {
+GrdHash64 hash_key(SsaId id) {
 	return hash64(id.v);
 }
 
@@ -54,21 +54,21 @@ struct SsaBasicBlock {
 	Array<SsaBasicBlock*>       successors;
 	HashMap<AstVar*, SsaValue*> ssa_vars;
 
-	REFLECT(SsaBasicBlock) {
-		MEMBER(name);
-		MEMBER(ssa);
-		MEMBER(ending);
-		MEMBER(is_sealed);
-		MEMBER(values);
-		MEMBER(incomplete_phis);
-		MEMBER(pred);
-		MEMBER(successors);
-		MEMBER(ssa_vars);
+	GRD_REFLECT(SsaBasicBlock) {
+		GRD_MEMBER(name);
+		GRD_MEMBER(ssa);
+		GRD_MEMBER(ending);
+		GRD_MEMBER(is_sealed);
+		GRD_MEMBER(values);
+		GRD_MEMBER(incomplete_phis);
+		GRD_MEMBER(pred);
+		GRD_MEMBER(successors);
+		GRD_MEMBER(ssa_vars);
 	}
 };
 
 struct Ssa {
-	Allocator                   allocator = c_allocator;
+	GrdAllocator                   allocator = c_allocator;
 	SsaBasicBlock*              entry = NULL;
 	s64                         reg_counter = 0;
 	SsaBasicBlock*              current_block = NULL;
@@ -91,8 +91,8 @@ s64 alloc_construct_id(Ssa* ssa) {
 	return ++ssa->construct_id_counter;
 }
 
-SsaBasicBlock* make_ssa_basic_block(Ssa* ssa, String name = ""_b, s64 construct_id = 0) {
-	SsaBasicBlock* block = make<SsaBasicBlock>(ssa->allocator);
+SsaBasicBlock* grd_make_ssa_basic_block(Ssa* ssa, String name = ""_b, s64 construct_id = 0) {
+	SsaBasicBlock* block = grd_make<SsaBasicBlock>(ssa->allocator);
 	if (construct_id > 0) {
 		block->name = sprint(ssa->allocator, "%_%", construct_id, name);
 	} else {
@@ -112,10 +112,10 @@ bool can_ssa(AstVar* var) {
 	if (var->is_global) {
 		return false;
 	}
-	if (reflect_cast<AstPrimitiveType>(var->var_ts->tp)) {
+	if (grd_reflect_cast<AstGrdPrimitiveType>(var->var_ts->tp)) {
 		return true;
 	}
-	if (reflect_cast<AstFunctionArg>(var)) {
+	if (grd_reflect_cast<AstFunctionArg>(var)) {
 		return true;
 	}
 	return false;
@@ -132,7 +132,7 @@ void write_var(SsaBasicBlock* block, AstVar* var, SsaValue* v) {
 SsaValue* read_var(SsaBasicBlock* block, AstVar* var);
 
 SsaValue* init_ssa_val(SsaBasicBlock* block, SsaOp op) {
-	auto v = make<SsaValue>(block->ssa->allocator);
+	auto v = grd_make<SsaValue>(block->ssa->allocator);
 	v->block = block;
 	v->op = op;
 	v->id = alloc_id(block->ssa);
@@ -141,7 +141,7 @@ SsaValue* init_ssa_val(SsaBasicBlock* block, SsaOp op) {
 	return v;
 }
 
-SsaValue* make_ssa_val(SsaBasicBlock* block, SsaOp op) {
+SsaValue* grd_make_ssa_val(SsaBasicBlock* block, SsaOp op) {
 	assert(!block->ssa->is_rewriting);
 	auto v = init_ssa_val(block, op);
 	if (op == SsaOp::Phi) {
@@ -185,7 +185,7 @@ SsaRewriter start_rewrite(Ssa* ssa) {
 
 void finish_rewrite(SsaRewriter* r) {
 	for (auto it: r->add_values) {
-		for (auto i: range(len(it.v->block->values))) {
+		for (auto i: grd_range(len(it.v->block->values))) {
 			if (it.v->block->values[i] == it.before) {
 				// println("add: %* op % idx: %", it.v->id.v, it.v->op, i);
 				// println("block name: %*", it.v->block->name);
@@ -206,7 +206,7 @@ void finish_rewrite(SsaRewriter* r) {
 				}
 			}
 		}
-		for (auto i: range(len(v->block->values))) {
+		for (auto i: grd_range(len(v->block->values))) {
 			if (v->block->values[i] == v) {
 				remove_at_index(&v->block->values, i);
 				break;
@@ -216,7 +216,7 @@ void finish_rewrite(SsaRewriter* r) {
 	r->ssa->is_rewriting = false;
 }
 
-SsaValue* make_rewrite_ssa_val_before(SsaRewriter* r, SsaBasicBlock* block, SsaOp op, SsaValue* before) {
+SsaValue* grd_make_rewrite_ssa_val_before(SsaRewriter* r, SsaBasicBlock* block, SsaOp op, SsaValue* before) {
 	auto v = init_ssa_val(block, op);
 	SsaRewriteAddValue x;
 	x.v = v;
@@ -236,7 +236,7 @@ void replace_by(SsaRewriter* r, SsaValue* v, SsaValue* by) {
 			continue;
 		}
 		bool did_find = false;
-		for (auto i: range(len(use->args))) {
+		for (auto i: grd_range(len(use->args))) {
 			if (use->args[i] == v) {
 				use->args[i] = by;
 				add(&by->uses, use);
@@ -301,7 +301,7 @@ SsaValue* try_remove_trivial_phi(SsaValue* phi) {
 SsaValue* add_phi_args(SsaValue* phi) {
 	assert(phi->block->is_sealed);
 	assert(len(phi->args) == 0);
-	auto var = reflect_cast<AstVar>(phi->aux);
+	auto var = grd_reflect_cast<AstVar>(phi->aux);
 	if (!var) {
 		panic("Expected var");
 	}
@@ -316,8 +316,8 @@ SsaValue* add_phi_args(SsaValue* phi) {
 SsaValue* read_var_recursive(SsaBasicBlock* block, AstVar* var) {
 	SsaValue* v = NULL;
 	if (!block->is_sealed) {
-		auto phi = make_ssa_val(block, SsaOp::Phi);
-		phi->aux = make_any(var);
+		auto phi = grd_make_ssa_val(block, SsaOp::Phi);
+		phi->aux = grd_make_any(var);
 		phi->v_type = var->var_ts->tp;
 		add(&block->incomplete_phis, phi);
 		v = phi;
@@ -325,8 +325,8 @@ SsaValue* read_var_recursive(SsaBasicBlock* block, AstVar* var) {
 		assert(block->pred[0]->ending);
 		v = read_var(block->pred[0], var);
 	} else {
-		auto phi = make_ssa_val(block, SsaOp::Phi);
-		phi->aux = make_any(var);
+		auto phi = grd_make_ssa_val(block, SsaOp::Phi);
+		phi->aux = grd_make_any(var);
 		phi->v_type = var->var_ts->tp;
 		write_var(block, var, phi);
 		v = add_phi_args(phi);
@@ -358,15 +358,15 @@ void add_pred_inner(SsaBasicBlock* block, SsaBasicBlock* pred) {
 
 void end_block_jump(SsaBasicBlock* block, SsaBasicBlock* target) {
 	assert(block->ending == NULL);
-	auto v = make_ssa_val(block, SsaOp::Jump);
-	v->aux = make_any(target);
+	auto v = grd_make_ssa_val(block, SsaOp::Jump);
+	v->aux = grd_make_any(target);
 	block->ending = v;
 	add_pred_inner(target, block);
 }
 
 void end_block_ret(SsaBasicBlock* block, SsaValue* ret) {
 	assert(block->ending == NULL);
-	block->ending = make_ssa_val(block, SsaOp::Return);
+	block->ending = grd_make_ssa_val(block, SsaOp::Return);
 	if (ret) {
 		add_arg(block->ending, ret);
 	}
@@ -374,27 +374,27 @@ void end_block_ret(SsaBasicBlock* block, SsaValue* ret) {
 
 void end_block_ret_void(SsaBasicBlock* block) {
 	assert(block->ending == NULL);
-	block->ending = make_ssa_val(block, SsaOp::ReturnVoid);
+	block->ending = grd_make_ssa_val(block, SsaOp::ReturnVoid);
 }
 
 struct SsaCondJump {
 	SsaBasicBlock* t_block = NULL;
 	SsaBasicBlock* f_block = NULL;
 
-	REFLECT(SsaCondJump) {
-		MEMBER(t_block);
-		MEMBER(f_block);
+	GRD_REFLECT(SsaCondJump) {
+		GRD_MEMBER(t_block);
+		GRD_MEMBER(f_block);
 	}
 };
 
 void end_block_cond_jump(SsaBasicBlock* block, SsaValue* cond, SsaBasicBlock* t_block, SsaBasicBlock* f_block) {
 	assert(block->ending == NULL);
-	auto v = make_ssa_val(block, SsaOp::CondJump);
+	auto v = grd_make_ssa_val(block, SsaOp::CondJump);
 	add_arg(v, cond);
-	auto cj = make<SsaCondJump>(block->ssa->allocator);
+	auto cj = grd_make<SsaCondJump>(block->ssa->allocator);
 	cj->t_block = t_block;
 	cj->f_block = f_block;
-	v->aux = make_any(cj);
+	v->aux = grd_make_any(cj);
 	block->ending = v;
 	add_pred_inner(t_block, block);
 	add_pred_inner(f_block, block);
@@ -421,11 +421,11 @@ SsaValue* read_var(SsaBasicBlock* block, AstVar* var) {
 
 template <typename T>
 SsaValue* load_const(Ssa* ssa, T value) {
-	Type* type = reflect_type_of<T>();
-	auto inst = make_ssa_val(ssa->current_block, SsaOp::Const);
+	Type* type = grd_reflect_type_of<T>();
+	auto inst = grd_make_ssa_val(ssa->current_block, SsaOp::Const);
 	// @MemoryLeak
 	auto copied = copy(ssa->allocator, value);
-	inst->aux = make_any(type, copied);
+	inst->aux = grd_make_any(type, copied);
 	return inst;
 }
 
@@ -448,31 +448,31 @@ Tuple<SsaLV, SsaLVKind, Error*> fill_lvalue(Ssa* ssa, AstExpr* expr) {
 		return { {}, {}, format_error("Expected lvalue, got %*", expr->type->name) };
 	}
 
-	if (auto var_access = reflect_cast<AstVarMemberAccess>(expr)) {
+	if (auto var_access = grd_reflect_cast<AstVarMemberAccess>(expr)) {
 		auto [v, kind, e] = fill_lvalue(ssa, var_access->lhs);
 		if (e) {
 			return { {}, {}, e };
 		}
-		if (reflect_cast<AstPointerType>(var_access->lhs->expr_type)) {
+		if (grd_reflect_cast<AstGrdPointerType>(var_access->lhs->expr_type)) {
 			// I think we might want to emit_expr(lhs) instead of fill_lvalue(lhs).
-			auto idx = make_ssa_val(ssa->current_block, SsaOp::Const);
-			auto zero = make<s64>(ssa->allocator);
-			idx->aux = make_any(zero);
+			auto idx = grd_make_ssa_val(ssa->current_block, SsaOp::Const);
+			auto zero = grd_make<s64>(ssa->allocator);
+			idx->aux = grd_make_any(zero);
 			idx->v_type = ssa->function->p->s64_tp;
 			add(&v.args, idx);
 			kind = SsaLVKindPtr;
 		}
-		auto access = make_ssa_val(ssa->current_block, SsaOp::MemberAccess);
-		access->aux = make_any(var_access->member);
+		auto access = grd_make_ssa_val(ssa->current_block, SsaOp::MemberAccess);
+		access->aux = grd_make_any(var_access->member);
 		access->v_type = var_access->member->member_ts->tp;
 		add(&v.args, access);
 		return { v, kind, NULL };
-	} else if (auto var_access = reflect_cast<AstVariableAccess>(expr)) {
+	} else if (auto var_access = grd_reflect_cast<AstVariableAccess>(expr)) {
 		if (var_access->var->is_global) {
 			SsaLV lv;
 			lv.var = var_access->var;
-			lv.value = make_ssa_val(ssa->current_block, SsaOp::GlobalVar);
-			lv.value->aux = make_any(var_access->var);
+			lv.value = grd_make_ssa_val(ssa->current_block, SsaOp::GlobalVar);
+			lv.value->aux = grd_make_any(var_access->var);
 			lv.args.allocator = ssa->allocator;
 			return { lv, SsaLVKindPtr, NULL };
 		} else {
@@ -498,17 +498,17 @@ Tuple<SsaLV, SsaLVKind, Error*> fill_lvalue(Ssa* ssa, AstExpr* expr) {
 				return { lv, SsaLVKindPtr, NULL };
 			}
 		}
-	} else if (auto sw = reflect_cast<AstSwizzleExpr>(expr)) {
+	} else if (auto sw = grd_reflect_cast<AstSwizzleExpr>(expr)) {
 		auto [v, kind, e] = fill_lvalue(ssa, sw->lhs);
 		if (e) {
 			return { {}, {}, e };
 		}
-		auto swz = make_ssa_val(ssa->current_block, SsaOp::SwizzleIndices);
-		swz->aux = make_any(sw);
+		auto swz = grd_make_ssa_val(ssa->current_block, SsaOp::SwizzleIndices);
+		swz->aux = grd_make_any(sw);
 		swz->v_type = sw->expr_type;
 		add(&v.args, swz);
 		return { v, kind, NULL };
-	} else if (auto deref = reflect_cast<AstDerefExpr>(expr)) {
+	} else if (auto deref = grd_reflect_cast<AstDerefExpr>(expr)) {
 		auto [addr, e] = emit_expr(ssa, deref->lhs);
 		if (e) {
 			return { {}, {}, e };
@@ -517,12 +517,12 @@ Tuple<SsaLV, SsaLVKind, Error*> fill_lvalue(Ssa* ssa, AstExpr* expr) {
 		lv.args.allocator = ssa->allocator;
 		lv.value = addr;
 		return { lv, SsaLVKindPtr, NULL };
-	} else if (auto array_access = reflect_cast<AstArrayAccess>(expr)) {
+	} else if (auto array_access = grd_reflect_cast<AstArrayAccess>(expr)) {
 		auto [v, kind, e] = fill_lvalue(ssa, array_access->lhs);
 		if (e) {
 			return { {}, {}, e };
 		}
-		if (reflect_cast<AstPointerType>(array_access->lhs->expr_type)) {
+		if (grd_reflect_cast<AstGrdPointerType>(array_access->lhs->expr_type)) {
 			kind = SsaLVKindPtr;
 		}
 		auto [idx, e2] = emit_expr(ssa, array_access->index);
@@ -547,7 +547,7 @@ Tuple<SsaLV, Error*> lvalue(Ssa* ssa, AstExpr* expr) {
 		if (len(lv.args) == 0) {
 			return { lv, NULL };
 		}
-		auto v = make_ssa_val(ssa->current_block, SsaOp::GetElementPtr);
+		auto v = grd_make_ssa_val(ssa->current_block, SsaOp::GetElementPtr);
 		add_arg(v, lv.value);
 		for (auto arg: lv.args) {
 			add_arg(v, arg);
@@ -563,7 +563,7 @@ Tuple<SsaValue*, Error*> load(Ssa* ssa, SsaLV lv, AstType* type) {
 		if (len(lv.args) == 0) {
 			return { lv.value, NULL };
 		} else {
-			auto v = make_ssa_val(ssa->current_block, SsaOp::ExtractValue);
+			auto v = grd_make_ssa_val(ssa->current_block, SsaOp::ExtractValue);
 			add_arg(v, lv.value);
 			for (auto arg: lv.args) {
 				add_arg(v, arg);
@@ -572,7 +572,7 @@ Tuple<SsaValue*, Error*> load(Ssa* ssa, SsaLV lv, AstType* type) {
 			return { v, NULL };
 		}
 	}
-	auto v = make_ssa_val(ssa->current_block, SsaOp::Load);
+	auto v = grd_make_ssa_val(ssa->current_block, SsaOp::Load);
 	add_arg(v, lv.value);
 	v->v_type = type;
 	return { v, NULL };
@@ -583,7 +583,7 @@ Error* store(Ssa* ssa, SsaLV lv, SsaValue* rhs) {
 		if (len(lv.args) == 0) {
 			write_var(ssa->current_block, lv.var, rhs);
 		} else {
-			auto v = make_ssa_val(ssa->current_block, SsaOp::InsertValue);
+			auto v = grd_make_ssa_val(ssa->current_block, SsaOp::InsertValue);
 			add_arg(v, lv.value);
 			for (auto arg: lv.args) {
 				add_arg(v, arg);
@@ -593,15 +593,15 @@ Error* store(Ssa* ssa, SsaLV lv, SsaValue* rhs) {
 		}
 		return NULL;
 	}
-	auto v = make_ssa_val(ssa->current_block, SsaOp::Store);
+	auto v = grd_make_ssa_val(ssa->current_block, SsaOp::Store);
 	add_arg(v, lv.value);
 	add_arg(v, rhs);
 	return NULL;
 }
 
 SsaValue* ssa_alloca(Ssa* ssa, AstType* type) {
-	auto v = make_ssa_val(ssa->current_block, SsaOp::Alloca);
-	v->aux = make_any(type);
+	auto v = grd_make_ssa_val(ssa->current_block, SsaOp::Alloca);
+	v->aux = grd_make_any(type);
 	v->v_type = type;
 	return v;
 }
@@ -627,7 +627,7 @@ Tuple<SsaValue*, Error*> emit_binary_op(Ssa* ssa, UnicodeString op, SsaValue* lh
 	} else {
 		return { NULL, format_error("Unsupported binary operator: %", op) };
 	}
-	auto v = make_ssa_val(ssa->current_block, ssa_op);
+	auto v = grd_make_ssa_val(ssa->current_block, ssa_op);
 	add_arg(v, lhs);
 	add_arg(v, rhs);
 	return { v, NULL };
@@ -644,15 +644,15 @@ Tuple<SsaValue*, Error*> emit_unary_op(Ssa* ssa, UnicodeString op, SsaValue* lhs
 	} else {
 		return { NULL, format_error("Unsupported unary operator: %", op) };
 	}
-	auto v = make_ssa_val(ssa->current_block, ssa_op);
+	auto v = grd_make_ssa_val(ssa->current_block, ssa_op);
 	add_arg(v, lhs);
 	return { v, NULL };
 }
 
 Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr) {
-	if (auto call = reflect_cast<AstFunctionCall>(expr)) {
-		auto v = make_ssa_val(ssa->current_block, SsaOp::Call);
-		v->aux = make_any(call->f);
+	if (auto call = grd_reflect_cast<AstFunctionCall>(expr)) {
+		auto v = grd_make_ssa_val(ssa->current_block, SsaOp::Call);
+		v->aux = grd_make_any(call->f);
 		v->v_type = call->expr_type;
 		for (auto arg: call->args) {
 			auto [arg_v, e] = emit_expr(ssa, arg);
@@ -662,7 +662,7 @@ Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr) {
 			add_arg(v, arg_v);
 		}
 		return { v, NULL };
-	} else if (auto binary_expr = reflect_cast<AstBinaryExpr>(expr)) {
+	} else if (auto binary_expr = grd_reflect_cast<AstBinaryExpr>(expr)) {
 		if (binary_expr->op->op == "=") {
 			auto [lhs, e1] = lvalue(ssa, binary_expr->lhs);
 			if (e1) {
@@ -715,7 +715,7 @@ Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr) {
 			}
 			return { oped, NULL };
 		}
-	} else if (auto var_access = reflect_cast<AstVariableAccess>(expr)) {
+	} else if (auto var_access = grd_reflect_cast<AstVariableAccess>(expr)) {
 		auto [lv, e] = lvalue(ssa, var_access);
 		if (e) {
 			return { NULL, e };
@@ -725,16 +725,16 @@ Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr) {
 			return { NULL, e2 };
 		}
 		return { loaded, NULL };
-	} else if (auto literal_expr = reflect_cast<AstLiteralExpr>(expr)) {
-		auto any = make_any(literal_expr->lit_type, &literal_expr->lit_value);
-		auto inst = make_ssa_val(ssa->current_block, SsaOp::Const);
+	} else if (auto literal_expr = grd_reflect_cast<AstLiteralExpr>(expr)) {
+		auto any = grd_make_any(literal_expr->lit_type, &literal_expr->lit_value);
+		auto inst = grd_make_ssa_val(ssa->current_block, SsaOp::Const);
 		inst->aux = any;
 		return { inst, NULL };
-	} else if (auto ternary = reflect_cast<AstTernary>(expr)) {
+	} else if (auto ternary = grd_reflect_cast<AstTernary>(expr)) {
 		auto construct_id = alloc_construct_id(ssa);
 		// @TODO: This is not correct! Rewrite with starting and ending blocks.
 
-		auto cond_block = make_ssa_basic_block(ssa, "ternary_cond"_b, construct_id);
+		auto cond_block = grd_make_ssa_basic_block(ssa, "ternary_cond"_b, construct_id);
 		auto pred = ssa->current_block;
 		ssa->current_block = cond_block;
 		auto [cond_value, e1] = emit_expr(ssa, ternary->cond);
@@ -744,13 +744,13 @@ Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr) {
 		seal_block(pred);
 		end_block_jump(pred, cond_block);
 		seal_block(cond_block);
-		ssa->current_block = make_ssa_basic_block(ssa, "ternary_then"_b, construct_id);
+		ssa->current_block = grd_make_ssa_basic_block(ssa, "ternary_then"_b, construct_id);
 		auto [then_expr, e2] = emit_expr(ssa, ternary->then);
 		if (e2) {
 			return { NULL, e2 };
 		}
 		auto then_block = ssa->current_block;
-		ssa->current_block = make_ssa_basic_block(ssa, "ternary_else"_b, construct_id);
+		ssa->current_block = grd_make_ssa_basic_block(ssa, "ternary_else"_b, construct_id);
 		auto [else_expr, e3] = emit_expr(ssa, ternary->else_);
 		if (e3) {
 			return { NULL, e3 };
@@ -760,27 +760,27 @@ Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr) {
 		seal_block(then_block);
 		seal_block(else_block);
 
-		ssa->current_block = make_ssa_basic_block(ssa, "ternary_after"_b, construct_id);
+		ssa->current_block = grd_make_ssa_basic_block(ssa, "ternary_after"_b, construct_id);
 		end_block_jump(then_block, ssa->current_block);
 		end_block_jump(else_block, ssa->current_block);
 
-		auto phi = make_ssa_val(ssa->current_block, SsaOp::Phi);
+		auto phi = grd_make_ssa_val(ssa->current_block, SsaOp::Phi);
 		add_arg(phi, then_expr);
 		add_arg(phi, else_expr);
 		phi->v_type = ternary->then->expr_type;
 		return { phi, NULL };
-	} else if (auto init = reflect_cast<AstStructInitializer>(expr)) {
+	} else if (auto init = grd_reflect_cast<AstStructInitializer>(expr)) {
 		auto slot = ssa_alloca(ssa, init->struct_type);
 		for (auto m: init->members) {
 			auto [expr, e] = emit_expr(ssa, m.expr);
 			if (e) {
 				return { NULL, e };
 			}
-			auto member = make_ssa_val(ssa->current_block, SsaOp::MemberAccess);
-			member->aux = make_any(m.member);
+			auto member = grd_make_ssa_val(ssa->current_block, SsaOp::MemberAccess);
+			member->aux = grd_make_any(m.member);
 			member->v_type = m.member->member_ts->tp;
 			auto lv = SsaLV { .kind = SsaLVKindPtr, .value = slot };
-			lv.value = make_ssa_val(ssa->current_block, SsaOp::GetElementPtr);
+			lv.value = grd_make_ssa_val(ssa->current_block, SsaOp::GetElementPtr);
 			add_arg(lv.value, slot);
 			add_arg(lv.value, member);
 			store(ssa, lv, expr);
@@ -791,7 +791,7 @@ Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr) {
 			return { NULL, e };
 		}
 		return { ld, NULL };
-	} else if (auto unary = reflect_cast<AstUnaryExpr>(expr)) {
+	} else if (auto unary = grd_reflect_cast<AstUnaryExpr>(expr)) {
 		if (unary->op->op == "--" || unary->op->op == "++") {
 			auto [lv, e] = lvalue(ssa, unary->expr);
 			if (e) {
@@ -824,26 +824,26 @@ Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr) {
 			}
 			return { oped, NULL };
 		}
-	} else if (auto swizzle = reflect_cast<AstSwizzleExpr>(expr)) {
+	} else if (auto swizzle = grd_reflect_cast<AstSwizzleExpr>(expr)) {
 		auto [lhs, e] = emit_expr(ssa, swizzle->lhs);
 		if (e) {
 			return { NULL, e };
 		}
-		auto swz = make_ssa_val(ssa->current_block, SsaOp::SwizzleIndices);
-		swz->aux = make_any(swizzle);
+		auto swz = grd_make_ssa_val(ssa->current_block, SsaOp::SwizzleIndices);
+		swz->aux = grd_make_any(swizzle);
 		swz->v_type = swizzle->expr_type;
-		auto v = make_ssa_val(ssa->current_block, SsaOp::SwizzleExpr);
+		auto v = grd_make_ssa_val(ssa->current_block, SsaOp::SwizzleExpr);
 		add_arg(v, lhs);
 		add_arg(v, swz);
 		return { v, NULL };
-	} else if (auto access = reflect_cast<AstVarMemberAccess>(expr)) {
+	} else if (auto access = grd_reflect_cast<AstVarMemberAccess>(expr)) {
 		auto [lhs, e] = emit_expr(ssa, access->lhs);
 		if (e) {
 			return { NULL, e };
 		}
-		auto v = make_ssa_val(ssa->current_block, SsaOp::MemberAccess);
-		v->aux = make_any(access->member);
-		auto ext = make_ssa_val(ssa->current_block, SsaOp::ExtractValue);
+		auto v = grd_make_ssa_val(ssa->current_block, SsaOp::MemberAccess);
+		v->aux = grd_make_any(access->member);
+		auto ext = grd_make_ssa_val(ssa->current_block, SsaOp::ExtractValue);
 		add_arg(ext, lhs);
 		add_arg(ext, v);
 		return { ext, NULL };
@@ -868,8 +868,8 @@ Error* emit_block(Ssa* ssa, AstBlock* block);
 Error* decl_var(Ssa* ssa, AstVarDecl* var_decl, SsaValue* init) {
 	if (can_ssa(var_decl)) {
 		if (init == NULL) {
-			init = make_ssa_val(ssa->current_block, SsaOp::ZeroInit);
-			init->aux = make_any(var_decl->var_ts->tp);
+			init = grd_make_ssa_val(ssa->current_block, SsaOp::ZeroInit);
+			init->aux = grd_make_any(var_decl->var_ts->tp);
 		}
 		write_var(ssa->current_block, var_decl, init);
 	} else {
@@ -887,13 +887,13 @@ Error* decl_var(Ssa* ssa, AstVarDecl* var_decl, SsaValue* init) {
 }
 
 Error* emit_stmt(Ssa* ssa, AstNode* stmt) {
-	if (auto expr = reflect_cast<AstExpr>(stmt)) {
+	if (auto expr = grd_reflect_cast<AstExpr>(stmt)) {
 		auto [var, e] = emit_expr(ssa, expr);
 		if (e) {
 			return e;
 		}
 		return NULL;
-	} else if (auto var_decl_group = reflect_cast<AstVarDeclGroup>(stmt)) {
+	} else if (auto var_decl_group = grd_reflect_cast<AstVarDeclGroup>(stmt)) {
 		auto first = var_decl_group->var_decls[0];
 		SsaValue* v = NULL;
 		if (first->init) {
@@ -910,7 +910,7 @@ Error* emit_stmt(Ssa* ssa, AstNode* stmt) {
 			}
 		}
 		return NULL;
-	} else if (auto var_decl = reflect_cast<AstVarDecl>(stmt)) {
+	} else if (auto var_decl = grd_reflect_cast<AstVarDecl>(stmt)) {
 		SsaValue* v = NULL;
 		if (var_decl->init) {
 			auto [var, e] = emit_expr(ssa, var_decl->init);
@@ -924,13 +924,13 @@ Error* emit_stmt(Ssa* ssa, AstNode* stmt) {
 			return e;
 		}
 		return NULL;
-	} else if (auto _for = reflect_cast<AstFor>(stmt)) {
+	} else if (auto _for = grd_reflect_cast<AstFor>(stmt)) {
 		auto construct_id = alloc_construct_id(ssa);
 
 		seal_block(ssa->current_block);
 		auto pred = ssa->current_block;
 		// b_s = block start, b_e = block end
-		auto init_b_s = make_ssa_basic_block(ssa, "for_init"_b, construct_id);
+		auto init_b_s = grd_make_ssa_basic_block(ssa, "for_init"_b, construct_id);
 		ssa->current_block = init_b_s;
 		auto [_, e0] = emit_expr(ssa, _for->init_expr);
 		if (e0) {
@@ -941,7 +941,7 @@ Error* emit_stmt(Ssa* ssa, AstNode* stmt) {
 		end_block_jump(pred, init_b_s);
 		seal_block(init_b_e);
 
-		auto cond_b_s = make_ssa_basic_block(ssa, "for_cond"_b, construct_id);
+		auto cond_b_s = grd_make_ssa_basic_block(ssa, "for_cond"_b, construct_id);
 		end_block_jump(init_b_e, cond_b_s);
 		ssa->current_block = cond_b_s;
 		auto [cond_value, e1] = emit_expr(ssa, _for->cond_expr);
@@ -950,8 +950,8 @@ Error* emit_stmt(Ssa* ssa, AstNode* stmt) {
 		}
 		auto cond_b_e = ssa->current_block;
 
-		auto body_b_s = make_ssa_basic_block(ssa, "for_body"_b, construct_id);
-		auto after_b_s = make_ssa_basic_block(ssa, "for_after"_b, construct_id);
+		auto body_b_s = grd_make_ssa_basic_block(ssa, "for_body"_b, construct_id);
+		auto after_b_s = grd_make_ssa_basic_block(ssa, "for_after"_b, construct_id);
 		end_block_cond_jump(cond_b_e, cond_value, body_b_s, after_b_s);
 		
 		ssa->current_block = body_b_s;
@@ -961,7 +961,7 @@ Error* emit_stmt(Ssa* ssa, AstNode* stmt) {
 		}
 		auto body_b_e = ssa->current_block;
 
-		auto incr_b_s = make_ssa_basic_block(ssa, "for_incr"_b, construct_id);
+		auto incr_b_s = grd_make_ssa_basic_block(ssa, "for_incr"_b, construct_id);
 		end_block_jump(body_b_e, incr_b_s);
 
 		ssa->current_block = incr_b_s;
@@ -979,15 +979,15 @@ Error* emit_stmt(Ssa* ssa, AstNode* stmt) {
 		ssa->current_block = after_b_s;
 		seal_block(after_b_s);
 		return NULL;
-	} else if (auto if_ = reflect_cast<AstIf>(stmt)) {
+	} else if (auto if_ = grd_reflect_cast<AstIf>(stmt)) {
 		auto after_c_id = alloc_construct_id(ssa);
 
 		auto pred = ssa->current_block;
 		seal_block(pred);
 
-		auto if_after = make_ssa_basic_block(ssa, "if_after"_b, after_c_id);
+		auto if_after = grd_make_ssa_basic_block(ssa, "if_after"_b, after_c_id);
 		
-		auto ptr_b_s = make_ssa_basic_block(ssa, "if_cond"_b, after_c_id);
+		auto ptr_b_s = grd_make_ssa_basic_block(ssa, "if_cond"_b, after_c_id);
 		end_block_jump(pred, ptr_b_s);
 		seal_block(ptr_b_s);
 
@@ -1002,8 +1002,8 @@ Error* emit_stmt(Ssa* ssa, AstNode* stmt) {
 				return e1;
 			}
 			auto cond_b_e = ssa->current_block;
-			auto body_b_s = make_ssa_basic_block(ssa, "if_body"_b, construct_id);
-			ptr_b_s = make_ssa_basic_block(ssa, "if_else"_b, construct_id);
+			auto body_b_s = grd_make_ssa_basic_block(ssa, "if_body"_b, construct_id);
+			ptr_b_s = grd_make_ssa_basic_block(ssa, "if_else"_b, construct_id);
 			end_block_cond_jump(cond_b_e, cond_value, body_b_s, ptr_b_s);
 			seal_block(body_b_s);
 			seal_block(ptr_b_s);
@@ -1034,7 +1034,7 @@ Error* emit_stmt(Ssa* ssa, AstNode* stmt) {
 		seal_block(if_after);
 		ssa->current_block = if_after;
 		return NULL;
-	} else if (auto ret = reflect_cast<AstReturn>(stmt)) {
+	} else if (auto ret = grd_reflect_cast<AstReturn>(stmt)) {
 		if (ret->rhs) {
 			auto [ret_v, e] = emit_expr(ssa, ret->rhs);
 			if (e) {
@@ -1046,7 +1046,7 @@ Error* emit_stmt(Ssa* ssa, AstNode* stmt) {
 			end_block_ret_void(ssa->current_block);
 			return NULL;
 		}
-		ssa->current_block = make_ssa_basic_block(ssa, "after_ret"_b, alloc_construct_id(ssa));
+		ssa->current_block = grd_make_ssa_basic_block(ssa, "after_ret"_b, alloc_construct_id(ssa));
 		seal_block(ssa->current_block);	
 	} else {
 		return format_error("Unsupported statement: %*", stmt->type->name);
@@ -1068,9 +1068,9 @@ struct SpvUniformSetBinding {
 	s64 set = 0;
 	s64 binding = 0;
 
-	REFLECT(SpvUniformSetBinding) {
-		MEMBER(set);
-		MEMBER(binding);
+	GRD_REFLECT(SpvUniformSetBinding) {
+		GRD_MEMBER(set);
+		GRD_MEMBER(binding);
 	}
 };
 
@@ -1087,15 +1087,15 @@ void print_ssa_value(SsaValue* inst) {
 		print(" %* ", inst->aux.type->name);
 		if (inst->op == SsaOp::Const) {
 			print(" '%*' ", inst->aux);
-		} else if (auto var = reflect_cast<AstVar>(inst->aux)) {
+		} else if (auto var = grd_reflect_cast<AstVar>(inst->aux)) {
 			print(" '%' ", var->name);
-		} else if (auto block = reflect_cast<SsaBasicBlock>(inst->aux)) {
+		} else if (auto block = grd_reflect_cast<SsaBasicBlock>(inst->aux)) {
 			print(" %* ", block->name);
-		} else if (auto cj = reflect_cast<SsaCondJump>(inst->aux)) {
+		} else if (auto cj = grd_reflect_cast<SsaCondJump>(inst->aux)) {
 			print(" %*, %* ", cj->t_block->name, cj->f_block->name);
-		} else if (auto arg = reflect_cast<AstFunctionArg>(inst->aux)) {
+		} else if (auto arg = grd_reflect_cast<AstFunctionArg>(inst->aux)) {
 			print(" '%*' ", arg->var_ts->tp->name);
-		} else if (auto spv = reflect_cast<SpvUniformSetBinding>(inst->aux)) {
+		} else if (auto spv = grd_reflect_cast<SpvUniformSetBinding>(inst->aux)) {
 			print(" (%, %) ", spv->set, spv->binding);
 		}
 	}
@@ -1136,22 +1136,22 @@ void print_ssa(SsaBasicBlock* entry) {
 	printed_blocks.free();
 }
 
-Tuple<Ssa*, Error*> emit_function_ssa(Allocator allocator, AstFunction* f) {
-	auto arena = make_arena_allocator(allocator, 1024 * 1024);
-	Ssa* ssa = make<Ssa>(arena);
+Tuple<Ssa*, Error*> emit_function_ssa(GrdAllocator allocator, AstFunction* f) {
+	auto arena = grd_make_arena_allocator(allocator, 1024 * 1024);
+	Ssa* ssa = grd_make<Ssa>(arena);
 	ssa->function = f;
 	ssa->allocator = arena;
 	if (!f->block) {
 		return { {}, format_error("Function % has no body", f->name) };
 	}
-	auto entry_block = make_ssa_basic_block(ssa);
+	auto entry_block = grd_make_ssa_basic_block(ssa);
 	ssa->entry = entry_block;
 	ssa->current_block = entry_block;
 	ssa->non_ssa_vars.allocator = ssa->allocator;
 	seal_block(entry_block);
 	for (auto arg: f->args) {
-		auto v = make_ssa_val(ssa->current_block, SsaOp::FunctionArg);
-		v->aux = make_any(arg);
+		auto v = grd_make_ssa_val(ssa->current_block, SsaOp::FunctionArg);
+		v->aux = grd_make_any(arg);
 		v->v_type = arg->var_ts->tp;
 		write_var(ssa->current_block, arg, v);
 	}
@@ -1176,7 +1176,7 @@ struct SpirvEntryPoint {
 };
 
 struct SpirvEmitter {
-	Allocator               allocator;
+	GrdAllocator               allocator;
 	CLikeParser*            p = NULL;
 	Array<u32>              spv;
 	s64                     spv_cursor = 0;
@@ -1260,25 +1260,25 @@ Tuple<u32, Error*> get_type_id(SpirvEmitter* m, AstType* type) {
 		return { *found, NULL };
 	}
 	u32 id = 0;
-	if (auto prim = reflect_cast<AstPrimitiveType>(type)) {
+	if (auto prim = grd_reflect_cast<AstGrdPrimitiveType>(type)) {
 		id = alloc_id(m);
 		switch (prim->c_tp->primitive_kind) {
-			case PrimitiveKind::P_void:
+			case GrdPrimitiveKind::P_void:
 				spv_op(m, SpvOpTypeVoid, { id });
 				break;
-			case PrimitiveKind::P_u32:
+			case GrdPrimitiveKind::P_u32:
 				spv_op(m, SpvOpTypeInt, { id, 32, 0 });
 				break;
-			case PrimitiveKind::P_f32:
+			case GrdPrimitiveKind::P_f32:
 				spv_op(m, SpvOpTypeFloat, { id, 32 });
 				break;
-			case PrimitiveKind::P_f64:
+			case GrdPrimitiveKind::P_f64:
 				spv_op(m, SpvOpTypeFloat, { id, 64 });
 				break;
 			default:
 				return { 0, format_error("Unsupported type: %*", type->name) };
 		}
-	} else if (auto tp = reflect_cast<AstStructType>(type)) {
+	} else if (auto tp = grd_reflect_cast<AstStructType>(type)) {
 		id = alloc_id(m);
 		if (tp == m->p->float2_tp || tp == m->p->float3_tp || tp == m->p->float4_tp) {
 			auto [comp_id, e] = get_type_id(m, m->p->f32_tp);
@@ -1320,7 +1320,7 @@ Tuple<u32, Error*> decl_pointer_type(SpirvEmitter* m, AstType* type, u32 storage
 	return { res, NULL };
 }
 
-SpirvEmitter make_spirv_emitter(CLikeParser* p, Allocator allocator) {
+SpirvEmitter grd_make_spirv_emitter(CLikeParser* p, GrdAllocator allocator) {
 	SpirvEmitter m;
 	m.allocator = allocator;
 	m.p = p;
@@ -1338,14 +1338,14 @@ Error* emit_spirv_block(SpirvEmitter* m, SsaBasicBlock* block) {
 		switch (v->op) {
 			case SsaOp::Const: {
 				auto id = alloc_id(m);
-				if (auto f = reflect_cast<f32>(v->aux)) {
+				if (auto f = grd_reflect_cast<f32>(v->aux)) {
 					auto [tp, e] = get_type_id(m, m->p->f32_tp);
 					if (e) {
 						return e;
 					}
 					u32 w = bitcast<u32>(*f);
 					spv_op(m, SpvOpConstant, { tp, id, w });
-				} else if (auto f = reflect_cast<f64>(v->aux)) {
+				} else if (auto f = grd_reflect_cast<f64>(v->aux)) {
 					auto [tp, e] = get_type_id(m, m->p->f64_tp);
 					if (e) {
 						return e;
@@ -1354,7 +1354,7 @@ Error* emit_spirv_block(SpirvEmitter* m, SsaBasicBlock* block) {
 					u32 w0 = w & 0xffffffff;
 					u32 w1 = w >> 32;
 					spv_op(m, SpvOpConstant, { tp, id, w0, w1 });
-				} else if (auto i = reflect_cast<u32>(v->aux)) {
+				} else if (auto i = grd_reflect_cast<u32>(v->aux)) {
 					auto [tp, e] = get_type_id(m, m->p->u32_tp);
 					if (e) {
 						return e;
@@ -1367,7 +1367,7 @@ Error* emit_spirv_block(SpirvEmitter* m, SsaBasicBlock* block) {
 			}
 			break;
 			case SsaOp::ZeroInit: {
-				auto type = reflect_cast<AstType>(v->aux);
+				auto type = grd_reflect_cast<AstType>(v->aux);
 				auto [tp, e] = get_type_id(m, type);
 				if (e) {
 					return e;
@@ -1418,7 +1418,7 @@ Error* emit_spirv_block(SpirvEmitter* m, SsaBasicBlock* block) {
 			break;
 			case SsaOp::Lvalue: {
 				if (v->args[0]->op == SsaOp::FunctionArg) {
-					auto arg = reflect_cast<AstFunctionArg>(v->args[0]->aux);
+					auto arg = grd_reflect_cast<AstFunctionArg>(v->args[0]->aux);
 					if (!arg) {
 						return format_error("Expected function arg");
 					}
@@ -1446,7 +1446,7 @@ Error* emit_spirv_block(SpirvEmitter* m, SsaBasicBlock* block) {
 			}
 			break;
 			case SsaOp::MemberAccess: {
-				auto member = reflect_cast<AstStructMember>(v->aux);
+				auto member = grd_reflect_cast<AstStructMember>(v->aux);
 				if (!member) {
 					return format_error("Expected struct member in aux");
 				}
@@ -1516,7 +1516,7 @@ Error* emit_spirv_block(SpirvEmitter* m, SsaBasicBlock* block) {
 #endif
 
 Tuple<AstType*, Error*> strip_pointer_type(AstFunctionArg* arg) {
-	if (auto ptr = reflect_cast<AstPointerType>(arg->var_ts->tp)) {
+	if (auto ptr = grd_reflect_cast<AstGrdPointerType>(arg->var_ts->tp)) {
 		return { ptr->pointee, NULL };
 	} else {
 		return { NULL, simple_parser_error(arg->p, current_loc(), arg->text_region, "Expected pointer type, got '%*'", arg->var_ts->tp->name) };
@@ -1549,7 +1549,7 @@ Error* emit_entry_point_arg(SpirvEmitter* m, AstFunction* f, AstFunctionArg* arg
 			put(&m->ep->uniforms, arg, var_id);
 			spv_op(m, SpvOpVariable, { tp_id, var_id, SpvStorageClassUniform });
 		} else if (attr->name == "stage_in") {
-			auto tp = reflect_cast<AstStructType>(arg->var_ts->tp);
+			auto tp = grd_reflect_cast<AstStructType>(arg->var_ts->tp);
 			if (!tp) {
 				return simple_parser_error(f->p, current_loc(), attr->text_region, "Expected struct type");
 			}
@@ -1604,7 +1604,7 @@ void collect_phis(Array<SsaValue*>* phis, SsaValue* v) {
 
 void replace_arg(SsaValue* v, s64 arg, SsaValue* by) {
 	auto rp = v->args[arg];
-	for (auto i: range(len(rp->uses))) {
+	for (auto i: grd_range(len(rp->uses))) {
 		if (rp->uses[i] == v) {
 			remove_at_index(&rp->uses, i);
 			break;
@@ -1616,7 +1616,7 @@ void replace_arg(SsaValue* v, s64 arg, SsaValue* by) {
 
 #if 0
 Error* rewrite_spirv_function_arg(SpirvEmitter* m, Ssa* ssa, SsaRewriter* rw, SsaValue* v) {
-	auto arg = reflect_cast<AstFunctionArg>(v->aux);
+	auto arg = grd_reflect_cast<AstFunctionArg>(v->aux);
 	assert(arg);
 
 	auto f = ssa->function;
@@ -1651,17 +1651,17 @@ Error* rewrite_spirv_function_arg(SpirvEmitter* m, Ssa* ssa, SsaRewriter* rw, Ss
 				}
 				return simple_parser_error(f->p, current_loc(), reg, "Expected (set, binding) or (set).");
 			}
-			auto new_v = make_rewrite_ssa_val_before(rw, v->block, SsaOp::SpvUniform, v);
+			auto new_v = grd_make_rewrite_ssa_val_before(rw, v->block, SsaOp::SpvUniform, v);
 			SpvUniformSetBinding sb = { .set = set, .binding = binding };
 			auto cp = copy(m->allocator, sb);
 			new_v->v_type = v->v_type;
-			new_v->aux = make_any(cp);
+			new_v->aux = grd_make_any(cp);
 
 			replace_by(rw, v, new_v);
 			remove_value(rw, v);
 			return NULL;
 		} else if (attr->name == "stage_in") {
-			auto tp = reflect_cast<AstStructType>(arg->var_ts->tp);
+			auto tp = grd_reflect_cast<AstStructType>(arg->var_ts->tp);
 			if (!tp) {
 				return simple_parser_error(f->p, current_loc(), arg->text_region, "Expected struct type for [[stage_in]]");
 			}
@@ -1676,7 +1676,7 @@ Error* rewrite_spirv_function_arg(SpirvEmitter* m, Ssa* ssa, SsaRewriter* rw, Ss
 			for (auto member: tp->members) {
 				for (auto attr: member->attrs) {
 					if (attr->name == "position") {
-						auto pos = make_rewrite_ssa_val_before(rw, v->block, SsaOp::SpvBuiltinPosition, v);
+						auto pos = grd_make_rewrite_ssa_val_before(rw, v->block, SsaOp::SpvBuiltinPosition, v);
 						add(&member_values, pos);
 						break;
 					} else {
@@ -1687,7 +1687,7 @@ Error* rewrite_spirv_function_arg(SpirvEmitter* m, Ssa* ssa, SsaRewriter* rw, Ss
 
 			SsaValue* as_value = NULL;
 			if (need_as_value) {
-				as_value = make_rewrite_ssa_val_before(rw, v->block, SsaOp::MakeStruct, v);
+				as_value = grd_make_rewrite_ssa_val_before(rw, v->block, SsaOp::MakeStruct, v);
 				for (auto it: member_values) {
 					add_arg(as_value, it);
 				}
@@ -1699,7 +1699,7 @@ Error* rewrite_spirv_function_arg(SpirvEmitter* m, Ssa* ssa, SsaRewriter* rw, Ss
 					if (arg->op != SsaOp::MemberAccess) {
 						panic("Expected member access");
 					}
-					auto member = reflect_cast<AstStructMember>(arg->aux);
+					auto member = grd_reflect_cast<AstStructMember>(arg->aux);
 					if (!member) {
 						panic("Expected struct member");
 					}
@@ -1718,7 +1718,7 @@ Error* rewrite_spirv_function_arg(SpirvEmitter* m, Ssa* ssa, SsaRewriter* rw, Ss
 						replace_by(rw, use, member_value);
 						remove_value(rw, use);
 					} else if (len(use->args) > 2) {
-						auto new_v = make_rewrite_ssa_val_before(rw, v->block, SsaOp::ExtractValue, use);
+						auto new_v = grd_make_rewrite_ssa_val_before(rw, v->block, SsaOp::ExtractValue, use);
 						add_arg(new_v, member_value);
 						for (auto it: use->args[2, {}]) {
 							add_arg(new_v, it);
@@ -1764,7 +1764,7 @@ Error* emit_spirv_function(SpirvEmitter* m, Ssa* ssa) {
 	u32 return_type_id = 0;
 
 	if (f->kind == AstFunctionKind::Vertex || f->kind == AstFunctionKind::Fragment) {
-		m->ep = make<SpirvEntryPoint>(m->allocator);
+		m->ep = grd_make<SpirvEntryPoint>(m->allocator);
 		m->ep->f = f;
 		m->ep->function_id = function_id;
 		m->ep->interf.allocator = m->allocator;
@@ -1841,9 +1841,9 @@ Error* finalize_spirv(SpirvEmitter* m) {
 		}
 
 		auto str = encode_utf8(m->allocator, ep->f->name);
-		defer { str.free(); };
+		grd_defer { str.free(); };
 		s64 pad = align(len(str), 4) - len(str);
-		for (auto i: range(pad)) {
+		for (auto i: grd_range(pad)) {
 			add(&str, 0);
 		}
 		add(&str, 0);

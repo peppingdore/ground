@@ -25,7 +25,7 @@ struct BuddyAllocTrieNode {
 };
 
 struct BuddyGlobalHeader {
-	Allocator          parent;
+	GrdAllocator          parent;
 	u64                size = 0;
 	u64                metadata_size = 0;
 	BuddyAllocTrieNode trie_first;
@@ -46,7 +46,7 @@ static_assert(static_array_count(BUDDY_SIZE_CLASSES) == 55);
 constexpr s64 BUDDY_MIN_BLOCK_SIZE = 4096 * 8;
 
 s64 map_size_to_class(u64 size) {
-	for (auto i: range(BUDDY_SIZE_CLASSES_COUNT)) {
+	for (auto i: grd_range(BUDDY_SIZE_CLASSES_COUNT)) {
 		if (size <= BUDDY_SIZE_CLASSES[i]) {
 			return i;
 		}
@@ -68,11 +68,11 @@ void* buddy_alloc(BuddyHeader* header, u64 size, s64 order) {
 	return buddy_alloc_raw(header, size, order);
 }
 
-BuddyGlobalHeader* init(Allocator parent, u64 size) {
+BuddyGlobalHeader* init(GrdAllocator parent, u64 size) {
 	if (size < 512 * 1024 * 1024) {
 		size = 512 * 1024 * 1024;
 	}
-	auto header = (BuddyGlobalHeader*) Malloc(parent, size);
+	auto header = (BuddyGlobalHeader*) GrdMalloc(parent, size);
 	*header = {};
 	header->parent = parent;
 	header->size = size;

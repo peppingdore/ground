@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../base.h"
+#include "../grd_base.h"
 
 #if OS_WINDOWS
 	#include "win_window.h"

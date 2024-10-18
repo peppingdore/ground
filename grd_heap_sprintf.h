@@ -1,13 +1,13 @@
 #pragma once
 
-#include "base.h"
+#include "grd_base.h"
 #include "math/basic_functions.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 
 template <typename... Args>
-char* heap_sprintf(const char* format, Args... args) {
+char* grd_heap_sprintf(const char* format, Args... args) {
 	char buf[256];
 	int written = snprintf(buf, sizeof(buf), format, args...);
 	if (written < 0) {
@@ -28,14 +28,14 @@ char* heap_sprintf(const char* format, Args... args) {
 	return str;
 }
 
-char* heap_join(const char* start, const char* joiner, const char* end, auto... args) {
+char* grd_heap_join(const char* start, const char* joiner, const char* end, auto... args) {
 	char buf[512];
 	int  cursor = 0;
 
 	auto append = [&](const char* x) {
 		auto len = strlen(x);
 		auto remaining = s64(sizeof(buf)) - cursor - 1;
-		auto copy_len = min_s64(remaining, len);
+		auto copy_len = grd_min(remaining, len);
 		memcpy(buf + cursor, x, copy_len);
 		cursor += copy_len;
 		assert(cursor <= sizeof(buf));
@@ -54,5 +54,5 @@ char* heap_join(const char* start, const char* joiner, const char* end, auto... 
 		buf[sizeof(buf) - 1] = '\0';
 	}
 
-	return heap_sprintf(buf, args...);
+	return grd_heap_sprintf(buf, args...);
 }

@@ -4,14 +4,14 @@
 #include "allocator.h"
 #include "reflect.h"
 
-constexpr Hash64 HASH_MAP_HASH_EMPTY = 0;
-constexpr Hash64 HASH_MAP_SLOT_HASH_FIRST_OCCUPIED = 1;
+constexpr GrdHash64 HASH_MAP_HASH_EMPTY = 0;
+constexpr GrdHash64 HASH_MAP_SLOT_HASH_FIRST_OCCUPIED = 1;
 
 template <typename K, typename V>
 struct HashMapEntry {
 	K      key;
 	V      value;
-	Hash64 normalized_hash;
+	GrdHash64 normalized_hash;
 
 	bool is_occupied() {
 		return normalized_hash != HASH_MAP_HASH_EMPTY;
@@ -22,23 +22,23 @@ template <typename K, typename V>
 struct HashMap {
 	using Entry = HashMapEntry<K, V>;
 
-	Allocator    allocator   = c_allocator;
+	GrdAllocator    allocator   = c_allocator;
 	Entry*       data        = NULL;
 	s64          capacity    = 0;
 	s64          count       = 0;
 	f32          load_factor = 0.75;
-	CodeLocation loc = caller_loc();
+	GrdCodeLoc loc = grd_caller_loc();
 
 	void free() {
 		if (data) {
-			Free(allocator, data, loc);
+			GrdFree(allocator, data, loc);
 			data  = NULL;
 		}
 		*this = {};
 	}
 
-	Generator<Entry*> iterate() {
-		for (auto i: range(capacity)) {
+	GrdGenerator<Entry*> iterate() {
+		for (auto i: grd_range(capacity)) {
 			auto* e = &data[i];
 			if (e->is_occupied()) {
 				co_yield e;
@@ -53,7 +53,7 @@ s64 hash_map_get_home(HashMap<K, V>* map, HashMapEntry<K, V>* e) {
 	return e->normalized_hash % map->capacity;
 }
 
-Hash64 hash_map_normalize_hash(Hash64 hash) {
+GrdHash64 hash_map_normalize_hash(GrdHash64 hash) {
 	if (hash < HASH_MAP_SLOT_HASH_FIRST_OCCUPIED) {
 		return HASH_MAP_SLOT_HASH_FIRST_OCCUPIED;
 	}
@@ -61,7 +61,7 @@ Hash64 hash_map_normalize_hash(Hash64 hash) {
 }
 
 template <typename K>
-Hash64 hash_key(K key) {
+GrdHash64 hash_key(K key) {
 	auto h = hash64(key);
 	return hash_map_normalize_hash(h);
 }
@@ -79,7 +79,7 @@ s64 hash_map_next_index_wraparound(s64 idx, s64 capacity) {
 
 template <typename K, typename V>
 void hash_map_clear_entries_hashes(HashMapEntry<K, V>* entries, s64 capacity) {
-	for (auto i: range(capacity)) {
+	for (auto i: grd_range(capacity)) {
 		entries[i].normalized_hash = HASH_MAP_HASH_EMPTY;
 	}
 }
@@ -103,17 +103,17 @@ HashMapEntry<K, V>* put_entry(HashMap<K, V>* map, K key) {
 		map->data = Alloc<HashMapEntry<K, V>>(map->allocator, map->capacity, map->loc);
 		hash_map_clear_entries_hashes(map->data, map->capacity);
 
-		for (auto i: range(old_capacity)) {
+		for (auto i: grd_range(old_capacity)) {
 			auto e = old_data[i];
 			if (e.is_occupied()) {
 				put_entry(map, e.key)->value = e.value;
 			}
 		}
 
-		Free(map->allocator, old_data, map->loc);
+		GrdFree(map->allocator, old_data, map->loc);
 	}
 
-	Hash64 hash = hash_key(key);
+	GrdHash64 hash = hash_key(key);
 	s64 idx = hash % map->capacity;
 	s64 home = idx;
 	HashMapEntry<K, V>* e = NULL;
@@ -131,7 +131,7 @@ HashMapEntry<K, V>* put_entry(HashMap<K, V>* map, K key) {
 			s64 b_dist = hash_map_distance_from_home(home, idx, cap);
 			if (a_dist < b_dist) {
 				map->count += 1;
-				// Free the entry by shifting it's value to the right.
+				// GrdFree the entry by shifting it's value to the right.
 				s64 sh_idx = hash_map_next_index_wraparound(idx, map->capacity);
 				while (true) {
 					auto sh_e = &map->data[sh_idx];
@@ -167,7 +167,7 @@ HashMapEntry<K, V>* get_entry(HashMap<K, V>* map, std::type_identity_t<K> key) {
 	if (!map->data) {
 		return NULL;
 	}
-	Hash64 hash = hash_key(key);
+	GrdHash64 hash = hash_key(key);
 	s64 idx = hash % map->capacity;
 	s64 home = idx;
 
@@ -198,7 +198,7 @@ HashMapEntry<K, V>* remove(HashMap<K, V>* map, std::type_identity_t<K> key) {
 	if (!map->data) {
 		return NULL;
 	}
-	Hash64 hash = hash_key(key);
+	GrdHash64 hash = hash_key(key);
 	s64 idx = hash % map->capacity;
 	s64 home = idx;
 
@@ -269,15 +269,15 @@ struct HashMapType: MapType {
 	u32 entry_size   = 0;
 
 	struct Item: MapType::Item {
-		Hash64* hash;
+		GrdHash64* hash;
 	};
 };
 
 template <typename K, typename V>
 HashMapType* reflect_type(HashMap<K, V>* x, HashMapType* type) {
-	type->key   = reflect_type_of<K>();
-	type->value = reflect_type_of<V>();
-	type->name  = heap_sprintf("HashMap<%s, %s>", type->key->name, type->value->name);
+	type->key   = grd_reflect_type_of<K>();
+	type->value = grd_reflect_type_of<V>();
+	type->name  = grd_heap_sprintf("HashMap<%s, %s>", type->key->name, type->value->name);
 	type->subkind = "hash_map";
 
 	using Map = HashMap<K, V>;
@@ -298,13 +298,13 @@ HashMapType* reflect_type(HashMap<K, V>* x, HashMapType* type) {
 		return casted->capacity;
 	};
 
-	type->iterate = [](void* map) -> Generator<MapType::Item*> {
+	type->iterate = [](void* map) -> GrdGenerator<MapType::Item*> {
 		auto casted_map = (Map*) map;
 
 		HashMapType::Item item;
 
-		for (auto i: range(casted_map->capacity)) {
-			auto* entry = (Entry*) ptr_add(casted_map->data, i * sizeof(Entry));
+		for (auto i: grd_range(casted_map->capacity)) {
+			auto* entry = (Entry*) grd_ptr_add(casted_map->data, i * sizeof(Entry));
 			if (entry->is_occupied()) {
 				item.key   = &entry->key;
 				item.value = &entry->value;

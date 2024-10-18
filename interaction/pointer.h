@@ -13,12 +13,12 @@ enum class PointerAction: s32 {
 	Cancel = 3,
 	Scroll = 4,	
 };
-REFLECT(PointerAction) {
-	ENUM_VALUE(Down);
-	ENUM_VALUE(Up);
-	ENUM_VALUE(Move);
-	ENUM_VALUE(Cancel);
-	ENUM_VALUE(Scroll);
+GRD_REFLECT(PointerAction) {
+	GRD_ENUM_VALUE(Down);
+	GRD_ENUM_VALUE(Up);
+	GRD_ENUM_VALUE(Move);
+	GRD_ENUM_VALUE(Cancel);
+	GRD_ENUM_VALUE(Scroll);
 }
 
 enum class PointerKind: s32 {
@@ -26,10 +26,10 @@ enum class PointerKind: s32 {
 	Pen   = 1,
 	Touch = 2,
 };
-REFLECT(PointerKind) {
-	ENUM_VALUE(Mouse);
-	ENUM_VALUE(Pen);
-	ENUM_VALUE(Touch);
+GRD_REFLECT(PointerKind) {
+	GRD_ENUM_VALUE(Mouse);
+	GRD_ENUM_VALUE(Pen);
+	GRD_ENUM_VALUE(Touch);
 }
 
 enum PointerButtonFlags: u64 {
@@ -40,13 +40,13 @@ enum PointerButtonFlags: u64 {
 	POINTER_BUTTON_MOUSE_4      = 1 << 3,
 	POINTER_BUTTON_MOUSE_5      = 1 << 4,
 };
-REFLECT(PointerButtonFlags) {
-	ENUM_VALUE(POINTER_BUTTON_NONE);
-	ENUM_VALUE(POINTER_BUTTON_MOUSE_LEFT);
-	ENUM_VALUE(POINTER_BUTTON_MOUSE_RIGHT);
-	ENUM_VALUE(POINTER_BUTTON_MOUSE_MIDDLE);
-	ENUM_VALUE(POINTER_BUTTON_MOUSE_4);
-	ENUM_VALUE(POINTER_BUTTON_MOUSE_5);
+GRD_REFLECT(PointerButtonFlags) {
+	GRD_ENUM_VALUE(POINTER_BUTTON_NONE);
+	GRD_ENUM_VALUE(POINTER_BUTTON_MOUSE_LEFT);
+	GRD_ENUM_VALUE(POINTER_BUTTON_MOUSE_RIGHT);
+	GRD_ENUM_VALUE(POINTER_BUTTON_MOUSE_MIDDLE);
+	GRD_ENUM_VALUE(POINTER_BUTTON_MOUSE_4);
+	GRD_ENUM_VALUE(POINTER_BUTTON_MOUSE_5);
 }
 
 struct Pointer {
@@ -55,11 +55,11 @@ struct Pointer {
 	Vector2            position;
 	PointerButtonFlags buttons;
 };
-REFLECT(Pointer) {
-	MEMBER(kind);
-	MEMBER(id);
-	MEMBER(position);
-	MEMBER(buttons);
+GRD_REFLECT(Pointer) {
+	GRD_MEMBER(kind);
+	GRD_MEMBER(id);
+	GRD_MEMBER(position);
+	GRD_MEMBER(buttons);
 }
 
 struct PointerEvent: WindowEvent {
@@ -69,13 +69,13 @@ struct PointerEvent: WindowEvent {
 	Vector2            scroll_delta = { 0, 0 };
 	bool               is_scroll_in_lines = false;
 };
-REFLECT(PointerEvent) {
-	BASE_TYPE(WindowEvent);
-	MEMBER(action);
-	MEMBER(pointer);
-	MEMBER(changed_buttons);
-	MEMBER(scroll_delta);
-	MEMBER(is_scroll_in_lines);
+GRD_REFLECT(PointerEvent) {
+	GRD_BASE_TYPE(WindowEvent);
+	GRD_MEMBER(action);
+	GRD_MEMBER(pointer);
+	GRD_MEMBER(changed_buttons);
+	GRD_MEMBER(scroll_delta);
+	GRD_MEMBER(is_scroll_in_lines);
 }
 
 struct OsPointerIdMapper {

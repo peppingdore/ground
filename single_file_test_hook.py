@@ -8,7 +8,7 @@ CPP_CONTENT = '''
 #include "{testing_header}"
 #include "{file}"
 
-TEST(single_file_compilation) {{
+GRD_TEST(single_file_compilation) {{
 
 }}
 
@@ -40,7 +40,7 @@ def gen(dir, level=1):
 			file_path.parent.mkdir(parents=True, exist_ok=True)
 			to_build.append(file_path)
 			file_path.write_text(CPP_CONTENT.format(
-				testing_header=str(PurePosixPath('../' * level) / "testing.h"),
+				testing_header=str(PurePosixPath('../' * level) / "grd_testing.h"),
 				file=str(PurePosixPath('../' * level) / dir / it.name))
 			)
 

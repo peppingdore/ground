@@ -1,37 +1,28 @@
 #pragma once
 
-#include "../base.h"
+#include "../grd_base.h"
+#include <type_traits>
 
 template <typename T>
-inline T sign(T a) {
-	if (a < 0) {
-		return -1;
-	} else {
-		return 1;
-	}
+constexpr T grd_sign(T a) {
+	return a < 0 ? -1 : 1;
 }
 
 #undef max
 #undef min
 
 template <typename T>
-constexpr T max(T a, T b) {
-	if (a > b) {
-		return a;
-	}
-	return b;
+constexpr T grd_max(T a, std::type_identity_t<T> b) {
+	return a > b ? a : b;
 }
 
 template <typename T>
-constexpr T min(T a, T b) {
-	if (a < b) {
-		return a;
-	}
-	return b;
+constexpr T grd_min(T a, std::type_identity_t<T> b) {
+	return a < b ? a : b;
 }
 
 template <typename T>
-constexpr T clamp(T min, T max, T value) {
+constexpr T grd_clamp(T min, std::type_identity_t<T> max, std::type_identity_t<T> value) {
 	if (value < min) return min;
 	if (value > max) return max;
 	return value;
@@ -51,22 +42,22 @@ ALIAS_MATH_TEMPLATE_FUNCTION(name, u64)\
 ALIAS_MATH_TEMPLATE_FUNCTION(name, f32)\
 ALIAS_MATH_TEMPLATE_FUNCTION(name, f64)
 
-ALIAS_MATH_TEMPLATE_FUNCTION_WITH_DEFAULT_TYPES(clamp);
-ALIAS_MATH_TEMPLATE_FUNCTION_WITH_DEFAULT_TYPES(min);
-ALIAS_MATH_TEMPLATE_FUNCTION_WITH_DEFAULT_TYPES(max);
+ALIAS_MATH_TEMPLATE_FUNCTION_WITH_DEFAULT_TYPES(grd_clamp);
+ALIAS_MATH_TEMPLATE_FUNCTION_WITH_DEFAULT_TYPES(grd_min);
+ALIAS_MATH_TEMPLATE_FUNCTION_WITH_DEFAULT_TYPES(grd_max);
 
 
-bool is_aligned(u64 number, u64 alignment) {
+bool grd_is_aligned(u64 number, u64 alignment) {
 	return (number % alignment) == 0;
 }
 
-bool is_aligned(auto* ptr, u64 alignment) {
+bool grd_is_aligned(auto* ptr, u64 alignment) {
 	return (u64(ptr) % alignment) == 0;
 }
 
 template <typename T>
-T align(T number, u64 alignment) {
-	if (is_aligned(number, alignment)) {
+T grd_align(T number, u64 alignment) {
+	if (grd_is_aligned(number, alignment)) {
 		return number;
 	}
 	return number + (alignment - (number % alignment));

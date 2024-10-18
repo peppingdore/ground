@@ -1,6 +1,6 @@
 #pragma once
 
-#include "base.h"
+#include "grd_base.h"
 
 #if OS_WINDOWS
 	#include "Windows.h"
@@ -68,7 +68,7 @@ void reset(Stopwatch* w) {
 	w->last_us = get_current_nanos(w);
 }
 
-Stopwatch make_stopwatch() {
+Stopwatch grd_make_stopwatch() {
 	Stopwatch w;
 #if OS_WINDOWS
 	LARGE_INTEGER freq_li;

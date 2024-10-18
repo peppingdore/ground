@@ -1,6 +1,6 @@
 #pragma once
 
-#include "base.h"
+#include "grd_base.h"
 #include "format.h"
 #include "file_path.h"
 
@@ -16,20 +16,20 @@ enum class LogLevel: u32 {
 };
 
 struct LogInfo {
-	CodeLocation loc = caller_loc();
+	GrdCodeLoc loc = grd_caller_loc();
 	LogLevel    level = LogLevel::Verbose;
 };
 
 using Logger_Proc = void (*) (Logger*, LogInfo, UnicodeString);
 
 struct Logger {
-	Allocator   allocator = c_allocator;
+	GrdAllocator   allocator = c_allocator;
 	Logger_Proc proc = NULL;
 	LogLevel    pass_level = LogLevel::Trace;
 };
 
 void default_logger_proc(Logger* logger, LogInfo info, UnicodeString text) {
-	auto unicode_path = copy_unicode_string(make_string(info.loc.file));
+	auto unicode_path = copy_unicode_string(grd_make_string(info.loc.file));
 	auto base = path_basename(unicode_path);
 	auto formatted = sprint("%:% %", base, info.loc.line, text);
 	println(formatted);
@@ -37,8 +37,8 @@ void default_logger_proc(Logger* logger, LogInfo info, UnicodeString text) {
 	unicode_path.free();
 }
 
-Logger* make_default_logger() {
-	auto logger = make<Logger>();
+Logger* grd_make_default_logger() {
+	auto logger = grd_make<Logger>();
 	logger->proc = default_logger_proc;
 	return logger;
 }
@@ -47,13 +47,13 @@ void void_logger_proc(Logger* logger, LogInfo info, UnicodeString text) {
 
 }
 
-Logger* make_void_logger() {
-	auto logger = make<Logger>();
+Logger* grd_make_void_logger() {
+	auto logger = grd_make<Logger>();
 	logger->proc = void_logger_proc;
 	return logger;
 }
 
-inline Logger*(*make_new_logger)() = make_default_logger;
+inline Logger*(*grd_make_new_logger)() = grd_make_default_logger;
 inline thread_local Logger* __thread_logger = NULL;
 
 inline Logger* set_thread_logger(Logger* logger) {
@@ -63,7 +63,7 @@ inline Logger* set_thread_logger(Logger* logger) {
 
 inline Logger* get_logger() {
 	if (!__thread_logger) {
-		__thread_logger = make_new_logger();
+		__thread_logger = grd_make_new_logger();
 	}
 	return __thread_logger;
 }
@@ -89,15 +89,15 @@ inline void LogWithInfo(LogInfo info, auto... args) {
 	LogAtLogger(get_logger(), info, args...);
 }
 
-inline void Log(CodeLocation loc, auto... args) {
+inline void Log(GrdCodeLoc loc, auto... args) {
 	LogWithInfo({ .loc = loc, }, args...);
 }
 
-inline void LogTrace(CodeLocation loc, auto... args) {
+inline void LogTrace(GrdCodeLoc loc, auto... args) {
 	LogWithInfo({ .loc = loc, .level = LogLevel::Trace }, args...);
 }
 
-// We can't use loc = caller_loc() if we have parameter pack.
+// We can't use loc = grd_caller_loc() if we have parameter pack.
 //   These macros help us with that situation.
-#define Log(...)      Log(current_loc(), __VA_ARGS__)
-#define LogTrace(...) LogTrace(current_loc(), __VA_ARGS__)
+#define Log(...)      Log(grd_current_loc(), __VA_ARGS__)
+#define LogTrace(...) LogTrace(grd_current_loc(), __VA_ARGS__)

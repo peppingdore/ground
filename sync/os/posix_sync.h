@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../base.h"
+#include "../../grd_base.h"
 
 #if OS_DARWIN
 	#include <mach/task.h>
@@ -15,9 +15,9 @@
 #include <signal.h>
 
 
-using OsMutex = pthread_mutex_t;
+using GrdOsMutex = pthread_mutex_t;
 
-void os_mutex_create(OsMutex* mutex) {
+void grd_os_mutex_create(GrdOsMutex* mutex) {
 	*mutex = {};
 	pthread_mutexattr_t attr;
 	pthread_mutexattr_init(&attr);
@@ -25,26 +25,26 @@ void os_mutex_create(OsMutex* mutex) {
 	pthread_mutex_init(mutex, &attr);
 }
 
-void os_mutex_lock(OsMutex* mutex) {
+void grd_os_mutex_lock(GrdOsMutex* mutex) {
 	pthread_mutex_lock(mutex);
 }
 
-void os_mutex_unlock(OsMutex* mutex) {
+void grd_os_mutex_unlock(GrdOsMutex* mutex) {
 	pthread_mutex_unlock(mutex);
 }
 
-void os_mutex_destroy(OsMutex* mutex) {
+void grd_os_mutex_destroy(GrdOsMutex* mutex) {
 	pthread_mutex_destroy(mutex);
 }
 
 #if OS_DARWIN
-	using OsSemaphore = semaphore_t;
+	using GrdOsSemaphore = semaphore_t;
 
-	void os_semaphore_create(OsSemaphore* sem, u32 initial_value) {
+	void grd_os_semaphore_create(GrdOsSemaphore* sem, u32 initial_value) {
 		kern_return_t result = semaphore_create(current_task(), sem, SYNC_POLICY_FIFO, initial_value);
 	}
 
-	void os_semaphore_wait_and_decrement(OsSemaphore* sem) {
+	void grd_os_semaphore_wait_and_decrement(GrdOsSemaphore* sem) {
 		while (true) {
 			kern_return_t result = semaphore_wait(*sem);
 			if (result != KERN_ABORTED) {
@@ -53,30 +53,30 @@ void os_mutex_destroy(OsMutex* mutex) {
 		}
 	}
 
-	void os_semaphore_increment(OsSemaphore* sem) {
+	void grd_os_semaphore_increment(GrdOsSemaphore* sem) {
 		semaphore_signal(*sem);
 	}
 
-	void os_semaphore_destroy(OsSemaphore* sem) {
+	void grd_os_semaphore_destroy(GrdOsSemaphore* sem) {
 		semaphore_destroy(current_task(), *sem);
 	}
 
 #else
-	using OsSemaphore = sem_t;
+	using GrdOsSemaphore = sem_t;
 
-	void os_semaphore_create(OsSemaphore* sem, u32 initial_value) {
+	void grd_os_semaphore_create(GrdOsSemaphore* sem, u32 initial_value) {
 	    int result = sem_init(sem, 0, initial_value);
 	}
 
-	void os_semaphore_wait_and_decrement(OsSemaphore* sem) {
+	void grd_os_semaphore_wait_and_decrement(GrdOsSemaphore* sem) {
 		sem_wait(sem);
 	}
 
-	void os_semaphore_increment(OsSemaphore* sem) {
+	void grd_os_semaphore_increment(GrdOsSemaphore* sem) {
 		sem_post(sem);
 	}
 
-	void os_semaphore_destroy(OsSemaphore* sem) {
+	void grd_os_semaphore_destroy(GrdOsSemaphore* sem) {
 		sem_destroy(sem);
 	}
 #endif

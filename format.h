@@ -4,7 +4,7 @@
 #include "reflect.h"
 #include "hash_map.h"
 #include "sort.h"
-#include "defer.h"
+#include "grd_defer.h"
 #include "function.h"
 
 struct Formatter;
@@ -35,9 +35,9 @@ REFLECTION_REFLECT_HOOK(T) {
 	auto proc = pick_type_format<T>();
 	if (proc) {
 		if (!type_format_procs) {
-			type_format_procs = make<HashMap<Type*, Type_Format_Type_Erased*>>();
+			type_format_procs = grd_make<HashMap<Type*, Type_Format_Type_Erased*>>();
 		}
-		put(type_format_procs, reflect_type_of<T>(), proc);
+		put(type_format_procs, grd_reflect_type_of<T>(), proc);
 	}
 }
 
@@ -46,7 +46,7 @@ struct Custom_Member_Format {
 	void (*format_proc)(Formatter*, Any member);
 };
 
-Custom_Member_Format make_custom_member_format(auto proc) {
+Custom_Member_Format grd_make_custom_member_format(auto proc) {
 	return { .format_proc = proc };
 }
 
@@ -110,7 +110,7 @@ struct Formatter {
 };
 
 template <StringChar T>
-Formatter make_formatter(Array<T>* b, Allocator allocator) {
+Formatter grd_make_formatter(Array<T>* b, GrdAllocator allocator) {
 	Formatter result;
 	result.builder = b;
 	result.is_unicode_formatter = std::is_same_v<T, char32_t>;
@@ -120,7 +120,7 @@ Formatter make_formatter(Array<T>* b, Allocator allocator) {
 }
 
 void formatter_indent(Formatter* formatter) {
-	for (auto i: range(formatter->indentation)) {
+	for (auto i: grd_range(formatter->indentation)) {
 		formatter->append(formatter->indent_text);
 	}
 }
@@ -149,7 +149,7 @@ void format(Formatter* formatter, UnicodeString str) {
 }
 
 void format(Formatter* formatter, const char* c_str) {
-	format(formatter, make_string(c_str));
+	format(formatter, grd_make_string(c_str));
 }
 
 void format_item(Formatter* formatter, Type* type, void* thing, String spec);
@@ -197,7 +197,7 @@ void format_parser(
 	for (s64 i = 0; i < len(fmt); i++) {
 		auto c = fmt[i];
 		if (c == '\\') {
-			for (auto e: range(static_array_count(escapable))) {
+			for (auto e: grd_range(grd_static_array_count(escapable))) {
 				if (len(fmt) > i + 1 && fmt[i + 1] == escapable[e]) {
 					insert_char(escapable[e]);
 					i += 1;
@@ -287,7 +287,7 @@ Tuple<String, bool> formatter_resolve_spec(Formatter* formatter, String spec) {
 template <StringChar T, typename... Args>
 void format(Formatter* formatter, Span<T> format_str, Args... args) {
 
-	Any things[] = { make_any(&args)... };
+	Any things[] = { grd_make_any(&args)... };
 
 	String short_specs[] = { "p"_b, "P"_b, "h"_b, "H"_b, "b"_b, "B"_b };
 
@@ -312,19 +312,19 @@ void format(Formatter* formatter, Span<T> format_str, Args... args) {
 		},
 	};
 
-	auto specs_view = make_span(short_specs);
-	auto flags_view = make_span(flags);
+	auto specs_view = grd_make_span(short_specs);
+	auto flags_view = grd_make_span(flags);
 
 	auto insert_char = [&] (auto c) {
-		formatter_append_indented(formatter, make_string(&c, 1));
+		formatter_append_indented(formatter, grd_make_string(&c, 1));
 	};
 
 	auto insert_arg = [&] (s64 idx, auto spec) {
-		if (idx >= 0 && idx < static_array_count(things)) {
+		if (idx >= 0 && idx < grd_static_array_count(things)) {
 			auto [resolved_spec, have_to_free] = formatter_resolve_spec(formatter, spec);
 			format_item(formatter, things[idx], resolved_spec);
 			if (have_to_free) {
-				Free(resolved_spec.data);
+				GrdFree(resolved_spec.data);
 			}
 		}
 	};
@@ -341,7 +341,7 @@ void format(Formatter* formatter, Span<T> format_str, Args... args) {
 
 template <StringChar T, typename... Args>
 void format(Formatter* formatter, const T* c_str, Args... args) {
-	format(formatter, make_string(c_str), args...);
+	format(formatter, grd_make_string(c_str), args...);
 }
 
 template <typename... Args>
@@ -351,13 +351,13 @@ void format(Formatter* formatter, Args... args) {
 
 	char buf[N * 3 + 1];
 	int  cursor = 0;
-	for (auto i: range(N)) {
+	for (auto i: grd_range(N)) {
 		const char* str = (i == N - 1) ? "%*" : "%*, ";
 		memcpy(buf + cursor, str, strlen(str));
 		cursor += strlen(str);
 	}
 	buf[cursor] = '\0';
-	format(formatter, make_string(buf, cursor), args...);
+	format(formatter, grd_make_string(buf, cursor), args...);
 }
 
 struct Struct_Printer {
@@ -400,9 +400,9 @@ struct Struct_Printer {
 	}
 
 	void member(void* ptr, StructMember member) {
-		member_head(make_string(member.type->name), make_string(member.name));
+		member_head(grd_make_string(member.type->name), grd_make_string(member.name));
 		auto custom_member_fmt_tag = find_tag<Custom_Member_Format>(&member);
-		auto any = make_any(member.type, ptr_add(ptr, member.offset));
+		auto any = grd_make_any(member.type, grd_ptr_add(ptr, member.offset));
 		if (custom_member_fmt_tag) {
 			custom_member_fmt_tag->format_proc(formatter, any);
 		} else {
@@ -421,7 +421,7 @@ struct Struct_Printer {
 	}
 };
 
-Struct_Printer make_struct_printer(Formatter* formatter) {
+Struct_Printer grd_make_struct_printer(Formatter* formatter) {
 	return { .formatter = formatter };
 }
 
@@ -466,7 +466,7 @@ struct Array_Printer {
 	}
 };
 
-Array_Printer make_array_printer(Formatter* formatter) {
+Array_Printer grd_make_array_printer(Formatter* formatter) {
 	return { .formatter = formatter };
 }
 
@@ -500,7 +500,7 @@ struct Tuple_Printer {
 	}
 };
 
-Tuple_Printer make_tuple_printer(Formatter* formatter) {
+Tuple_Printer grd_make_tuple_printer(Formatter* formatter) {
 	return { .formatter = formatter };
 }
 
@@ -546,13 +546,13 @@ struct Map_Printer {
 	}
 };
 
-Map_Printer make_map_printer(Formatter* formatter) {
+Map_Printer grd_make_map_printer(Formatter* formatter) {
 	return { .formatter = formatter };
 }
 
 void format_struct(Formatter* formatter, StructType* type, void* thing) {
-	auto printer = make_struct_printer(formatter);
-	printer.head(make_string(type->name));
+	auto printer = grd_make_struct_printer(formatter);
+	printer.head(grd_make_string(type->name));
 	for (auto it: type->members) {
 		printer.member(thing, it);
 	}
@@ -577,12 +577,12 @@ void format_c_string(Formatter* formatter, T* c_str, String spec) {
 	s64 length = 0;
 	s64 start  = 0;
 	while (true) {
-		if ((length - start) == static_array_count(buf)) {
-			format(formatter, make_string(buf, length - start));
+		if ((length - start) == grd_static_array_count(buf)) {
+			format(formatter, grd_make_string(buf, length - start));
 			start = length;
 		}
 		if (length >= 4096 || c_str[length] == '\0') {
-			format(formatter, make_string(buf, length - start));
+			format(formatter, grd_make_string(buf, length - start));
 			break;
 		}
 		buf[length - start] = c_str[length];
@@ -601,9 +601,9 @@ void format_string(Formatter* formatter, SpanType* type, void* thing, String spe
 		format(formatter, "\"");
 	}
 
-	if (type->inner == reflect_type_of<char>()) {
+	if (type->inner == grd_reflect_type_of<char>()) {
 		format(formatter, *(String*) thing);
-	} else if (type->inner == reflect_type_of<char32_t>()) {
+	} else if (type->inner == grd_reflect_type_of<char32_t>()) {
 		format(formatter, *(UnicodeString*) thing);
 	} else {
 		assert(false);
@@ -615,36 +615,36 @@ void format_string(Formatter* formatter, SpanType* type, void* thing, String spe
 }
 
 void format_span(Formatter* formatter, SpanType* type, void* thing, String spec) {
-	if (type->inner == reflect_type_of<char>() ||
-		type->inner == reflect_type_of<char32_t>()) {
+	if (type->inner == grd_reflect_type_of<char>() ||
+		type->inner == grd_reflect_type_of<char32_t>()) {
 		format_string(formatter, type, thing, spec);
 		return;
 	}
 
-	auto printer = make_array_printer(formatter);
-	printer.head(make_string(type->name));
-	for (auto i: range(type->get_count(thing))) {
+	auto printer = grd_make_array_printer(formatter);
+	printer.head(grd_make_string(type->name));
+	for (auto i: grd_range(type->get_count(thing))) {
 		void* item = type->get_item(thing, i);
-		printer.item(make_any(type->inner, item));
+		printer.item(grd_make_any(type->inner, item));
 	}
 	printer.tail();
 }
 
 void format_tuple(Formatter* formatter, StructType* type, void* thing) {
-	auto printer = make_tuple_printer(formatter);
+	auto printer = grd_make_tuple_printer(formatter);
 	printer.head();
 	for (auto it: type->members) {
-		printer.item(make_any(it.type, ptr_add(thing, it.offset)));
+		printer.item(grd_make_any(it.type, grd_ptr_add(thing, it.offset)));
 	}
 	printer.tail();
 }
 
 void format_map(Formatter* formatter, MapType* type, void* thing) {
-	auto printer = make_map_printer(formatter);
-	printer.head(make_string(type->name));
+	auto printer = grd_make_map_printer(formatter);
+	printer.head(grd_make_string(type->name));
 	for (auto* item: type->iterate(thing)) {
-		auto key   = make_any(type->key,   item->key);
-		auto value = make_any(type->value, item->value);
+		auto key   = grd_make_any(type->key,   item->key);
+		auto value = grd_make_any(type->value, item->value);
 		printer.item(key, value);
 	}
 	printer.tail();
@@ -689,67 +689,67 @@ void format_float_primitive(Formatter* formatter, f64 num, String spec) {
 	format(formatter, as_str(&num_str));
 }
 
-void format_primitive(Formatter* formatter, PrimitiveType* type, void* thing, String spec) {
+void format_primitive(Formatter* formatter, GrdPrimitiveType* type, void* thing, String spec) {
 
 	switch (type->primitive_kind) {
-		case PrimitiveKind::P_u8:
+		case GrdPrimitiveKind::P_u8:
 			format_integer_primitive(formatter, *(u8*)  thing, spec);
 			break;
-		case PrimitiveKind::P_s8:
+		case GrdPrimitiveKind::P_s8:
 			format_integer_primitive(formatter, *(s8*)  thing, spec);
 			break;
-		case PrimitiveKind::P_u16:
+		case GrdPrimitiveKind::P_u16:
 			format_integer_primitive(formatter, *(u16*) thing, spec);
 			break;
-		case PrimitiveKind::P_s16:
+		case GrdPrimitiveKind::P_s16:
 			format_integer_primitive(formatter, *(s16*) thing, spec);
 			break;
-		case PrimitiveKind::P_u32:
+		case GrdPrimitiveKind::P_u32:
 			format_integer_primitive(formatter, *(u32*) thing, spec);
 			break;
-		case PrimitiveKind::P_s32:
+		case GrdPrimitiveKind::P_s32:
 			format_integer_primitive(formatter, *(s32*) thing, spec);
 			break;
-		case PrimitiveKind::P_u64:
+		case GrdPrimitiveKind::P_u64:
 			format_integer_primitive(formatter, *(u64*) thing, spec);
 			break;
-		case PrimitiveKind::P_s64:
+		case GrdPrimitiveKind::P_s64:
 			format_integer_primitive(formatter, *(s64*) thing, spec);
 			break;
 
-		case PrimitiveKind::P_f32:
+		case GrdPrimitiveKind::P_f32:
 			format_float_primitive(formatter, *(f32*)  thing, spec);
 			break;
-		case PrimitiveKind::P_f64:
+		case GrdPrimitiveKind::P_f64:
 			format_float_primitive(formatter, *(f64*)  thing, spec);
 			break;
 
-		case PrimitiveKind::P_bool: {
+		case GrdPrimitiveKind::P_bool: {
 			SmallString str = to_string(*(bool*) thing);
 			format(formatter, as_str(&str));
 		}
 		break;
 
-		case PrimitiveKind::P_char: {
+		case GrdPrimitiveKind::P_char: {
 			format(formatter, "%", String((char*) thing, 1));
 		}
 		break;
-		case PrimitiveKind::P_wchar: {
+		case GrdPrimitiveKind::P_wchar: {
 			char32_t c = (char32_t) (*(wchar_t*) thing);
 			format(formatter, "%", UnicodeString(&c, 1));
 		}
 		break;
-		case PrimitiveKind::P_char16: {
+		case GrdPrimitiveKind::P_char16: {
 			char32_t c = *(char16_t*) thing;
 			format(formatter, "%", UnicodeString(&c, 1));
 		}
 		break;
-		case PrimitiveKind::P_char32: {
+		case GrdPrimitiveKind::P_char32: {
 			format(formatter, "%", UnicodeString((char32_t*) thing, 1));
 		}
 		break;
 
-		case PrimitiveKind::P_void:
+		case GrdPrimitiveKind::P_void:
 			// Should not happen.
 			format(formatter, "(void)");
 			break;
@@ -762,7 +762,7 @@ void format_primitive(Formatter* formatter, PrimitiveType* type, void* thing, St
 }
 
 bool is_flag_set(void* dst, void* src, u64 size) {
-	for (auto i: range(size)) {
+	for (auto i: grd_range(size)) {
 		u8 dst_v = *(u8*) dst;
 		u8 src_v = *(u8*) src;
 
@@ -799,19 +799,19 @@ void format_enum(Formatter* formatter, EnumType* type, void* thing) {
 		}
 	}
 
-	format(formatter, "%(%)", type->name, make_any(type->base_type, thing));
+	format(formatter, "%(%)", type->name, grd_make_any(type->base_type, thing));
 }
 
-void format_pointer(Formatter* formatter, PointerType* type, void* thing, String spec) {
+void format_pointer(Formatter* formatter, GrdPointerType* type, void* thing, String spec) {
 	s32  indir_level;
 	auto inner_type = reflect_get_pointer_inner_type_with_indirection_level(type, &indir_level);
 
 	char stars_buf[64];
-	auto stars_count = min_u32(static_array_count(stars_buf), indir_level);
-	for (auto i: range(stars_count)) {
+	auto stars_count = min_u32(grd_static_array_count(stars_buf), indir_level);
+	for (auto i: grd_range(stars_count)) {
 		stars_buf[i] = '*';
 	}
-	auto stars = make_string(stars_buf, stars_count);
+	auto stars = grd_make_string(stars_buf, stars_count);
 
 	bool did_deref_before = false;
 	bool did_add_to_cycle_tracker = false;
@@ -825,7 +825,7 @@ void format_pointer(Formatter* formatter, PointerType* type, void* thing, String
 			did_add_to_cycle_tracker = true;
 		}
 	}
-	defer { 
+	grd_defer { 
 		if (did_add_to_cycle_tracker) {
 			remove(&formatter->cyclic_pointer_tracker, ptr_value); 
 		}
@@ -840,7 +840,7 @@ void format_pointer(Formatter* formatter, PointerType* type, void* thing, String
 	void* ptr = thing;
 	// Detect NULL pointer.
 	if (deref) {
-		for (auto i: range(indir_level)) {
+		for (auto i: grd_range(indir_level)) {
 			ptr = *(void**)ptr;
 			if (!ptr) {
 				deref = false;
@@ -850,27 +850,27 @@ void format_pointer(Formatter* formatter, PointerType* type, void* thing, String
 	}
 	// Can't deref void type.
 	if (deref) {
-		if (inner_type == reflect_type_of<void>()) {
+		if (inner_type == grd_reflect_type_of<void>()) {
 			deref = false;
 		}
 	}
 
 	if (!deref) {
 		auto num = bitcast<u64>(*(void**) thing);
-		format(formatter, "(%%) %h", make_string(inner_type->name), stars, num);
+		format(formatter, "(%%) %h", grd_make_string(inner_type->name), stars, num);
 		return;
 	}
 
-	if (inner_type == reflect_type_of<char>()) {
+	if (inner_type == grd_reflect_type_of<char>()) {
 		format_c_string(formatter, (char*) ptr, spec);
-	} else if (inner_type == reflect_type_of<wchar_t>()) {
+	} else if (inner_type == grd_reflect_type_of<wchar_t>()) {
 		format_c_string(formatter, (wchar_t*) ptr, spec);
-	} else if (inner_type == reflect_type_of<char16_t>()) {
+	} else if (inner_type == grd_reflect_type_of<char16_t>()) {
 		format_c_string(formatter, (char16_t*) ptr, spec);
-	} else if (inner_type == reflect_type_of<char32_t>()) {
+	} else if (inner_type == grd_reflect_type_of<char32_t>()) {
 		format_c_string(formatter, (char32_t*) ptr, spec);
 	} else {
-		auto inner = make_any(inner_type, ptr);
+		auto inner = grd_make_any(inner_type, ptr);
 
 		if (formatter->is_compact()) {
 			format(formatter, "%", inner);
@@ -883,7 +883,7 @@ void format_pointer(Formatter* formatter, PointerType* type, void* thing, String
 
 void format_function(Formatter* formatter, FunctionType* type, void* thing, String spec) {
 	format(formatter, "% (*)(", type->return_type->name);
-	for (auto i: range(type->arg_types.count)) {
+	for (auto i: grd_range(type->arg_types.count)) {
 		format(formatter, type->arg_types.data[i]->name);
 		if (i != type->arg_types.count - 1) {
 			format(formatter, ", ");
@@ -902,11 +902,11 @@ void format_item(Formatter* formatter, Type* type, void* thing, String spec) {
 	}
 
 	formatter->depth += 1;
-	defer { formatter->depth -= 1; };
+	grd_defer { formatter->depth -= 1; };
 	auto saved_quote_string = formatter->quote_inner_string;
 	formatter->quote_inner_string = false;
 
-	auto real_type = get_real_type(type, thing);
+	auto real_type = grd_get_real_type(type, thing);
 
 	switch (real_type->kind) {
 		case StructType::KIND: {
@@ -919,8 +919,8 @@ void format_item(Formatter* formatter, Type* type, void* thing, String spec) {
 		}
 		break;
 
-		case PrimitiveType::KIND: {
-			auto casted = (PrimitiveType*) real_type;
+		case GrdPrimitiveType::KIND: {
+			auto casted = (GrdPrimitiveType*) real_type;
 			format_primitive(formatter, casted, thing, spec);
 		}
 		break;
@@ -937,13 +937,13 @@ void format_item(Formatter* formatter, Type* type, void* thing, String spec) {
 		}
 		break;
 
-		case PointerType::KIND: {
-			auto casted = (PointerType*) real_type;
+		case GrdPointerType::KIND: {
+			auto casted = (GrdPointerType*) real_type;
 			auto inner_type = reflect_get_pointer_inner_type_with_indirection_level(casted, NULL);
-			if (inner_type == reflect_type_of<char>() ||
-				inner_type == reflect_type_of<wchar_t>() ||
-				inner_type == reflect_type_of<char16_t>() ||
-				inner_type == reflect_type_of<char32_t>()) {
+			if (inner_type == grd_reflect_type_of<char>() ||
+				inner_type == grd_reflect_type_of<wchar_t>() ||
+				inner_type == grd_reflect_type_of<char16_t>() ||
+				inner_type == grd_reflect_type_of<char32_t>()) {
 				formatter->quote_inner_string = saved_quote_string;
 			}
 			format_pointer(formatter, casted, thing, spec);
@@ -969,8 +969,8 @@ void format_item(Formatter* formatter, Type* type, void* thing, String spec) {
 }
 
 template <StringChar T>
-void format(Array<T>* builder, Allocator allocator, auto... args) {
-	auto formatter = make_formatter(builder, allocator);
+void format(Array<T>* builder, GrdAllocator allocator, auto... args) {
+	auto formatter = grd_make_formatter(builder, allocator);
 	format(&formatter, args...);
 	formatter.free();
 }
@@ -986,7 +986,7 @@ void formatln(Formatter* formatter, auto... args) {
 }
 
 template <StringChar T>
-void formatln(Array<T>* builder, Allocator allocator, auto... args) {
+void formatln(Array<T>* builder, GrdAllocator allocator, auto... args) {
 	format(builder, allocator, args...);
 	format(builder, allocator, "\n");
 }
@@ -1003,12 +1003,12 @@ void print_to_stdout(String text) {
 void print_to_stdout(UnicodeString text) {
 	auto utf8 = encode_utf8(text);
 	print_to_stdout(utf8);
-	Free(utf8.data);
+	GrdFree(utf8.data);
 }
 
 void print(auto... args) {
 	Array<char32_t> builder;
-	defer { builder.free(); };
+	grd_defer { builder.free(); };
 	format(&builder, c_allocator, args...);
 	print_to_stdout(builder);
 }
@@ -1019,7 +1019,7 @@ void println(auto... args) {
 }
 
 template <StringChar T = char>
-Array<T> sprint(Allocator allocator, auto... args) {
+Array<T> sprint(GrdAllocator allocator, auto... args) {
 	Array<T> builder = { .allocator = allocator };
 	format(&builder, allocator, args...);
 	return builder;
@@ -1030,7 +1030,7 @@ Array<T> sprint(auto... args) {
 	return sprint(c_allocator, args...);
 }
 
-AllocatedUnicodeString sprint_unicode(Allocator allocator, auto... args) {
+AllocatedUnicodeString sprint_unicode(GrdAllocator allocator, auto... args) {
 	return sprint<char32_t>(allocator, args...);
 }
 
@@ -1044,16 +1044,16 @@ void format_fixed_array_as_c_string(Formatter* formatter, Any thing) {
 		auto casted = (ArrayType*) thing.type;
 		if (strcmp(casted->subkind, "fixed_array") == 0) {
 			auto casted = (FixedArrayType*) thing.type;
-			if (casted->inner == reflect_type_of<char>()) {
+			if (casted->inner == grd_reflect_type_of<char>()) {
 				auto ptr = (char*) thing.ptr;
 				s64 length = 0;
-				for (auto i: range(casted->array_size)) {
+				for (auto i: grd_range(casted->array_size)) {
 					if (ptr[i] == '\0') {
 						break;
 					}
 					length += 1;
 				}
-				auto str = make_string(ptr, length);
+				auto str = grd_make_string(ptr, length);
 				format(formatter, "%", str);
 				return;
 			}
@@ -1072,11 +1072,11 @@ void type_format(Formatter* formatter, Optional<T>* opt, String spec) {
 	}
 }
 
-void type_format(Formatter* formatter, CodeLocation* loc, String spec) {
-	format(formatter, "%: %", make_string(loc->file), loc->line);
+void type_format(Formatter* formatter, GrdCodeLoc* loc, String spec) {
+	format(formatter, "%: %", grd_make_string(loc->file), loc->line);
 }
 
-REFLECT(CodeLocation) {
-	MEMBER(file);
-	MEMBER(line);
+GRD_REFLECT(GrdCodeLoc) {
+	GRD_MEMBER(file);
+	GRD_MEMBER(line);
 }

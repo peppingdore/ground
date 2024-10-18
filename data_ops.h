@@ -1,22 +1,22 @@
 #pragma once
 
-#include "base.h"
+#include "grd_base.h"
 
 template <typename T>
-void swap(T* a, T* b) {
+void grd_swap(T* a, T* b) {
 	auto temp = *a;
 	*a = *b;
 	*b = temp;
 }
 
 template <typename T>
-void reverse(T* data, u64 length) {
+void grd_reverse(T* data, u64 length) {
 	for (u64 i = 0; i < length / 2; i++) {
-		swap(data + i, data + (length - i - 1));
+		grd_swap(data + i, data + (length - i - 1));
 	}
 }
 
 template <typename ReturnType, typename T> requires (sizeof(ReturnType) == sizeof(T))
-ReturnType bitcast(T thing) {
+ReturnType grd_bitcast(T thing) {
 	return *reinterpret_cast<ReturnType*>(&thing);
 }
