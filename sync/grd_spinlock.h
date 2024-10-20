@@ -2,8 +2,8 @@
 
 #include "grd_atomics.h"
 #include "os/os_sync.h"
-#include "../type_utils.h"
-#include "../thread/os/os_thread.h"
+#include "../grd_type_utils.h"
+#include "../thread/os/grd_os_thread.h"
 
 static_assert(
 	sizeof(GrdThreadId) == 4 ||
@@ -21,6 +21,7 @@ static_assert(
 static_assert(!grd_does_type_have_padding<GrdSpinlock>());
 
 void grd_lock(GrdSpinlock* x) {
+	assert(grd_is_aligned(x, sizeof(GrdSpinlock)));
 	auto loaded = grd_atomic_load(x);
 	auto thread_id = grd_current_thread_id();
 
@@ -44,19 +45,14 @@ void grd_lock(GrdSpinlock* x) {
 }
 
 void grd_unlock(GrdSpinlock* x) {
-	while (true) {
-		auto prev = grd_atomic_load(x);
-		assert(prev.lock_count >= 1);
-		assert(prev.locking_thread_id == grd_current_thread_id());
+	assert(grd_is_aligned(x, sizeof(GrdSpinlock)));
+	auto prev = grd_atomic_load(x);
+	assert(prev.lock_count >= 1);
+	assert(prev.locking_thread_id == grd_current_thread_id());
 
-		if (prev.lock_count > 1) {
-			grd_atomic_load_add<GrdSpinlockNumType, GrdMemoryOrder::Release>(&x->lock_count, -1LL);
-		} else {
-			grd_atomic_store<GrdSpinlock, GrdMemoryOrder::Release>(x, {});
-		}
-
-		if (prev.lock_count == 0) {
-			break;
-		}
+	if (prev.lock_count > 1) {
+		grd_atomic_load_add<GrdSpinlockNumType, GrdMemoryOrder::Release>(&x->lock_count, -1LL);
+	} else {
+		grd_atomic_store<GrdSpinlock, GrdMemoryOrder::Release>(x, {});
 	}
 }
