@@ -1,9 +1,10 @@
 #pragma once
 
 #include "grd_atomics.h"
-#include "os/os_sync.h"
+#include "os/grd_os_sync.h"
 #include "../grd_type_utils.h"
 #include "../thread/os/grd_os_thread.h"
+#include "../math/grd_basic_functions.h"
 
 static_assert(
 	sizeof(GrdThreadId) == 4 ||

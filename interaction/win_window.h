@@ -6,7 +6,7 @@
 #include "win_key.h"
 #include "pointer.h"
 #include "win_message_codes.h"
-#include "../log.h"
+#include "../grd_log.h"
 
 #include <windowsx.h>
 
@@ -16,7 +16,7 @@ GRD_BUILD_RUN("params.add_lib('user32.lib')");
 struct WindowsWindow: Window {
 	HWND               hwnd;
 	wchar_t*           utf16_title = NULL;
-	Array<Event*>      events;
+	GrdArray<Event*>      events;
 	char16_t           wm_char_high_surrogate = 0;
 	LRESULT          (*wnd_proc)(WindowsWindow* window, HWND h, UINT m, WPARAM wParam, LPARAM lParam) = NULL;
 	OsPointerIdMapper  os_pointer_mapper;
@@ -59,7 +59,7 @@ Tuple<WindowsWindow*, Error*> os_create_window(WindowParams params) {
 	auto window = grd_make<WindowsWindow>();
 	window->type = grd_reflect_type_of<WindowsWindow>();
 	window->params = params;
-	window->utf16_title = (wchar_t*) encode_utf16(params.title).data;
+	window->utf16_title = (wchar_t*) grd_encode_utf16(params.title).data;
 	
 	WINDOWS_GETMINMAXINFO_WINDOW_POINTER = window;
 
@@ -220,11 +220,11 @@ f64 get_windows_time_from_start(DWORD message_time) {
 	return ((f64) time) / 1000.0;
 }
 
-void push_windows_window_event(WindowsWindow* window, WindowEvent* event, Optional<DWORD> custom_time = {}) {
+void push_windows_window_event(WindowsWindow* window, WindowEvent* event, GrdOptional<DWORD> custom_time = {}) {
 	// GetMessageTime() is like GetTickCount(), but casted to LONG instead of DWORD.
 	auto time = custom_time.has_value ? custom_time.value : bitcast<DWORD>(GetMessageTime());
 	event->time_from_system_start = get_windows_time_from_start(time);
-	add(&window->events, event);
+	grd_add(&window->events, event);
 }
 
 PointerButtonFlags wparam_to_pointer_buttons(WPARAM wParam) {
@@ -416,7 +416,7 @@ LRESULT read_event_wnd_proc(WindowsWindow* window, HWND h, UINT m, WPARAM wParam
 
 // @TODO: Add a check that grd_makes sure that this function is called from the same thread that created the window, because Windows requires that.
 //   And the check must be present on all OSs (not Windows only) for consistency.
-Array<Event*> os_read_window_events(WindowsWindow* window) {
+GrdArray<Event*> os_read_window_events(WindowsWindow* window) {
 	GrdScopedRestore(window->wnd_proc);
 	window->wnd_proc = read_event_wnd_proc;
 

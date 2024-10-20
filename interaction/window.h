@@ -2,7 +2,7 @@
 
 #include "../grd_base.h"
 
-#if OS_WINDOWS
+#if GRD_OS_WINDOWS
 	#include "win_window.h"
 #endif
 
@@ -11,6 +11,6 @@ Tuple<Window*, Error*> create_window(WindowParams params) {
 	return { window, e };
 }
 
-Array<Event*> read_window_events(Window* window) {
+GrdArray<Event*> read_window_events(Window* window) {
 	return os_read_window_events((WindowsWindow*) window);
 }

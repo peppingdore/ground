@@ -1,13 +1,13 @@
 #pragma once
 
-#include "../string.h"
+#include "../grd_string.h"
 #include "../grd_scoped.h"
-#include "../math/vector.h"
-#include "../error.h"
+#include "../math/grd_vector.h"
+#include "../grd_error.h"
 #include "event.h"
 
 struct WindowParams {
-	UnicodeString title;
+	GrdUnicodeString title;
 	Vector2i      initial_size = { 1280, 720 };
 	Vector2i      min_size = { 100, 100 };
 	bool          borderless = false;

@@ -25,7 +25,7 @@ struct SsaId {
 	}
 };
 
-GrdHash64 hash_key(SsaId id) {
+GrdHash64 grd_hash_key(SsaId id) {
 	return hash64(id.v);
 }
 
@@ -36,23 +36,23 @@ struct SsaValue {
 	SsaId            id;
 	SsaOp            op = SsaOp::Nop;
 	SsaBasicBlock*   block = NULL;
-	Array<SsaValue*> args;
-	Array<SsaValue*> uses;
+	GrdArray<SsaValue*> args;
+	GrdArray<SsaValue*> uses;
 	Any              aux;
 	AstType*         v_type = NULL;
 	bool             is_removed = false; // @TODO: only for debugging. remove later.
 };
 
 struct SsaBasicBlock {
-	String                      name;
+	GrdString                      name;
 	Ssa*                        ssa;
 	SsaValue*                   ending = NULL;
 	bool                        is_sealed = false;
-	Array<SsaValue*>            values;
-	Array<SsaValue*>            incomplete_phis;
-	Array<SsaBasicBlock*>       pred;
-	Array<SsaBasicBlock*>       successors;
-	HashMap<AstVar*, SsaValue*> ssa_vars;
+	GrdArray<SsaValue*>            values;
+	GrdArray<SsaValue*>            incomplete_phis;
+	GrdArray<SsaBasicBlock*>       pred;
+	GrdArray<SsaBasicBlock*>       successors;
+	GrdHashMap<AstVar*, SsaValue*> ssa_vars;
 
 	GRD_REFLECT(SsaBasicBlock) {
 		GRD_MEMBER(name);
@@ -73,9 +73,9 @@ struct Ssa {
 	s64                         reg_counter = 0;
 	SsaBasicBlock*              current_block = NULL;
 	s64                         construct_id_counter = 0;
-	HashMap<AstVar*, SsaValue*> non_ssa_vars;
+	GrdHashMap<AstVar*, SsaValue*> non_ssa_vars;
 	AstFunction*                function = NULL;
-	Array<SsaBasicBlock*>       blocks;
+	GrdArray<SsaBasicBlock*>       blocks;
 	bool                        is_rewriting = false;
 
 	void free() {
@@ -91,10 +91,10 @@ s64 alloc_construct_id(Ssa* ssa) {
 	return ++ssa->construct_id_counter;
 }
 
-SsaBasicBlock* grd_make_ssa_basic_block(Ssa* ssa, String name = ""_b, s64 construct_id = 0) {
+SsaBasicBlock* grd_make_ssa_basic_block(Ssa* ssa, GrdString name = ""_b, s64 construct_id = 0) {
 	SsaBasicBlock* block = grd_make<SsaBasicBlock>(ssa->allocator);
 	if (construct_id > 0) {
-		block->name = sprint(ssa->allocator, "%_%", construct_id, name);
+		block->name = grd_sprint(ssa->allocator, "%_%", construct_id, name);
 	} else {
 		block->name = name;
 	}
@@ -104,7 +104,7 @@ SsaBasicBlock* grd_make_ssa_basic_block(Ssa* ssa, String name = ""_b, s64 constr
 	block->pred = { .allocator = ssa->allocator };
 	block->successors = { .allocator = ssa->allocator };
 	block->ssa_vars = { .allocator = ssa->allocator };
-	add(&ssa->blocks, block);
+	grd_add(&ssa->blocks, block);
 	return block;
 }
 
@@ -145,22 +145,22 @@ SsaValue* grd_make_ssa_val(SsaBasicBlock* block, SsaOp op) {
 	assert(!block->ssa->is_rewriting);
 	auto v = init_ssa_val(block, op);
 	if (op == SsaOp::Phi) {
-		add(&block->values, v, 0);
+		grd_add(&block->values, v, 0);
 	} else if (block->ending) {
-		add(&block->values, v, len(block->values) - 1);
+		grd_add(&block->values, v, grd_len(block->values) - 1);
 	} else {
-		add(&block->values, v);
+		grd_add(&block->values, v);
 	}
 	return v;
 }
 
 void use(SsaValue* by, SsaValue* v) {
-	add(&v->uses, by);
+	grd_add(&v->uses, by);
 }
 
 void add_arg(SsaValue* v, SsaValue* arg) {
 	use(v, arg);
-	add(&v->args, arg);
+	grd_add(&v->args, arg);
 }
 
 
@@ -171,8 +171,8 @@ struct SsaRewriteAddValue {
 
 struct SsaRewriter {
 	Ssa*                      ssa = NULL;
-	Array<SsaRewriteAddValue> add_values;
-	Array<SsaValue*>          to_remove;
+	GrdArray<SsaRewriteAddValue> add_values;
+	GrdArray<SsaValue*>          to_remove;
 };
 
 SsaRewriter start_rewrite(Ssa* ssa) {
@@ -185,30 +185,30 @@ SsaRewriter start_rewrite(Ssa* ssa) {
 
 void finish_rewrite(SsaRewriter* r) {
 	for (auto it: r->add_values) {
-		for (auto i: grd_range(len(it.v->block->values))) {
+		for (auto i: grd_range(grd_len(it.v->block->values))) {
 			if (it.v->block->values[i] == it.before) {
-				// println("add: %* op % idx: %", it.v->id.v, it.v->op, i);
-				// println("block name: %*", it.v->block->name);
-				// println("before: %* op %", it.before->id.v, it.before->op);
-				add(&it.v->block->values, it.v, i);
+				// grd_println("add: %* op % idx: %", it.v->id.v, it.v->op, i);
+				// grd_println("block name: %*", it.v->block->name);
+				// grd_println("before: %* op %", it.before->id.v, it.before->op);
+				grd_add(&it.v->block->values, it.v, i);
 				break;
 			}
 		}
 	}
 	for (auto v: r->to_remove) {
-		assert(len(v->uses) == 0);
-		// println("remove: %* op %", v->id.v, v->op);
+		assert(grd_len(v->uses) == 0);
+		// grd_println("remove: %* op %", v->id.v, v->op);
 		for (auto arg: v->args) {
-			for (s64 i = 0; i < len(arg->uses); i++) {
+			for (s64 i = 0; i < grd_len(arg->uses); i++) {
 				if (arg->uses[i] == v) {
-					remove_at_index(&arg->uses, i);
+					grd_remove(&arg->uses, i);
 					i -= 1;
 				}
 			}
 		}
-		for (auto i: grd_range(len(v->block->values))) {
+		for (auto i: grd_range(grd_len(v->block->values))) {
 			if (v->block->values[i] == v) {
-				remove_at_index(&v->block->values, i);
+				grd_remove(&v->block->values, i);
 				break;
 			}
 		}
@@ -221,7 +221,7 @@ SsaValue* grd_make_rewrite_ssa_val_before(SsaRewriter* r, SsaBasicBlock* block, 
 	SsaRewriteAddValue x;
 	x.v = v;
 	x.before = before;
-	add(&r->add_values, x);
+	grd_add(&r->add_values, x);
 	return v;
 }
 
@@ -236,10 +236,10 @@ void replace_by(SsaRewriter* r, SsaValue* v, SsaValue* by) {
 			continue;
 		}
 		bool did_find = false;
-		for (auto i: grd_range(len(use->args))) {
+		for (auto i: grd_range(grd_len(use->args))) {
 			if (use->args[i] == v) {
 				use->args[i] = by;
-				add(&by->uses, use);
+				grd_add(&by->uses, use);
 				did_find = true;
 				// arg may be used more than one time in the same value,
 				//  so we don't break here.
@@ -247,12 +247,12 @@ void replace_by(SsaRewriter* r, SsaValue* v, SsaValue* by) {
 		}
 		// assert(did_find);
 	}
-	clear(&v->uses);
+	grd_clear(&v->uses);
 }
 
 void remove_value(SsaRewriter* r, SsaValue* v) {
 	v->is_removed = true;
-	add(&r->to_remove, v);
+	grd_add(&r->to_remove, v);
 }
 
 SsaValue* try_remove_trivial_phi(SsaValue* phi) {
@@ -268,13 +268,13 @@ SsaValue* try_remove_trivial_phi(SsaValue* phi) {
 		same = arg;
 	}
 	assert(same);
-	// Array<SsaValue*> uses;
+	// GrdArray<SsaValue*> uses;
 	// for (auto use: phi->uses) {
 	// 	if (use == phi) {
 	// 		continue;
 	// 	}
-	// 	if (!contains(uses, use)) {
-	// 		add(&uses, use);
+	// 	if (!grd_contains(uses, use)) {
+	// 		grd_add(&uses, use);
 	// 	}
 	// }
 	
@@ -300,7 +300,7 @@ SsaValue* try_remove_trivial_phi(SsaValue* phi) {
 
 SsaValue* add_phi_args(SsaValue* phi) {
 	assert(phi->block->is_sealed);
-	assert(len(phi->args) == 0);
+	assert(grd_len(phi->args) == 0);
 	auto var = grd_reflect_cast<AstVar>(phi->aux);
 	if (!var) {
 		panic("Expected var");
@@ -319,9 +319,9 @@ SsaValue* read_var_recursive(SsaBasicBlock* block, AstVar* var) {
 		auto phi = grd_make_ssa_val(block, SsaOp::Phi);
 		phi->aux = grd_make_any(var);
 		phi->v_type = var->var_ts->tp;
-		add(&block->incomplete_phis, phi);
+		grd_add(&block->incomplete_phis, phi);
 		v = phi;
-	} else if (len(block->pred) == 1) {
+	} else if (grd_len(block->pred) == 1) {
 		assert(block->pred[0]->ending);
 		v = read_var(block->pred[0], var);
 	} else {
@@ -339,10 +339,10 @@ SsaValue* read_var_recursive(SsaBasicBlock* block, AstVar* var) {
 void seal_block(SsaBasicBlock* block) {
 	block->is_sealed = true;
 	for (auto phi: block->incomplete_phis) {
-		assert(len(block->pred) > 0);
+		assert(grd_len(block->pred) > 0);
 		add_phi_args(phi);
 	}
-	clear(&block->incomplete_phis);
+	grd_clear(&block->incomplete_phis);
 }
 
 void add_pred_inner(SsaBasicBlock* block, SsaBasicBlock* pred) {
@@ -352,8 +352,8 @@ void add_pred_inner(SsaBasicBlock* block, SsaBasicBlock* pred) {
 	if (pred->ending == NULL) {
 		panic("Cannot add unfilled pred");
 	}
-	add(&block->pred, pred);
-	add(&pred->successors, block);
+	grd_add(&block->pred, pred);
+	grd_add(&pred->successors, block);
 }
 
 void end_block_jump(SsaBasicBlock* block, SsaBasicBlock* target) {
@@ -438,7 +438,7 @@ enum SsaLVKind {
 
 struct SsaLV {
 	SsaLVKind        kind = SsaLVKindSsa;
-	Array<SsaValue*> args;
+	GrdArray<SsaValue*> args;
 	AstVar*          var = NULL;
 	SsaValue*        value = NULL;
 };
@@ -459,13 +459,13 @@ Tuple<SsaLV, SsaLVKind, Error*> fill_lvalue(Ssa* ssa, AstExpr* expr) {
 			auto zero = grd_make<s64>(ssa->allocator);
 			idx->aux = grd_make_any(zero);
 			idx->v_type = ssa->function->p->s64_tp;
-			add(&v.args, idx);
+			grd_add(&v.args, idx);
 			kind = SsaLVKindPtr;
 		}
 		auto access = grd_make_ssa_val(ssa->current_block, SsaOp::MemberAccess);
 		access->aux = grd_make_any(var_access->member);
 		access->v_type = var_access->member->member_ts->tp;
-		add(&v.args, access);
+		grd_add(&v.args, access);
 		return { v, kind, NULL };
 	} else if (auto var_access = grd_reflect_cast<AstVariableAccess>(expr)) {
 		if (var_access->var->is_global) {
@@ -506,7 +506,7 @@ Tuple<SsaLV, SsaLVKind, Error*> fill_lvalue(Ssa* ssa, AstExpr* expr) {
 		auto swz = grd_make_ssa_val(ssa->current_block, SsaOp::SwizzleIndices);
 		swz->aux = grd_make_any(sw);
 		swz->v_type = sw->expr_type;
-		add(&v.args, swz);
+		grd_add(&v.args, swz);
 		return { v, kind, NULL };
 	} else if (auto deref = grd_reflect_cast<AstDerefExpr>(expr)) {
 		auto [addr, e] = emit_expr(ssa, deref->lhs);
@@ -517,7 +517,7 @@ Tuple<SsaLV, SsaLVKind, Error*> fill_lvalue(Ssa* ssa, AstExpr* expr) {
 		lv.args.allocator = ssa->allocator;
 		lv.value = addr;
 		return { lv, SsaLVKindPtr, NULL };
-	} else if (auto array_access = grd_reflect_cast<AstArrayAccess>(expr)) {
+	} else if (auto array_access = grd_reflect_cast<AstGrdArrayAccess>(expr)) {
 		auto [v, kind, e] = fill_lvalue(ssa, array_access->lhs);
 		if (e) {
 			return { {}, {}, e };
@@ -529,7 +529,7 @@ Tuple<SsaLV, SsaLVKind, Error*> fill_lvalue(Ssa* ssa, AstExpr* expr) {
 		if (e2) {
 			return { {}, {}, e2 };
 		}
-		add(&v.args, idx);
+		grd_add(&v.args, idx);
 		return { v, kind, NULL };
 	} else {
 		return { {}, {}, format_error("Unsupported lvalue: %*", expr->type->name) };
@@ -544,7 +544,7 @@ Tuple<SsaLV, Error*> lvalue(Ssa* ssa, AstExpr* expr) {
 	lv.kind = kind;
 	if (lv.kind != SsaLVKindSsa) {
 		// @TODO: this can happen in the fill_lvalue() itself.
-		if (len(lv.args) == 0) {
+		if (grd_len(lv.args) == 0) {
 			return { lv, NULL };
 		}
 		auto v = grd_make_ssa_val(ssa->current_block, SsaOp::GetElementPtr);
@@ -560,7 +560,7 @@ Tuple<SsaLV, Error*> lvalue(Ssa* ssa, AstExpr* expr) {
 
 Tuple<SsaValue*, Error*> load(Ssa* ssa, SsaLV lv, AstType* type) {
 	if (lv.kind == SsaLVKindSsa) {
-		if (len(lv.args) == 0) {
+		if (grd_len(lv.args) == 0) {
 			return { lv.value, NULL };
 		} else {
 			auto v = grd_make_ssa_val(ssa->current_block, SsaOp::ExtractValue);
@@ -580,7 +580,7 @@ Tuple<SsaValue*, Error*> load(Ssa* ssa, SsaLV lv, AstType* type) {
 
 Error* store(Ssa* ssa, SsaLV lv, SsaValue* rhs) {
 	if (lv.kind == SsaLVKindSsa) {
-		if (len(lv.args) == 0) {
+		if (grd_len(lv.args) == 0) {
 			write_var(ssa->current_block, lv.var, rhs);
 		} else {
 			auto v = grd_make_ssa_val(ssa->current_block, SsaOp::InsertValue);
@@ -606,7 +606,7 @@ SsaValue* ssa_alloca(Ssa* ssa, AstType* type) {
 	return v;
 }
 
-Tuple<SsaValue*, Error*> emit_binary_op(Ssa* ssa, UnicodeString op, SsaValue* lhs, SsaValue* rhs) {
+Tuple<SsaValue*, Error*> emit_binary_op(Ssa* ssa, GrdUnicodeString op, SsaValue* lhs, SsaValue* rhs) {
 	SsaOp ssa_op = SsaOp::Nop;
 	if (op == "+") {
 		ssa_op = SsaOp::Add;
@@ -633,7 +633,7 @@ Tuple<SsaValue*, Error*> emit_binary_op(Ssa* ssa, UnicodeString op, SsaValue* lh
 	return { v, NULL };
 }
 
-Tuple<SsaValue*, Error*> emit_unary_op(Ssa* ssa, UnicodeString op, SsaValue* lhs) {
+Tuple<SsaValue*, Error*> emit_unary_op(Ssa* ssa, GrdUnicodeString op, SsaValue* lhs) {
 	SsaOp ssa_op = SsaOp::Nop;
 	if (op == "+") {
 		return { lhs, NULL };
@@ -856,7 +856,7 @@ Tuple<SsaValue*, Error*> emit_expr(Ssa* ssa, AstExpr* expr) {
 			}
 			return { loaded, NULL };
 		} else {
-			println(e);
+			grd_println(e);
 			e->free();
 		}
 	}
@@ -1105,33 +1105,33 @@ void print_ssa_value(SsaValue* inst) {
 	}
 }
 
-void print_ssa_block(SsaBasicBlock* block, Array<SsaBasicBlock*>* printed_blocks) {
+void print_ssa_block(SsaBasicBlock* block, GrdArray<SsaBasicBlock*>* printed_blocks) {
 	if (!block->is_sealed) {
 		panic("Block % is not sealed", block->name);
 	}
-	if (contains(*printed_blocks, block)) {
+	if (grd_contains(*printed_blocks, block)) {
 		return;
 	}
-	add(printed_blocks, block);
-	println("Block: %", block->name);
+	grd_add(printed_blocks, block);
+	grd_println("Block: %", block->name);
 	print("Predecessors: ");
 	for (auto pred: block->pred) {
 		print(" % ", pred->name);
 	}
-	println();
+	grd_println();
 	for (auto v: block->values) {
 		print("  ");
 		print_ssa_value(v);
-		println();
+		grd_println();
 	}
-	println();
+	grd_println();
 	for (auto succ: block->successors) {
 		print_ssa_block(succ, printed_blocks);
 	}
 }
 
 void print_ssa(SsaBasicBlock* entry) {
-	Array<SsaBasicBlock*> printed_blocks;
+	GrdArray<SsaBasicBlock*> printed_blocks;
 	print_ssa_block(entry, &printed_blocks);
 	printed_blocks.free();
 }
@@ -1165,26 +1165,26 @@ Tuple<Ssa*, Error*> emit_function_ssa(GrdAllocator allocator, AstFunction* f) {
 	return { ssa, NULL };
 }
 
-#include "../third_party/spirv_reflect.h"
+#include "../third_party/spirv_grd_reflect.h"
 
 struct SpirvEntryPoint {
 	AstFunction* f;
-	HashMap<AstFunctionArg*, u32> uniforms;
-	HashMap<AstStructMember*, u32> inputs;
-	Array<u32>   interf;
+	GrdHashMap<AstFunctionArg*, u32> uniforms;
+	GrdHashMap<AstStructMember*, u32> inputs;
+	GrdArray<u32>   interf;
 	u32          function_id;
 };
 
 struct SpirvEmitter {
 	GrdAllocator               allocator;
 	CLikeParser*            p = NULL;
-	Array<u32>              spv;
+	GrdArray<u32>              spv;
 	s64                     spv_cursor = 0;
-	HashMap<AstType*, u32>  type_ids;
-	HashMap<Tuple<AstType*, u32>, u32> ptr_type_ids;
+	GrdHashMap<AstType*, u32>  type_ids;
+	GrdHashMap<Tuple<AstType*, u32>, u32> ptr_type_ids;
 	u32                     id_counter = 0;
-	HashMap<SsaId, u32>     id_map;
-	Array<SpirvEntryPoint*> entry_points;
+	GrdHashMap<SsaId, u32>     id_map;
+	GrdArray<SpirvEntryPoint*> entry_points;
 	SpirvEntryPoint*        ep = NULL;
 };
 
@@ -1193,7 +1193,7 @@ u32 alloc_id(SpirvEmitter* m) {
 }
 
 void spv_word(SpirvEmitter* m, u32 word) {
-	add(&m->spv, word, m->spv_cursor);
+	grd_add(&m->spv, word, m->spv_cursor);
 	m->spv_cursor += 1;
 }
 
@@ -1203,7 +1203,7 @@ void spv_opcode(SpirvEmitter* m, SpvOp op, u32 word_count) {
 
 struct SpvOpOperand {
 	u32       op = 0;
-	Span<u32> span = {};
+	GrdSpan<u32> span = {};
 	bool      is_span = false;
 
 	SpvOpOperand(u32 x) {
@@ -1211,7 +1211,7 @@ struct SpvOpOperand {
 		is_span = false;
 	}
 
-	SpvOpOperand(Span<u32> x) {
+	SpvOpOperand(GrdSpan<u32> x) {
 		span = x;
 		is_span = true;
 	}
@@ -1221,7 +1221,7 @@ void spv_op(SpirvEmitter* m, SpvOp op, std::initializer_list<SpvOpOperand> words
 	s64 words_count = 0;
 	for (auto word: words) {
 		if (word.is_span) {
-			words_count += len(word.span);
+			words_count += grd_len(word.span);
 		} else {
 			words_count += 1;
 		}
@@ -1239,7 +1239,7 @@ void spv_op(SpirvEmitter* m, SpvOp op, std::initializer_list<SpvOpOperand> words
 	}
 
 	if (false) {
-		println("%", op);
+		grd_println("%", op);
 		for (auto word: words) {
 			if (word.is_span) {
 				for (auto w: word.span) {
@@ -1249,7 +1249,7 @@ void spv_op(SpirvEmitter* m, SpvOp op, std::initializer_list<SpvOpOperand> words
 				print(" % ", word.op);
 			}
 		}
-		println();
+		grd_println();
 	}
 }
 
@@ -1469,9 +1469,9 @@ Error* emit_spirv_block(SpirvEmitter* m, SsaBasicBlock* block) {
 				if (handled) {
 					break;
 				}
-				println("member: %*", member->name);
+				grd_println("member: %*", member->name);
 				auto found_input = get(&m->ep->inputs, member);
-				println("found_input: %", found_input);
+				grd_println("found_input: %", found_input);
 				if (found_input) {
 					auto id = alloc_id(m);
 					spv_op(m, SpvOpAccessChain, { id, *found_input });
@@ -1523,7 +1523,7 @@ Tuple<AstType*, Error*> strip_pointer_type(AstFunctionArg* arg) {
 	}
 }
 
-AstAttr* find_attr(Span<AstAttr*> attrs, UnicodeString name) {
+AstAttr* find_attr(GrdSpan<AstAttr*> attrs, UnicodeString name) {
 	for (auto attr: attrs) {
 		if (attr->name == name) {
 			return attr;
@@ -1567,7 +1567,7 @@ Error* emit_entry_point_arg(SpirvEmitter* m, AstFunction* f, AstFunctionArg* arg
 					}
 					auto id = alloc_id(m);
 					spv_op(m, SpvOpVariable, { tp_id, id, SpvStorageClassInput });
-					add(&m->ep->interf, id);
+					grd_add(&m->ep->interf, id);
 					put(&m->ep->inputs, member, id);
 					idx += 1;
 				}
@@ -1589,14 +1589,14 @@ Error* emit_entry_point_header(SpirvEmitter* m, AstFunction* f) {
 	return NULL;
 }
 
-void collect_phis(Array<SsaValue*>* phis, SsaValue* v) {
+void collect_phis(GrdArray<SsaValue*>* phis, SsaValue* v) {
 	assert(v->op == SsaOp::Phi);
 	for (auto arg: v->args) {
 		if (arg->op == SsaOp::Phi) {
-			if (contains(*phis, arg)) {
+			if (grd_contains(*phis, arg)) {
 				continue;
 			}
-			add(phis, arg);
+			grd_add(phis, arg);
 			collect_phis(phis, arg);
 		}
 	}
@@ -1604,14 +1604,14 @@ void collect_phis(Array<SsaValue*>* phis, SsaValue* v) {
 
 void replace_arg(SsaValue* v, s64 arg, SsaValue* by) {
 	auto rp = v->args[arg];
-	for (auto i: grd_range(len(rp->uses))) {
+	for (auto i: grd_range(grd_len(rp->uses))) {
 		if (rp->uses[i] == v) {
-			remove_at_index(&rp->uses, i);
+			grd_remove(&rp->uses, i);
 			break;
 		}
 	}
 	v->args[arg] = by;
-	add(&by->uses, v);
+	grd_add(&by->uses, v);
 }
 
 #if 0
@@ -1625,14 +1625,14 @@ Error* rewrite_spirv_function_arg(SpirvEmitter* m, Ssa* ssa, SsaRewriter* rw, Ss
 		if (attr->name == "vk_uniform") {
 			s64 set = 0;
 			s64 binding = 0;
-			if (len(attr->args) == 1) {
+			if (grd_len(attr->args) == 1) {
 				set = 0;
 				auto [i, e] = eval_const_int(attr->args[0]);
 				if (e) {
 					return e;
 				}
 				binding = i;
-			} else if (len(attr->args) == 2) {
+			} else if (grd_len(attr->args) == 2) {
 				auto [i, e] = eval_const_int(attr->args[0]);
 				if (e) {
 					return e;
@@ -1672,12 +1672,12 @@ Error* rewrite_spirv_function_arg(SpirvEmitter* m, Ssa* ssa, SsaRewriter* rw, Ss
 				}
 			}
 
-			Array<SsaValue*> member_values;
+			GrdArray<SsaValue*> member_values;
 			for (auto member: tp->members) {
 				for (auto attr: member->attrs) {
 					if (attr->name == "position") {
 						auto pos = grd_make_rewrite_ssa_val_before(rw, v->block, SsaOp::SpvBuiltinPosition, v);
-						add(&member_values, pos);
+						grd_add(&member_values, pos);
 						break;
 					} else {
 						return simple_parser_error(v->block->ssa->function->p, current_loc(), attr->text_region, "Unknown attribute", attr->name);
@@ -1713,11 +1713,11 @@ Error* rewrite_spirv_function_arg(SpirvEmitter* m, Ssa* ssa, SsaRewriter* rw, Ss
 						idx += 1;
 					}
 					assert(member_value);
-					if (len(use->args) == 2) {
+					if (grd_len(use->args) == 2) {
 						s64 idx = 0;
 						replace_by(rw, use, member_value);
 						remove_value(rw, use);
-					} else if (len(use->args) > 2) {
+					} else if (grd_len(use->args) > 2) {
 						auto new_v = grd_make_rewrite_ssa_val_before(rw, v->block, SsaOp::ExtractValue, use);
 						add_arg(new_v, member_value);
 						for (auto it: use->args[2, {}]) {
@@ -1768,7 +1768,7 @@ Error* emit_spirv_function(SpirvEmitter* m, Ssa* ssa) {
 		m->ep->f = f;
 		m->ep->function_id = function_id;
 		m->ep->interf.allocator = m->allocator;
-		add(&m->entry_points, m->ep);
+		grd_add(&m->entry_points, m->ep);
 	}
 
 	// auto e = perform_spirv_rewrites(m, ssa);
@@ -1783,7 +1783,7 @@ Error* emit_spirv_function(SpirvEmitter* m, Ssa* ssa) {
 	// 		return e;
 	// 	}
 	// 	return_type_id = ret_type_id;
-	// 	spv_opcode(m, SpvOpTypeFunction, 1 + 1 + len(f->args));
+	// 	spv_opcode(m, SpvOpTypeFunction, 1 + 1 + grd_len(f->args));
 	// 	spv_word(m, function_type_id);
 	// 	spv_word(m, ret_type_id);
 
@@ -1840,18 +1840,18 @@ Error* finalize_spirv(SpirvEmitter* m) {
 			return simple_parser_error(m->p, current_loc(), ep->f->text_region, "Unsupported entry point kind: %", ep->f->kind);
 		}
 
-		auto str = encode_utf8(m->allocator, ep->f->name);
+		auto str = grd_encode_utf8(m->allocator, ep->f->name);
 		grd_defer { str.free(); };
-		s64 pad = align(len(str), 4) - len(str);
+		s64 pad = align(grd_len(str), 4) - grd_len(str);
 		for (auto i: grd_range(pad)) {
-			add(&str, 0);
+			grd_add(&str, 0);
 		}
-		add(&str, 0);
-		add(&str, 0);
-		add(&str, 0);
-		add(&str, 0);
+		grd_add(&str, 0);
+		grd_add(&str, 0);
+		grd_add(&str, 0);
+		grd_add(&str, 0);
 
-		auto casted_str = *(Span<u32>*) &str;
+		auto casted_str = *(GrdSpan<u32>*) &str;
 		casted_str.count /= 4;
 
 		spv_op(m, SpvOpEntryPoint, { exec_mode, ep->function_id, casted_str, ep->interf });

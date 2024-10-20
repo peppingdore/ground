@@ -1,7 +1,7 @@
 #pragma once
 
 #include "third_party/spooky_hash.h"
-#include "type_utils.h"
+#include "grd_type_utils.h"
 #include <math.h>
 
 using GrdHash64 = u64;
@@ -30,7 +30,7 @@ struct GrdHash128 {
 };
 
 template <typename T>
-concept GrdHashPrimitive = !std::is_class_v<T> && !std::is_union_v<T> && !does_type_have_padding<T>();
+concept GrdHashPrimitive = !std::is_class_v<T> && !std::is_union_v<T> && !grd_does_type_have_padding<T>();
 
 struct GrdHasher;
 
@@ -52,7 +52,7 @@ struct GrdHasher {
 	spookyhash_context ctx;
 };
 
-void update(GrdHasher* h, void* data, u64 size) {
+void grd_update(GrdHasher* h, void* data, u64 size) {
 	spookyhash_update(&h->ctx, data, size);
 }
 
@@ -67,18 +67,18 @@ GrdHash64 grd_hash64(GrdHasher* h) {
 }
 
 template <GrdGlobalHashable T>
-void update(GrdHasher* h, T x) {
+void grd_update(GrdHasher* h, T x) {
 	grd_type_hash(h, x);
 }
 
 template <GrdMemberHashable T>
-void update(GrdHasher* h, T x) {
+void grd_update(GrdHasher* h, T x) {
 	x.hash(h);
 }
 
 template <GrdPodHashable T>
-void update(GrdHasher* h, T x) {
-	update(h, &x, sizeof(T));
+void grd_update(GrdHasher* h, T x) {
+	grd_update(h, &x, sizeof(T));
 }
 
 constexpr GrdHash128 grd_spookyhash_seed = {
@@ -127,7 +127,7 @@ void grd_hash_fp_naive(GrdHasher* h, T num) {
 	static_assert(std::is_same_v<T, f32> || std::is_same_v<T, f64>);
 
 	auto hash_bytes = [=](T num) {
-		update(&h, &num, sizeof(num));
+		grd_update(&h, &num, sizeof(num));
 	};
 
 	switch (fpclassify(num)) {

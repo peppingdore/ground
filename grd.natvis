@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?> 
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+  <Type Name="GrdArray&lt;*&gt;">
+    <DisplayString>{{ count={count} capacity={capacity} }}</DisplayString>
+    <Expand>
+		<Synthetic Name="[entire]">
+			<Expand>
+				<GrdArrayItems>
+					<Size>capacity</Size>
+					<ValuePointer>data</ValuePointer>
+				</GrdArrayItems>
+			</Expand>
+		</Synthetic>
+
+		<GrdArrayItems>
+			<Size>count</Size>
+			<ValuePointer>data</ValuePointer>
+		</GrdArrayItems>
+    </Expand>
+
+  </Type>
+
+  <Type Name="GrdSpan&lt;*&gt;">
+    <DisplayString>{{ count={count} }}</DisplayString>
+    <Expand>
+      <GrdArrayItems>
+        <Size>count</Size>
+        <ValuePointer>data</ValuePointer>
+      </GrdArrayItems>
+    </Expand>
+  </Type>
+
+<!-- 
+  <Type Name="GrdHashMap&lt;*&gt;">
+  	<Expand>
+		<Synthetic Name="[items]">
+        <Expand>
+          <CustomListItems>
+            <Variable Name="i" InitialValue="0"/>
+            <Variable Name="idx" InitialValue="0"/>
+            <Loop>
+              <Break Condition="i >= entries.capacity"/>
+              <If Condition="entries.data[i].hash >= 2">
+			  	<Item Name="{entries.data[i].key}">entries.data[i].value</Item>
+                <Exec>idx++</Exec>
+              </If>
+              <Exec>i++</Exec>
+            </Loop>
+          </CustomListItems>
+        </Expand>
+      </Synthetic>
+      <Synthetic Name="[items_raw]">
+        <Expand>
+          <CustomListItems>
+            <Variable Name="i" InitialValue="0"/>
+            <Variable Name="idx" InitialValue="0"/>
+            <Loop>
+              <Break Condition="i >= entries.capacity"/>
+              <If Condition="entries.data[i].hash >= 2">
+			  	<Item Name="{i}">entries.data[i]</Item>
+                <Exec>idx++</Exec>
+              </If>
+              <Exec>i++</Exec>
+            </Loop>
+          </CustomListItems>
+        </Expand>
+      </Synthetic>
+    </Expand>
+  </Type> -->
+
+</AutoVisualizer>

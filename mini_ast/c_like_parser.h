@@ -1,13 +1,13 @@
 #pragma once
 
-#include "../error.h"
-#include "../math/vector.h"
-#include "../arena_allocator.h"
-#include "../reflect.h"
-#include "../array.h"
-#include "../tuple.h"
-#include "../string.h"
-#include "../panic.h"
+#include "../grd_error.h"
+#include "../math/grd_vector.h"
+#include "../grd_arena_allocator.h"
+#include "../grd_reflect.h"
+#include "../grd_array.h"
+#include "../grd_tuple.h"
+#include "../grd_string.h"
+#include "../grd_panic.h"
 
 
 enum AstOperatorFlags {
@@ -22,7 +22,7 @@ enum AstOperatorFlags {
 };
 
 struct AstOperator {
-	UnicodeString op;
+	GrdUnicodeString op;
 	s32           prec;
 	s32           flags = 0;
 
@@ -99,7 +99,7 @@ struct ProgramTextRegion {
 };
 
 struct Token {
-	UnicodeString     str;
+	GrdUnicodeString     str;
 	ProgramTextRegion reg;
 	u32               flags = 0;
 };
@@ -113,12 +113,12 @@ struct AstType;
 struct CLikeParser {
 	GrdAllocator            allocator;
 	CLikeProgram*        program;
-	Array<AstNode*>      scope;
-	UnicodeString        str;
+	GrdArray<AstNode*>      scope;
+	GrdUnicodeString        str;
 	s64                  cursor = 0;
 	Token                current_token;
-	Array<UnicodeString> op_tokens_sorted;
-	HashMap<AstType*, AstType*> ptr_types;
+	GrdArray<GrdUnicodeString> op_tokens_sorted;
+	GrdHashMap<AstType*, AstType*> ptr_types;
 
 	AstGrdPrimitiveType*    void_tp = NULL;
 	AstGrdPrimitiveType*    bool_tp = NULL;
@@ -141,7 +141,7 @@ struct CLikeParser {
 struct AstNode {
 	Type*                       type;
 	CLikeParser*                p = NULL;
-	Optional<ProgramTextRegion> text_region;
+	GrdOptional<ProgramTextRegion> text_region;
 
 	GRD_REFLECT(AstNode) {
 		GRD_MEMBER(p);
@@ -152,7 +152,7 @@ struct AstNode {
 };
 
 template <typename T>
-T* grd_make_ast_node(CLikeParser* p, Optional<ProgramTextRegion> text_region) {
+T* grd_make_ast_node(CLikeParser* p, GrdOptional<ProgramTextRegion> text_region) {
 	auto x = grd_make<T>(p->allocator);
 	x->type = grd_reflect_type_of<T>();
 	x->p = p;
@@ -161,7 +161,7 @@ T* grd_make_ast_node(CLikeParser* p, Optional<ProgramTextRegion> text_region) {
 }
 
 struct AstSymbol: AstNode {
-	UnicodeString name;
+	GrdUnicodeString name;
 	bool          is_global = false;
 
 	GRD_REFLECT(AstSymbol) {
@@ -233,7 +233,7 @@ constexpr bool AST_EXPR_LVALUE = true;
 constexpr bool AST_EXPR_RVALUE = false;
 
 template <typename T>
-T* grd_make_ast_expr(CLikeParser* p, AstType* expr_type, bool is_lvalue, Optional<ProgramTextRegion> text_region) {
+T* grd_make_ast_expr(CLikeParser* p, AstType* expr_type, bool is_lvalue, GrdOptional<ProgramTextRegion> text_region) {
 	auto x = grd_make_ast_node<T>(p, text_region);
 	if (!expr_type) {
 		panic("expr_type must be non-null");
@@ -244,7 +244,7 @@ T* grd_make_ast_expr(CLikeParser* p, AstType* expr_type, bool is_lvalue, Optiona
 }
 
 struct AstBlock: AstNode {
-	Array<AstNode*> statements;
+	GrdArray<AstNode*> statements;
 
 	GRD_REFLECT(AstBlock) {
 		GRD_BASE_TYPE(AstNode);
@@ -254,8 +254,8 @@ struct AstBlock: AstNode {
 
 
 struct CLikeProgram: AstNode {
-	Array<AstNode*>   globals; // Main diff between globals and global_syms is var decl groups vs var decls.
-	Array<AstSymbol*> global_syms;
+	GrdArray<AstNode*>   globals; // Main diff between globals and global_syms is var decl groups vs var decls.
+	GrdArray<AstSymbol*> global_syms;
 
 	GRD_REFLECT(CLikeProgram) {
 		GRD_BASE_TYPE(AstNode);
@@ -297,7 +297,7 @@ struct ShaderIntrinVar: AstVar {
 struct AstAttr;
 
 struct AstFunctionArg: AstVar {
-	Array<AstAttr*> attrs;
+	GrdArray<AstAttr*> attrs;
 
 	GRD_REFLECT(AstFunctionArg) {
 		GRD_BASE_TYPE(AstVar);
@@ -321,13 +321,13 @@ struct VkSetBindingAttr;
 
 struct AstFunction: AstSymbol {
 	AstTypeSite*           return_ts = NULL; 
-	Array<AstFunctionArg*> args;
-	Array<AstAttr*>        attrs;
+	GrdArray<AstFunctionArg*> args;
+	GrdArray<AstAttr*>        attrs;
 	AstFunctionKind        kind = AstFunctionKind::Plain;
 	AstBlock*              block = NULL;
 	AstFunctionArg*        stage_in_arg = NULL;
-	Array<MtlBufferIdxAttr*> mtl_buffers;
-	Array<VkSetBindingAttr*> vk_set_bindings;
+	GrdArray<MtlBufferIdxAttr*> mtl_buffers;
+	GrdArray<VkSetBindingAttr*> vk_set_bindings;
 
 	GRD_REFLECT(AstFunction) {
 		GRD_BASE_TYPE(AstSymbol);
@@ -343,7 +343,7 @@ struct AstFunction: AstSymbol {
 };
 
 template <typename T>
-T* grd_make_ast_symbol(CLikeParser* p, UnicodeString name, Optional<ProgramTextRegion> text_region) {
+T* grd_make_ast_symbol(CLikeParser* p, GrdUnicodeString name, GrdOptional<ProgramTextRegion> text_region) {
 	auto node = grd_make_ast_node<T>(p, text_region);
 	node->name = name;
 	return node;
@@ -395,7 +395,7 @@ struct AstVarDecl: AstVar {
 
 
 struct AstVarDeclGroup: AstNode {
-	Array<AstVarDecl*> var_decls;
+	GrdArray<AstVarDecl*> var_decls;
 
 	GRD_REFLECT(AstVarDeclGroup) {
 		GRD_BASE_TYPE(AstNode);
@@ -409,9 +409,9 @@ struct AstAttr;
 struct AstStructMember: AstNode {
 	AstStructType*  struct_type = NULL;
 	AstTypeSite*    member_ts = NULL;
-	UnicodeString   name;
+	GrdUnicodeString   name;
 	s64             offset = 0;
-	Array<AstAttr*> attrs;
+	GrdArray<AstAttr*> attrs;
 
 	GRD_REFLECT(AstStructMember) {
 		GRD_BASE_TYPE(AstNode);
@@ -424,7 +424,7 @@ struct AstStructMember: AstNode {
 };
 
 struct AstStructType: AstType {
-	Array<AstStructMember*> members;
+	GrdArray<AstStructMember*> members;
 
 	GRD_REFLECT(AstStructType) {
 		GRD_BASE_TYPE(AstType);
@@ -443,11 +443,11 @@ struct AstVarMemberAccess: AstExpr {
 	}
 };
 
-struct AstArrayAccess: AstExpr {
+struct AstGrdArrayAccess: AstExpr {
 	AstExpr*      lhs;
 	AstExpr*      index;
 
-	GRD_REFLECT(AstArrayAccess) {
+	GRD_REFLECT(AstGrdArrayAccess) {
 		GRD_BASE_TYPE(AstExpr);
 		GRD_MEMBER(lhs);
 		GRD_MEMBER(index);
@@ -460,8 +460,8 @@ struct AstLiteralExpr: AstExpr {
 };
 
 struct AstAttr: AstNode {
-	UnicodeString   name;
-	Array<AstExpr*> args;
+	GrdUnicodeString   name;
+	GrdArray<AstExpr*> args;
 	bool            is_used = false;
 
 	GRD_REFLECT(AstAttr) {
@@ -487,12 +487,12 @@ s64 maybe_eat_floating_point_literal(CLikeParser* p) {
 	s64 start = p->cursor;
 	s64 c = p->cursor;
 	
-	for (; c < len(p->str); c++) {
+	for (; c < grd_len(p->str); c++) {
 		if (!(p->str[c] >= '0' && p->str[c] <= '9')) {
 			break;
 		}
 	}
-	if (c >= len(p->str)) {
+	if (c >= grd_len(p->str)) {
 		return 0;
 	}
 	bool have_stuff_before_dot = c > start;
@@ -502,7 +502,7 @@ s64 maybe_eat_floating_point_literal(CLikeParser* p) {
 		have_dot = true;
 		c += 1;
 		s64 decimal_start = c;
-		for (; c < len(p->str); c++) {
+		for (; c < grd_len(p->str); c++) {
 			if (!(p->str[c] >= '0' && p->str[c] <= '9')) { 
 				break;
 			}
@@ -516,20 +516,20 @@ s64 maybe_eat_floating_point_literal(CLikeParser* p) {
 		return 0;
 	}
 	bool have_exp = false;
-	if (c < len(p->str)) {
+	if (c < grd_len(p->str)) {
 		if (p->str[c] == 'e' || p->str[c] == 'E') {
 			have_exp = true;
 			c += 1;
-			if (c >= len(p->str)) {
+			if (c >= grd_len(p->str)) {
 				return 0;
 			}
 			if (p->str[c] == '+' || p->str[c] == '-') {
 				c += 1;
-				if (c >= len(p->str)) {
+				if (c >= grd_len(p->str)) {
 					return 0;
 				}
 			}
-			for (; c < len(p->str); c++) {
+			for (; c < grd_len(p->str); c++) {
 				if (!(p->str[c] >= '0' && p->str[c] <= '9')) {
 					break;
 				}
@@ -537,7 +537,7 @@ s64 maybe_eat_floating_point_literal(CLikeParser* p) {
 		}
 	}
 	bool have_suffix = false;
-	if (c < len(p->str)) {
+	if (c < grd_len(p->str)) {
 		if (p->str[c] == 'f' || p->str[c] == 'F' || p->str[c] == 'd' || p->str[c] == 'D') {
 			have_suffix = true;
 			c += 1;
@@ -553,20 +553,20 @@ s64 maybe_eat_integer_literal(CLikeParser* p) {
 	auto start = p->str[p->cursor, {}];
 
 	s32 prefix_len = 0;
-	if (len(start) > 0 && (start[0] >= '0' && start[0] <= '9')) {
+	if (grd_len(start) > 0 && (start[0] >= '0' && start[0] <= '9')) {
 		prefix_len = 1;
 	} else if (
-		starts_with(start, U"0x"_b) ||
-		starts_with(start, U"0X"_b) ||
-		starts_with(start, U"0b"_b) ||
-		starts_with(start, U"0B"_b) ||
-		starts_with(start, U"0o"_b) ||
-		starts_with(start, U"0O"_b))
+		grd_starts_with(start, U"0x"_b) ||
+		grd_starts_with(start, U"0X"_b) ||
+		grd_starts_with(start, U"0b"_b) ||
+		grd_starts_with(start, U"0B"_b) ||
+		grd_starts_with(start, U"0o"_b) ||
+		grd_starts_with(start, U"0O"_b))
 	{
 		prefix_len = 2;
 	}
 
-	for (auto i: range_from_to(p->cursor + prefix_len, len(p->str))) {
+	for (auto i: range_from_to(p->cursor + prefix_len, grd_len(p->str))) {
 		if (p->str[i] >= '0' && p->str[i] <= '9') {
 			continue;
 		}
@@ -580,12 +580,12 @@ s64 maybe_eat_integer_literal(CLikeParser* p) {
 		}
 		return i != p->cursor ? i : 0;
 	}
-	return prefix_len > 0 ? len(p->str) : 0;
+	return prefix_len > 0 ? grd_len(p->str) : 0;
 }
 
 Token next(CLikeParser* p) {
-	for (auto i: range_from_to(p->cursor, len(p->str))) {
-		if (is_whitespace(p->str[i])) {
+	for (auto i: range_from_to(p->cursor, grd_len(p->str))) {
+		if (grd_is_whitespace(p->str[i])) {
 			if (p->cursor < i) {
 				return set_current_token(p, i);
 			} else {
@@ -612,8 +612,8 @@ Token next(CLikeParser* p) {
 					// parse multichar operators.
 					auto txt = p->str[i, {}];
 					for (auto it: p->op_tokens_sorted) {
-						if (starts_with(txt, it)) {
-							return set_current_token(p, i + len(it));
+						if (grd_starts_with(txt, it)) {
+							return set_current_token(p, i + grd_len(it));
 						}
 					}
 					return set_current_token(p, i + 1);
@@ -621,11 +621,11 @@ Token next(CLikeParser* p) {
 			}
 		}
 	}
-	return set_current_token(p, len(p->str));
+	return set_current_token(p, grd_len(p->str));
 }
 
 Token peek(CLikeParser* p) {
-	if (len(p->current_token.str) == 0) {
+	if (grd_len(p->current_token.str) == 0) {
 		return next(p);
 	}
 	return p->current_token;
@@ -664,8 +664,8 @@ T* grd_make_prep_node(Preprocessor* pp) {
 }
 
 struct PrepFile {
-	UnicodeString path;
-	UnicodeString str;
+	GrdUnicodeString path;
+	GrdUnicodeString str;
 };
 
 struct PrepFileNode: PrepNode {
@@ -687,50 +687,50 @@ struct PrepNodeReg {
 
 struct Preprocessor {
 	GrdAllocator              allocator;
-	AllocatedUnicodeString pr;
-	Array<PrepNode*>       scope;
-	Array<PrepFile*>       files;
-	Array<PrepNodeReg*>    regs;
+	GrdAllocatedUnicodeString pr;
+	GrdArray<PrepNode*>       scope;
+	GrdArray<PrepFile*>       files;
+	GrdArray<PrepNodeReg*>    regs;
 };
 
 void push_reg(Preprocessor* pp) {
-	if (len(pp->scope) == 0) {
+	if (grd_len(pp->scope) == 0) {
 		return;
 	}
 	auto reg = grd_make<PrepNodeReg>(pp->allocator);
 	reg->node = pp->scope[-1];
-	reg->start = len(pp->pr);
-	while (len(pp->regs) > 0) {
+	reg->start = grd_len(pp->pr);
+	while (grd_len(pp->regs) > 0) {
 		if (pp->regs[-1]->start < reg->start) {
 			break;
 		}
-		remove_at_index(&pp->regs, -1);
+		grd_remove(&pp->regs, -1);
 	}
-	if (len(pp->regs) > 0) {
+	if (grd_len(pp->regs) > 0) {
 		pp->regs[-1]->end = reg->start;
 	}
-	add(&pp->regs, reg);
+	grd_add(&pp->regs, reg);
 }
 
 void push_scope(Preprocessor* pp, PrepNode* node) {
-	if (len(pp->scope) > 0) {
+	if (grd_len(pp->scope) > 0) {
 		assert(node->parent == NULL);
 		node->parent = pp->scope[-1];
 	}
-	add(&pp->scope, node);
+	grd_add(&pp->scope, node);
 	push_reg(pp);
 }
 
-void pop_scope(Preprocessor* pp) {
-	pop(&pp->scope);
+void grd_pop_scope(Preprocessor* pp) {
+	grd_pop(&pp->scope);
 	push_reg(pp);
 }
 
-Error* prep_file(Preprocessor* pp, UnicodeString str, UnicodeString path) {
+Error* prep_file(Preprocessor* pp, GrdUnicodeString str, GrdUnicodeString path) {
 	auto file = grd_make<PrepFile>(pp->allocator);
 	file->path = path;
 	file->str = str;
-	add(&pp->files, file);
+	grd_add(&pp->files, file);
 
 	auto node = grd_make_prep_node<PrepFileNode>(pp);
 	node->file = file;
@@ -738,40 +738,40 @@ Error* prep_file(Preprocessor* pp, UnicodeString str, UnicodeString path) {
 	push_scope(pp, node);
 
 	s64 cursor = 0;
-	while (cursor < len(str)) {
-		UnicodeString remaining = str[cursor, {}];
-		if (starts_with(remaining, "//")) {
+	while (cursor < grd_len(str)) {
+		GrdUnicodeString remaining = str[cursor, {}];
+		if (grd_starts_with(remaining, "//")) {
 			s64 start = cursor;
-			s64 end = len(str);
-			for (auto i: range_from_to(cursor, len(str))) {
-				if (is_line_break(str[i])) {
+			s64 end = grd_len(str);
+			for (auto i: range_from_to(cursor, grd_len(str))) {
+				if (grd_is_line_break(str[i])) {
 					end = i;
 					break;
 				}
 			}
 			cursor = end;
-			pop_scope(pp);
+			grd_pop_scope(pp);
 			auto comment_node = grd_make_prep_node<PrepFileNode>(pp);
 			comment_node->file = file;
 			comment_node->file_offset = start;
 			push_scope(pp, comment_node);
-			add(&pp->pr, ' ');
-			pop_scope(pp);
+			grd_add(&pp->pr, ' ');
+			grd_pop_scope(pp);
 			auto new_node = grd_make_prep_node<PrepFileNode>(pp);
 			new_node->file = file;
 			new_node->file_offset = end;
 			push_scope(pp, new_node);
 			continue;
 		}
-		if (starts_with(remaining, "/*")) {
+		if (grd_starts_with(remaining, "/*")) {
 			s64 start = cursor;
 			cursor += 2;
 			s64 level = 1;
-			while (cursor < len(str)) {
-				if (starts_with(str[cursor, {}], "/*")) {
+			while (cursor < grd_len(str)) {
+				if (grd_starts_with(str[cursor, {}], "/*")) {
 					cursor += 2;
 					level += 1;
-				} else if (starts_with(str[cursor, {}], "*/")) {
+				} else if (grd_starts_with(str[cursor, {}], "*/")) {
 					cursor += 2;
 					level -= 1;
 					if (level == 0) {
@@ -786,10 +786,10 @@ Error* prep_file(Preprocessor* pp, UnicodeString str, UnicodeString path) {
 				// Add preprocessor text region.
 			}
 		}
-		// if (starts_with(remaining, "#")) {
+		// if (grd_starts_with(remaining, "#")) {
 			
 		// }
-		add(&pp->pr, str[cursor]);
+		grd_add(&pp->pr, str[cursor]);
 		cursor += 1;
 	}
 	return NULL;
@@ -820,8 +820,8 @@ GrdGenerator<AstSymbol*> resolve_symbols(AstNode* node) {
 	}
 }
 
-AstNode* lookup_symbol(CLikeParser* p, UnicodeString name) {
-	for (auto i: reverse(grd_range(len(p->scope)))) { 
+AstNode* lookup_symbol(CLikeParser* p, GrdUnicodeString name) {
+	for (auto i: grd_reverse(grd_range(grd_len(p->scope)))) { 
 		auto scope = p->scope[i];
 		if (auto program = grd_reflect_cast<CLikeProgram>(scope)) {
 			for (auto child: program->globals) {
@@ -866,11 +866,11 @@ Error* add_global(CLikeParser* p, AstNode* s) {
 		}
 		sym->is_global = true;
 	}
-	add(&p->program->globals, s);
+	grd_add(&p->program->globals, s);
 	return NULL;
 }
 
-AstType* find_type(CLikeParser* p, UnicodeString name) {
+AstType* find_type(CLikeParser* p, GrdUnicodeString name) {
 	if (name == "float") {
 		name = U"f32"_b;
 	}
@@ -941,7 +941,7 @@ struct PreType {
 
 Tuple<PreType, Error*> parse_pre_type(CLikeParser* p) {
 	auto tok = peek(p);
-	auto c_str = encode_utf8(tok.str);
+	auto c_str = grd_encode_utf8(tok.str);
 	grd_defer { c_str.free(); };
 	AstType* type = find_type(p, tok.str);
 	if (!type) {
@@ -974,7 +974,7 @@ AstGrdPointerType* get_pointer_type(CLikeParser* p, AstType* tp, VulkanStorageCl
 	return ptr;
 }
 
-Tuple<AstTypeSite*, Error*> finalize_type(CLikeParser* p, PreType pt, Span<AstAttr*> attrs) {
+Tuple<AstTypeSite*, Error*> finalize_type(CLikeParser* p, PreType pt, GrdSpan<AstAttr*> attrs) {
 	if (pt.pointer_indir_level > 0) {
 		auto st_class = VulkanStorageClass::Unspecified;
 		for (auto attr: attrs) {
@@ -1015,7 +1015,7 @@ Tuple<AstTypeSite*, Error*> finalize_type(CLikeParser* p, PreType pt, Span<AstAt
 
 Tuple<Token, Error*> parse_ident(CLikeParser* p) {
 	auto tok = peek(p);
-	if (len(tok.str) == 0) {
+	if (grd_len(tok.str) == 0) {
 		return { {}, simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected an identifier."_b) };
 	}
 	if ((tok.str[0] < 'a' || tok.str[0] > 'z') && (tok.str[0] < 'A' || tok.str[0] > 'Z')) {
@@ -1032,9 +1032,9 @@ Tuple<Token, Error*> parse_ident(CLikeParser* p) {
 
 Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p);
 Tuple<AstExpr*, Error*> parse_expr(CLikeParser* p, s32 min_prec);
-Tuple<Array<AstAttr*>, Error*> parse_attrs(CLikeParser* p);
+Tuple<GrdArray<AstAttr*>, Error*> parse_attrs(CLikeParser* p);
 
-Error* check_if_attrs_used(CLikeParser* p, Array<AstAttr*> attrs, GrdCodeLoc loc = grd_caller_loc()) {
+Error* check_if_attrs_used(CLikeParser* p, GrdArray<AstAttr*> attrs, GrdCodeLoc loc = grd_caller_loc()) {
 	for (auto attr: attrs) {
 		if (!attr->is_used) {
 			auto e = simple_parser_error(p, loc, attr->text_region, "Attribute '%' is not used."_b, attr->name);
@@ -1045,10 +1045,10 @@ Error* check_if_attrs_used(CLikeParser* p, Array<AstAttr*> attrs, GrdCodeLoc loc
 }
 
 Tuple<AstVarDeclGroup*, Error*> parse_var_decl(CLikeParser* p, PreType pt, Token ident_tok, bool is_global) {
-	Array<AstVarDecl*> var_decls = { .allocator = p->allocator };
+	GrdArray<AstVarDecl*> var_decls = { .allocator = p->allocator };
 	grd_defer { var_decls.free(); };
 
-	auto val_decl_attrs = [&](auto* p, Array<AstAttr*> attrs) -> Error* {
+	auto val_decl_attrs = [&](auto* p, GrdArray<AstAttr*> attrs) -> Error* {
 		for (auto attr: attrs) {
 			if (is_global) {
 				return simple_parser_error(p, grd_current_loc(), attr->text_region, "Global variables cannot have attributes"_b);
@@ -1076,7 +1076,7 @@ Tuple<AstVarDeclGroup*, Error*> parse_var_decl(CLikeParser* p, PreType pt, Token
 		node->var_ts = ts;
 		node->name = current_ident.str;
 		node->is_global = is_global;
-		add(&var_decls, node);
+		grd_add(&var_decls, node);
 
 		auto tok = peek(p);
 		if (tok.str != U","_b) {
@@ -1123,7 +1123,7 @@ Tuple<AstVarDeclGroup*, Error*> parse_var_decl(CLikeParser* p, PreType pt, Token
 
 struct AstFunctionCall: AstExpr {
 	AstNode*        f;
-	Array<AstExpr*> args;
+	GrdArray<AstExpr*> args;
 
 	GRD_REFLECT(AstFunctionCall) {
 		GRD_BASE_TYPE(AstExpr);
@@ -1131,7 +1131,7 @@ struct AstFunctionCall: AstExpr {
 	}
 };
 
-AstOperator* find_binary_operator(CLikeParser* p, UnicodeString op) {
+AstOperator* find_binary_operator(CLikeParser* p, GrdUnicodeString op) {
 	for (auto& it: AST_BINARY_OPERATORS_UNSORTED) {
 		if (op == it.op) {
 			return &it;
@@ -1140,7 +1140,7 @@ AstOperator* find_binary_operator(CLikeParser* p, UnicodeString op) {
 	return NULL;
 }
 
-AstOperator* find_prefix_unary_operator(CLikeParser* p, UnicodeString op) {
+AstOperator* find_prefix_unary_operator(CLikeParser* p, GrdUnicodeString op) {
 	for (auto& it: AST_PREFIX_UNARY_OPERATORS_UNSORTED) {
 		if (op == it.op) {
 			return &it;
@@ -1149,7 +1149,7 @@ AstOperator* find_prefix_unary_operator(CLikeParser* p, UnicodeString op) {
 	return NULL;
 }
 
-AstOperator* find_postfix_unary_operator(CLikeParser* p, UnicodeString op) {
+AstOperator* find_postfix_unary_operator(CLikeParser* p, GrdUnicodeString op) {
 	for (auto& it: AST_POSTFIX_UNARY_OPERATORS_UNSORTED) {
 		if (op == it.op) {
 			return &it;
@@ -1180,7 +1180,7 @@ Tuple<AstExpr*, Error*> parse_function_call(CLikeParser* p, Token func_token, As
 		if (e) {
 			return { NULL, e };
 		}
-		add(&call->args, expr);
+		grd_add(&call->args, expr);
 		if (peek(p).str == ","_b) {
 			next(p);
 		}
@@ -1290,7 +1290,7 @@ bool is_bool(AstType* type) {
 	return type == type->p->bool_tp;
 }
 
-AstStructMember* find_struct_member(CLikeParser* p, AstStructType* type, UnicodeString name) {
+AstStructMember* find_struct_member(CLikeParser* p, AstStructType* type, GrdUnicodeString name) {
 	for (auto it: type->members) {
 		if (it->name == name) {
 			return it;
@@ -1312,8 +1312,8 @@ struct AstSwizzleExpr: AstExpr {
 	}
 };
 
-bool parse_swizzle_ident(CLikeParser* p, UnicodeString ident, s32* swizzle, s32 src_len) {
-	s64 ident_len = len(ident);
+bool parse_swizzle_ident(CLikeParser* p, GrdUnicodeString ident, s32* swizzle, s32 src_len) {
+	s64 ident_len = grd_len(ident);
 	if (ident_len > 4) {
 		return false;
 	}
@@ -1436,7 +1436,7 @@ struct AstStructInitMember {
 
 struct AstStructInitializer: AstExpr {
 	AstType*                   struct_type = NULL;
-	Array<AstStructInitMember> members;
+	GrdArray<AstStructInitMember> members;
 
 	GRD_REFLECT(AstStructInitializer) {
 		GRD_BASE_TYPE(AstExpr);
@@ -1481,7 +1481,7 @@ Tuple<AstExpr*, Error*> typecheck_binary_expr(CLikeParser* p, AstExpr* lhs, AstE
 	AstType* expr_result_type = NULL;
 	if ((op->flags & AST_OP_FLAG_MOD_ASSIGN) || op->op == "=") {
 		if (op->flags & AST_OP_FLAG_MOD_ASSIGN) {
-			pure_op = find_binary_operator(p, op->op[0, len(op->op) - 1]);
+			pure_op = find_binary_operator(p, op->op[0, grd_len(op->op) - 1]);
 		}
 		if (!lhs->is_lvalue) {
 			return { NULL, simple_parser_error(p, grd_current_loc(), op_tok.reg, U"Left side of '%' must be an lvalue.", op->op) };
@@ -1591,12 +1591,12 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 	if (tok.flags & CTOKEN_FLAG_FLOATING_POINT) {
 		auto lit = tok.str;
 		bool parse_as_float = false;
-		if (len(lit) > 0) {
-			if (lit[len(lit) - 1] == 'f' || lit[len(lit) - 1] == 'F') {
+		if (grd_len(lit) > 0) {
+			if (lit[grd_len(lit) - 1] == 'f' || lit[grd_len(lit) - 1] == 'F') {
 				lit.count -= 1;
 				parse_as_float = true;
 			}
-			if (lit[len(lit) - 1] == 'd' || lit[len(lit) - 1] == 'D') {
+			if (lit[grd_len(lit) - 1] == 'd' || lit[grd_len(lit) - 1] == 'D') {
 				lit.count -= 1;
 			}
 		}
@@ -1608,10 +1608,10 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 
 		bool ok = false;
 		if (parse_as_float) {
-			ok = parse_float(lit, &lit_value.f32_value);
+			ok = grd_parse_float(lit, &lit_value.f32_value);
 			lit_type = grd_reflect_type_of<f32>()->as<GrdPrimitiveType>();
 		} else {
-			ok = parse_float(lit, &lit_value.f64_value);
+			ok = grd_parse_float(lit, &lit_value.f64_value);
 			lit_type = grd_reflect_type_of<f64>()->as<GrdPrimitiveType>();
 		}
 		if (!ok) {
@@ -1626,7 +1626,7 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 
 	if (tok.flags & CTOKEN_FLAG_INTEGER) {
 		s64 u;
-		bool ok = parse_integer(tok.str, &u);
+		bool ok = grd_parse_integer(tok.str, &u);
 		if (!ok) {
 			return { NULL, simple_parser_error(p, grd_current_loc(), tok.reg, U"Could not parse integer literal."_b) };
 		}
@@ -1715,13 +1715,13 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 				return { NULL, simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected struct type but got '%'"_b, type->name) };
 			}
 			s64 member_index = 0;
-			Array<AstExpr*> args = { .allocator = p->allocator };
+			GrdArray<AstExpr*> args = { .allocator = p->allocator };
 			grd_defer { args.free(); };
 			while (true) {
 				auto tok = peek(p);
 				if (tok.str == ")"_b) {
-					if (len(args) != len(struct_tp->members)) {
-						return { NULL, simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected % arguments in initializer but got '%'.", len(struct_tp->members), len(args)) };
+					if (grd_len(args) != grd_len(struct_tp->members)) {
+						return { NULL, simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected % arguments in initializer but got '%'.", grd_len(struct_tp->members), grd_len(args)) };
 					}
 					ProgramTextRegion text_region = { initializer_reg_start, tok.reg.end };
 					auto node = grd_make_ast_expr<AstStructInitializer>(p, type, AST_EXPR_RVALUE, text_region);
@@ -1734,7 +1734,7 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 							.expr = it,
 							.member = member,
 						};
-						add(&node->members, m);
+						grd_add(&node->members, m);
 						idx += 1;
 					}
 					args = {};
@@ -1747,14 +1747,14 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 				if (e) {
 					return { NULL, e };
 				}
-				if (member_index >= len(struct_tp->members)) {
-					return { NULL, simple_parser_error(p, grd_current_loc(), tok.reg, U"Exceeded arguments count in initializer, struct '%' has % members.", type->name, len(struct_tp->members)) };
+				if (member_index >= grd_len(struct_tp->members)) {
+					return { NULL, simple_parser_error(p, grd_current_loc(), tok.reg, U"Exceeded arguments count in initializer, struct '%' has % members.", type->name, grd_len(struct_tp->members)) };
 				}
 				auto member = struct_tp->members[member_index];
 				if (member->member_ts->tp != expr->expr_type) {
 					return { NULL, simple_parser_error(p, grd_current_loc(), tok.reg, U"Initializer type mismatch, expected '%' but got '%'.", member->member_ts->tp->name, expr->expr_type->name) };
 				}
-				add(&args, expr);
+				grd_add(&args, expr);
 				member_index += 1;
 				if (peek(p).str == ","_b) {
 					next(p);
@@ -1870,7 +1870,7 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 				return { NULL, e };
 			}
 			if (!is_integer(expr->expr_type)) {
-				return { NULL, simple_parser_error(p, grd_current_loc(), tok.reg, U"Array index must be an integer, got '%'"_b, expr->expr_type->name) };
+				return { NULL, simple_parser_error(p, grd_current_loc(), tok.reg, U"GrdArray index must be an integer, got '%'"_b, expr->expr_type->name) };
 			}
 			if (peek(p).str != "]"_b) {
 				return { NULL, simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected a ]"_b) };
@@ -1884,7 +1884,7 @@ Tuple<AstExpr*, Error*> parse_primary_expr(CLikeParser* p) {
 			if (lhs->text_region.has_value) {
 				text_region.start = lhs->text_region.value.start;
 			}
-			auto node = grd_make_ast_expr<AstArrayAccess>(p, element_type, AST_EXPR_LVALUE, text_region);
+			auto node = grd_make_ast_expr<AstGrdArrayAccess>(p, element_type, AST_EXPR_LVALUE, text_region);
 			node->lhs = lhs;
 			node->index = expr;
 			lhs = node;
@@ -2077,25 +2077,25 @@ struct ColorAttr: AstAttr {
 };
 
 template <typename T>
-T* grd_make_ast_attr(CLikeParser* p, Token name, Array<AstExpr*> args, ProgramTextRegion reg) {
+T* grd_make_ast_attr(CLikeParser* p, Token name, GrdArray<AstExpr*> args, ProgramTextRegion reg) {
 	auto node = grd_make_ast_node<T>(p, reg);
 	node->name = name.str;
 	node->args = args;
 	return node;
 }
 
-Tuple<AstAttr*, Error*> parse_attr(CLikeParser* p, Token name, Array<AstExpr*> args, ProgramTextRegion reg) {
+Tuple<AstAttr*, Error*> parse_attr(CLikeParser* p, Token name, GrdArray<AstExpr*> args, ProgramTextRegion reg) {
 	if (name.str == "vk_uniform") {
 		auto attr = grd_make_ast_attr<VkUniformAttr>(p, name, args, reg);
-		if (len(args) == 0) {
+		if (grd_len(args) == 0) {
 
-		} else if (len(args) == 1) {
+		} else if (grd_len(args) == 1) {
 			auto [v, e] = eval_const_int(args[0], 0, s64_max);
 			if (e) {
 				return { NULL, e };
 			}
 			attr->binding = v;
-		} else if (len(args) == 2) {
+		} else if (grd_len(args) == 2) {
 			auto [v, e] = eval_const_int(args[0], 0, s64_max);
 			if (e) {
 				return { NULL, e };
@@ -2112,9 +2112,9 @@ Tuple<AstAttr*, Error*> parse_attr(CLikeParser* p, Token name, Array<AstExpr*> a
 		return { attr, NULL };
 	} else if (name.str == "mtl_buffer") {
 		auto attr = grd_make_ast_attr<MtlBufferAttr>(p, name, args, reg);
-		if (len(args) == 0) {
+		if (grd_len(args) == 0) {
 
-		} else if (len(args) == 1) {
+		} else if (grd_len(args) == 1) {
 			auto [v, e] = eval_const_int(args[0], 0, s64_max);
 			if (e) {
 				return { NULL, e };
@@ -2126,9 +2126,9 @@ Tuple<AstAttr*, Error*> parse_attr(CLikeParser* p, Token name, Array<AstExpr*> a
 		return { attr, NULL };
 	} else if (name.str == "mtl_constant") {
 		auto attr = grd_make_ast_attr<MtlConstantAttr>(p, name, args, reg);
-		if (len(args) == 0) {
+		if (grd_len(args) == 0) {
 
-		} else if (len(args) == 1) {
+		} else if (grd_len(args) == 1) {
 			auto [v, e] = eval_const_int(args[0], 0, s64_max);
 			if (e) {
 				return { NULL, e };
@@ -2139,26 +2139,26 @@ Tuple<AstAttr*, Error*> parse_attr(CLikeParser* p, Token name, Array<AstExpr*> a
 		}
 		return { attr, NULL };
 	} else if (name.str == "position") {
-		if (len(args) != 0) {
-			return { NULL, simple_parser_error(p, grd_current_loc(), name.reg, "Expected 0 arguments for position attribute, got %"_b, len(args)) };
+		if (grd_len(args) != 0) {
+			return { NULL, simple_parser_error(p, grd_current_loc(), name.reg, "Expected 0 arguments for position attribute, got %"_b, grd_len(args)) };
 		}
 		auto attr = grd_make_ast_attr<PositionAttr>(p, name, args, reg);
 		return { attr, NULL };
 	} else if (name.str == "fragment") {
-		if (len(args) != 0) {
-			return { NULL, simple_parser_error(p, grd_current_loc(), name.reg, "Expected 0 arguments for fragment attribute, got %"_b, len(args)) };
+		if (grd_len(args) != 0) {
+			return { NULL, simple_parser_error(p, grd_current_loc(), name.reg, "Expected 0 arguments for fragment attribute, got %"_b, grd_len(args)) };
 		}
 		auto attr = grd_make_ast_attr<FragmentAttr>(p, name, args, reg);
 		return { attr, NULL };
 	} else if (name.str == "stage_in") {
-		if (len(args) != 0) {
-			return { NULL, simple_parser_error(p, grd_current_loc(), name.reg, "Expected 0 arguments for stage_in attribute, got %"_b, len(args)) };
+		if (grd_len(args) != 0) {
+			return { NULL, simple_parser_error(p, grd_current_loc(), name.reg, "Expected 0 arguments for stage_in attribute, got %"_b, grd_len(args)) };
 		}
 		auto attr = grd_make_ast_attr<StageInAttr>(p, name, args, reg);
 		return { attr, NULL };
 	} else if (name.str == "color") {
-		if (len(args) != 1) {
-			return { NULL, simple_parser_error(p, grd_current_loc(), name.reg, "Expected 1 argument for color attribute, got %"_b, len(args)) };
+		if (grd_len(args) != 1) {
+			return { NULL, simple_parser_error(p, grd_current_loc(), name.reg, "Expected 1 argument for color attribute, got %"_b, grd_len(args)) };
 		}
 		auto [v, e] = eval_const_int(args[0], 0, s64_max);
 		if (e) {
@@ -2172,8 +2172,8 @@ Tuple<AstAttr*, Error*> parse_attr(CLikeParser* p, Token name, Array<AstExpr*> a
 	}
 }
 
-Tuple<Array<AstAttr*>, Error*> parse_attrs(CLikeParser* p) {
-	Array<AstAttr*> attrs;
+Tuple<GrdArray<AstAttr*>, Error*> parse_attrs(CLikeParser* p) {
+	GrdArray<AstAttr*> attrs;
 	attrs.allocator = p->allocator;
 	while (true) {
 		auto start_tok = peek(p);
@@ -2186,7 +2186,7 @@ Tuple<Array<AstAttr*>, Error*> parse_attrs(CLikeParser* p) {
 			return { {}, e };
 		}
 		auto tok = peek(p);
-		Array<AstExpr*> args = { .allocator = p->allocator };
+		GrdArray<AstExpr*> args = { .allocator = p->allocator };
 		if (tok.str == "(") {
 			next(p);
 			while (true) {
@@ -2195,7 +2195,7 @@ Tuple<Array<AstAttr*>, Error*> parse_attrs(CLikeParser* p) {
 					next(p);
 					break;
 				}
-				if (len(args) > 0) {
+				if (grd_len(args) > 0) {
 					if (tok.str != ",") {
 						return { {}, simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected ','"_b) };
 					}
@@ -2206,7 +2206,7 @@ Tuple<Array<AstAttr*>, Error*> parse_attrs(CLikeParser* p) {
 				if (e) {
 					return { {}, e };
 				}
-				add(&args, expr);
+				grd_add(&args, expr);
 			}
 		}
 		auto end_tok = peek(p);
@@ -2219,7 +2219,7 @@ Tuple<Array<AstAttr*>, Error*> parse_attrs(CLikeParser* p) {
 		if (e3) {
 			return { {}, e3 };
 		}
-		add(&attrs, attr);
+		grd_add(&attrs, attr);
 	}
 	return { attrs, NULL };
 }
@@ -2299,7 +2299,7 @@ Tuple<AstBlock*, Error*> parse_block_or_one_stmt(CLikeParser* p) {
 			next(p);
 		}
 		auto block = grd_make_ast_node<AstBlock>(p, stmt->text_region);
-		add(&block->statements, stmt);
+		grd_add(&block->statements, stmt);
 		return { block, NULL };
 	}
 }
@@ -2365,7 +2365,7 @@ Tuple<AstNode*, Error*> parse_for(CLikeParser* p, Token for_tok) {
 }
 
 AstFunction* get_current_function(CLikeParser* p) {
-	for (auto i: reverse(grd_range(len(p->scope)))) { 
+	for (auto i: grd_reverse(grd_range(grd_len(p->scope)))) { 
 		auto scope = p->scope[i];
 		if (auto f = grd_reflect_cast<AstFunction>(scope)) {
 			return f;
@@ -2454,8 +2454,8 @@ Tuple<AstBlock*, Error*> parse_block(CLikeParser* p) {
 	next(p);
 	auto block = grd_make_ast_node<AstBlock>(p, {});
 	block->statements.allocator = p->allocator;
-	add(&p->scope, block);
-	grd_defer { pop(&p->scope); };
+	grd_add(&p->scope, block);
+	grd_defer { grd_pop(&p->scope); };
 
 	s64 region_end = -1;
 	
@@ -2476,7 +2476,7 @@ Tuple<AstBlock*, Error*> parse_block(CLikeParser* p) {
 			}
 			next(p);
 		}
-		add(&block->statements, stmt);
+		grd_add(&block->statements, stmt);
 	}
 	assert(region_end != -1);
 	ProgramTextRegion text_region = { tok.reg.start, region_end };
@@ -2484,7 +2484,7 @@ Tuple<AstBlock*, Error*> parse_block(CLikeParser* p) {
 	return { block, NULL };
 }
 
-Error* grd_make_double_site_error(CLikeParser* p, GrdCodeLoc loc, Optional<ProgramTextRegion> reg, Optional<ProgramTextRegion> reg2, auto... args) {
+Error* grd_make_double_site_error(CLikeParser* p, GrdCodeLoc loc, GrdOptional<ProgramTextRegion> reg, GrdOptional<ProgramTextRegion> reg2, auto... args) {
 	auto error = grd_make_parser_error(p, loc, args...);
 	add_site(p, error,
 		CParserErrorToken{ .reg = reg, .color = CPARSER_ERROR_TOKEN_COLOR_REGULAR_GREEN },
@@ -2590,8 +2590,8 @@ Error* handle_entry_point_arg(CLikeParser* p, AstFunction* f, s64 idx) {
 		}
 		mtl_attr->is_used = true;
 		vk_attr->is_used = true;
-		add(&f->mtl_buffers, mtl_attr);
-		add(&f->vk_set_bindings, vk_attr);
+		grd_add(&f->mtl_buffers, mtl_attr);
+		grd_add(&f->vk_set_bindings, vk_attr);
 	}
 	if (kind == EntryPointArgKind::StageIn) {
 		if (!is_struct(arg->var_ts->tp)) {
@@ -2606,7 +2606,7 @@ Error* handle_entry_point_arg(CLikeParser* p, AstFunction* f, s64 idx) {
 }
 
 Error* handle_entry_point_args(CLikeParser* p, AstFunction* f) {
-	for (auto i: grd_range(len(f->args))) {
+	for (auto i: grd_range(grd_len(f->args))) {
 		if (f->kind != AstFunctionKind::Plain) {
 			auto e = handle_entry_point_arg(p, f, i);
 			if (e) {
@@ -2628,7 +2628,7 @@ Error* ensure_function_has_return(CLikeParser* p, AstFunction* f) {
 	if (!f->block) {
 		return simple_parser_error(p, grd_current_loc(), f->text_region, "Function % has no body", f->name);
 	}
-	if (len(f->block->statements) == 0) {
+	if (grd_len(f->block->statements) == 0) {
 		// Expected return statement.
 		return simple_parser_error(p, grd_current_loc(), f->block->text_region, "Expected return statement");
 	}
@@ -2696,8 +2696,8 @@ Error* typecheck_function_return_value(CLikeParser* p, AstFunction* f) {
 	return NULL;
 }
 
-Tuple<AstSymbol*, Error*> parse_function(CLikeParser* p, PreType pre_type,  Array<AstAttr*> attrs, Token start_tok, Token ident) {
-	Array<AstFunctionArg*> args = { .allocator = p->allocator };
+Tuple<AstSymbol*, Error*> parse_function(CLikeParser* p, PreType pre_type,  GrdArray<AstAttr*> attrs, Token start_tok, Token ident) {
+	GrdArray<AstFunctionArg*> args = { .allocator = p->allocator };
 	grd_defer { args.free(); };
 
 	next(p);
@@ -2723,7 +2723,7 @@ Tuple<AstSymbol*, Error*> parse_function(CLikeParser* p, PreType pre_type,  Arra
 			}
 			break;
 		}
-		if (len(args) > 0) {
+		if (grd_len(args) > 0) {
 			if (tok.str != U","_b) {
 				return { NULL, simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected ','"_b) };
 			}
@@ -2748,7 +2748,7 @@ Tuple<AstSymbol*, Error*> parse_function(CLikeParser* p, PreType pre_type,  Arra
 			return { NULL, e4 };
 		}
 		ProgramTextRegion text_region = { start, peek(p).reg.end };
-		if (len(attrs) > 0) {
+		if (grd_len(attrs) > 0) {
 			auto last = attrs[-1];
 			if (last->text_region.has_value) {
 				text_region.end = last->text_region.value.end;
@@ -2757,7 +2757,7 @@ Tuple<AstSymbol*, Error*> parse_function(CLikeParser* p, PreType pre_type,  Arra
 		auto arg_node = grd_make_ast_symbol<AstFunctionArg>(p, arg_name.str, text_region);
 		arg_node->var_ts = ts;
 		arg_node->attrs = attrs;
-		add(&args, arg_node);
+		grd_add(&args, arg_node);
 	}
 
 	ProgramTextRegion text_region = { start_tok.reg.start, peek(p).reg.end };
@@ -2798,8 +2798,8 @@ Tuple<AstSymbol*, Error*> parse_function(CLikeParser* p, PreType pre_type,  Arra
 		return { f, NULL };
 	}
 	if (tok.str == "{") {
-		add(&p->scope, f);
-		grd_defer { pop(&p->scope); };
+		grd_add(&p->scope, f);
+		grd_defer { grd_pop(&p->scope); };
 
 		auto [block, e] = parse_block(p);
 		if (e) {
@@ -2830,7 +2830,7 @@ Tuple<AstStructType*, Error*> parse_struct(CLikeParser* p, Token start_tok) {
 	}
 	next(p);
 
-	Array<AstStructMember*> members = { .allocator = p->allocator };
+	GrdArray<AstStructMember*> members = { .allocator = p->allocator };
 	grd_defer { members.free(); };
 
 	ProgramTextRegion st_reg;
@@ -2883,7 +2883,7 @@ Tuple<AstStructType*, Error*> parse_struct(CLikeParser* p, Token start_tok) {
 		if (init_expr && init_expr->text_region.has_value) {
 			reg.end = init_expr->text_region.value.end;
 		}
-		if (len(attrs) > 0) {
+		if (grd_len(attrs) > 0) {
 			auto last = attrs[-1];
 			if (last->text_region.has_value) {
 				reg.end = last->text_region.value.end;
@@ -2893,7 +2893,7 @@ Tuple<AstStructType*, Error*> parse_struct(CLikeParser* p, Token start_tok) {
 		member->member_ts = ts;
 		member->name = name.str;
 		member->attrs = attrs;
-		add(&members, member);
+		grd_add(&members, member);
 
 		for (auto attr: attrs) {
 			if (auto x = grd_reflect_cast<PositionAttr>(attr)) {
@@ -2985,7 +2985,7 @@ Error* parse_top_level(CLikeParser* p) {
 }
 
 template <typename T>
-AstGrdPrimitiveType* push_prim_type(CLikeParser* p, UnicodeString name, u64 size, u64 alignment, bool is_signed) {
+AstGrdPrimitiveType* push_prim_type(CLikeParser* p, GrdUnicodeString name, u64 size, u64 alignment, bool is_signed) {
 	auto tp = grd_make_ast_symbol<AstGrdPrimitiveType>(p, name, {});
 	tp->size = size;
 	tp->alignment = alignment;
@@ -3015,14 +3015,14 @@ u64 calc_struct_size(AstStructType* tp) {
 	return size;
 }
 
-void push_member(AstStructType* tp, UnicodeString name, AstTypeSite* ts) {
+void push_member(AstStructType* tp, GrdUnicodeString name, AstTypeSite* ts) {
 	auto m = grd_make_ast_node<AstStructMember>(tp->p, {});
 	m->struct_type = tp;
 	m->member_ts = ts;
 	m->name = name;
 	auto sz = calc_struct_size(tp);
 	m->offset = align(sz, ts->tp->alignment);
-	add(&tp->members, m);
+	grd_add(&tp->members, m);
 }
 
 AstTypeSite* grd_make_siteless_type_site(CLikeParser* p, AstType* tp) {
@@ -3089,7 +3089,7 @@ struct ShaderIntrinFunc: AstFunction {
 	}
 };
 
-void add_shader_intrinsic_var(CLikeParser* p, UnicodeString name, AstTypeSite* ts) {
+void add_shader_intrinsic_var(CLikeParser* p, GrdUnicodeString name, AstTypeSite* ts) {
 	// @TODO: check for duplicates
 	if (!ts) {
 		panic("No type for shader intrinsic var");
@@ -3102,7 +3102,7 @@ void add_shader_intrinsic_var(CLikeParser* p, UnicodeString name, AstTypeSite* t
 	}
 }
 
-void add_shader_intrinsic_func(CLikeParser* p, UnicodeString name, AstTypeSite* ret_ts, std::initializer_list<AstTypeSite*> args) {
+void add_shader_intrinsic_func(CLikeParser* p, GrdUnicodeString name, AstTypeSite* ret_ts, std::initializer_list<AstTypeSite*> args) {
 	// @TODO: check for duplicates
 	auto node = grd_make_ast_symbol<ShaderIntrinFunc>(p, name, {});
 	node->args.allocator = p->allocator;
@@ -3112,7 +3112,7 @@ void add_shader_intrinsic_func(CLikeParser* p, UnicodeString name, AstTypeSite* 
 		auto name = sprint_unicode(p->allocator, U"arg_%"_b, i);
 		auto arg_node = grd_make_ast_symbol<AstFunctionArg>(p, name, {});
 		arg_node->var_ts = arg;
-		add(&node->args, arg_node);
+		grd_add(&node->args, arg_node);
 		i += 1;
 	}
 	auto e = add_global(p, node);
@@ -3121,26 +3121,26 @@ void add_shader_intrinsic_func(CLikeParser* p, UnicodeString name, AstTypeSite* 
 	}
 }
 
-Tuple<CLikeProgram*, Error*> parse_c_like(UnicodeString str) {
+Tuple<CLikeProgram*, Error*> parse_c_like(GrdUnicodeString str) {
 	auto allocator = grd_make_arena_allocator();
 	auto p = grd_make<CLikeParser>(allocator);
 	p->allocator = allocator;
 	p->program = grd_make_ast_node<CLikeProgram>(p, {});
 	p->program->globals.allocator = p->allocator;
 	p->str = str;
-	add(&p->scope, p->program);
+	grd_add(&p->scope, p->program);
 	for (auto it: AST_BINARY_OPERATORS_UNSORTED) {
-		add(&p->op_tokens_sorted, it.op);
+		grd_add(&p->op_tokens_sorted, it.op);
 	}
 	for (auto it: AST_PREFIX_UNARY_OPERATORS_UNSORTED) {
-		add(&p->op_tokens_sorted, it.op);
+		grd_add(&p->op_tokens_sorted, it.op);
 	}
 	for (auto it: AST_POSTFIX_UNARY_OPERATORS_UNSORTED) {
-		add(&p->op_tokens_sorted, it.op);
+		grd_add(&p->op_tokens_sorted, it.op);
 	}
-	add(&p->op_tokens_sorted, U"[["_b);
-	add(&p->op_tokens_sorted, U"]]"_b);
-	sort(p->op_tokens_sorted, lambda(len($0[$1]) > len($0[$2]))); 
+	grd_add(&p->op_tokens_sorted, U"[["_b);
+	grd_add(&p->op_tokens_sorted, U"]]"_b);
+	sort(p->op_tokens_sorted, lambda(grd_len($0[$1]) > grd_len($0[$2]))); 
 
 	push_base_types(p);
 

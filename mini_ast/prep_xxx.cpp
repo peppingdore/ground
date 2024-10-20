@@ -3,7 +3,7 @@
 #include "c_like_parser.h"
 
 int main() {
-	UnicodeString prog = UR"XXXX(
+	GrdUnicodeString prog = UR"XXXX(
 	// comment
 	int main() {
 		// xxxx
@@ -17,5 +17,5 @@ int main() {
 		print_parser_error(e);
 		return -1;
 	}
-	println(prep->pr);
+	grd_println(prep->pr);
 }

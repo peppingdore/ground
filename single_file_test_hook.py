@@ -18,9 +18,7 @@ path = Path(__file__).parent / "single_file_compilation_tests"
 path.mkdir(parents=True, exist_ok=True)
 to_build = []
 
-blacklist = ['.git', '.vscode', 'third_party', 'b_lib', 'testing.h']
-win_blacklist = ['posix_thread.h', 'posix_sync.h']
-non_win_blacklist = ['win_thread.h', 'win_sync.h', 'win_window.h', 'win_key.h']
+blacklist = ['.git', '.vscode', 'third_party', 'b_lib', 'testing.h', 'misc']
 
 def gen(dir, level=1):
 	for it in os.scandir(Path(__file__).parent / dir):
@@ -30,12 +28,9 @@ def gen(dir, level=1):
 			gen(dir / it.name, level=level+1)
 			continue
 		if it.name.endswith(".h"):
-			if os.name == 'nt':
-				if it.name in win_blacklist:
-					continue
-			else:
-				if it.name in non_win_blacklist:
-					continue
+			skiplist = ['posix_', 'darwin_'] if os.name == 'nt' else ['win_']
+			if any (x in it.name for x in skiplist):
+				continue
 			file_path = (path / dir / f'{it.name}_test.cpp').resolve()
 			file_path.parent.mkdir(parents=True, exist_ok=True)
 			to_build.append(file_path)

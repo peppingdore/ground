@@ -18,5 +18,5 @@ struct GrdDeferMaker {
 	}
 };
 
-#define grd_defer const auto& CONCAT(grd_defer__, __LINE__ ) = GrdDeferMaker() + [&]()
+#define grd_defer const auto& GRD_CONCAT(grd_defer__, __LINE__ ) = GrdDeferMaker() + [&]()
 #define grd_defer_x(stmt) grd_defer { stmt; };

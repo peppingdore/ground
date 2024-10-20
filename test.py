@@ -14,6 +14,10 @@ import time
 
 ARGS = None
 
+GREEN = '\033[92m'
+RED = '\033[91m'
+RESETC = '\033[0m'
+
 class Tester:
 	def __init__(self, path):
 		self.tests = []
@@ -23,9 +27,8 @@ class Tester:
 		self.file_filters = []
 		self.path_filters = []
 
-	def run_exec(self, cmd, *, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, shell=True):
-		self.verbose(f'Running: {cmd}')
-		return subprocess.run(cmd, stdout=stdout, stderr=stderr, stdin=stdin, shell=shell, cwd=Path(cmd).parent)
+	def run_exec(self, cmd, args, *, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL):
+		return subprocess.run([Path(cmd).absolute(), *args], stdout=stdout, stderr=stderr, stdin=stdin, cwd=Path(cmd).parent)
 
 	def add(self, test):
 		self.tests.append(test)
@@ -38,14 +41,11 @@ class Tester:
 			self.msg_queue.put(msg)
 
 	def test_build_failed(self, test, output=""):
-		if ARGS.verbose:
-			self.print(f"Failed to build {test.path}\n{output}")
-		else:
-			self.print(f"Failed to build {test.path}")
+		self.print(f"{RED}Failed to build{RESETC} {test.path}\n{output}")
 
 	def test_run_failed(self, test, error=None):
-		if error and ARGS.verbose: self.print(f"Failed to run test {test.path} {error}")
-		else:                      self.print(f"Failed to run test {test.path}")
+		if error and ARGS.verbose: self.print(f"{RED}Failed to run test{RESETC} {test.path} {error}")
+		else:                      self.print(f"{RED}Failed to run test{RESETC} {test.path}")
 
 	def add_file_filter(self, filter):
 		self.file_filters.append(filter)
@@ -94,8 +94,13 @@ class Tester:
 		cases = []
 		for it in self.tests: cases.extend(it.cases.values())
 		return cases
+	
+	def div_or_zero(self, x, y):
+		if y == 0: return 0
+		return x / y
 
 	def run(self):
+		print(f"Running tests in {self.path.resolve()}")
 		self.scan_and_load_hooks(self.path)
 		self.collect_tests()
 		exit_code = -1
@@ -114,19 +119,23 @@ class Tester:
 			while True:
 				if res.ready(): break
 				time.sleep(0.1)
-			res =pool.map_async(lambda test: run_test(test), filter(lambda it: it.build_ok, self.tests))
+			# res.get() is needed to catch exceptions
+			res.get()
+			res = pool.map_async(lambda test: run_test(test), filter(lambda it: it.status != 'test_failed_to_build', self.tests))
 			while True:
 				if res.ready(): break
 				time.sleep(0.1)
+			res.get()
 			self.print(" -- Summary -- ")
-			for test in self.tests:
-				if not test.build_ok:
-					self.print(f"Test {test.path}: failed to build")
+			sorted_tests = sorted(self.tests, key=lambda it: (it.is_ok(), it.path), reverse=True)
+			for test in sorted_tests:
+				if test.status == 'test_failed_to_build':
+					self.print(f"Test {test.path}: {RED}failed to build{RESETC}")
 				else:
 					if test.is_ok():
-						self.print(f"Test {test.path}: success")
+						self.print(f"Test {test.path}: {GREEN}success{RESETC}")
 					else:
-						self.print(f"Test {test.path}: failed")
+						self.print(f"Test {test.path}: {RED}failed{RESETC}")
 						for case in test.cases.values():
 							if not case.is_ok():
 								self.print(f"  Case {case.name}: failed")
@@ -137,11 +146,16 @@ class Tester:
 											self.print(f"    Condition: {expect.condition}")
 										for it in expect.scope:
 											self.print(f"      at {it[0]}:{it[1]}")
-			ok_tests = [x for x in self.tests if x.is_ok()]
+
+			ok_tests = [x for x in sorted_tests if x.is_ok()]
 			ok_cases = [x for x in self.cases() if x.is_ok()]
-			self.print(f"{len(ok_tests)}/{len(self.tests)} tests ok - {len(ok_tests)/len(self.tests)*100:.2f}%")
-			self.print(f"{len(ok_cases)}/{len(self.cases())} cases ok - {len(ok_cases)/len(self.cases())*100:.2f}%")
-			if len(ok_tests) == len(self.tests):
+			# replace / with div_or_zero
+			nb_tests = list(filter(lambda it: it.needs_build, sorted_tests))
+			nb_tests_ok = len(list(filter(lambda it: it.status != 'test_failed_to_build', nb_tests)))
+			self.print(f"{nb_tests_ok}/{len(nb_tests)} tests built ok - {self.div_or_zero(nb_tests_ok, len(nb_tests))*100:.2f}%")
+			self.print(f"{len(ok_tests)}/{len(sorted_tests)} tests ok - {self.div_or_zero(len(ok_tests), len(sorted_tests))*100:.2f}%")
+			self.print(f"{len(ok_cases)}/{len(self.cases())} cases ok - {self.div_or_zero(len(ok_cases), len(self.cases()))*100:.2f}%")
+			if len(ok_tests) == len(sorted_tests):
 				exit_code = 0
 			self.print("Success!" if exit_code == 0 else "Failed.")
 		finally:
@@ -153,29 +167,31 @@ class TestCase:
 	def __init__(self, test, name):
 		self.test = test
 		self.name = name
-		self.status = 'did not run'
+		self.status = 'case_did_not_run'
 		self.expects = []
 	
 	def is_ok(self):
-		return self.status == 'finished' and all(map(lambda it: it.ok, self.expects))
+		return self.status == 'case_finished' and all(map(lambda it: it.ok, self.expects))
 
 class Test:
 	def __init__(self, path, tester):
 		self.path = path
 		self.tester = tester
 		self.cases = {}
-		self.build_ok = False
+		self.status = 'test_not_built'
+		self.needs_build = False
 
 	def is_ok(self):
-		return self.build_ok and all(map(lambda it: it.is_ok(), self.cases.values()))
+		return self.status == 'test_finished' and all(map(lambda it: it.is_ok(), self.cases.values()))
 
 	def get_case(self, name):
 		if name in self.cases: return self.cases[name]
 		case = TestCase(self, name)
 		self.cases[name] = case
+		return case
 
-	def build(self): self.build_ok = True
-	def run(self): self.tester.print(f"Running: {self.path}")
+	def build(self): self.status = 'test_built'
+	def run(self): self.status = 'test_finished'
 
 class TestCaseExpect:
 	def __init__(self, ok, condition, message, scope):
@@ -190,6 +206,7 @@ class CppTest(Test):
 	def __init__(self, path, tester):
 		super().__init__(path, tester)
 		self.exec_path = None
+		self.needs_build = True
 
 	def parse_results(self, output):
 		lines = output.decode('utf-8').splitlines()
@@ -234,20 +251,22 @@ class CppTest(Test):
 			elif verb == "TESTER_TEST_START":
 				name = read_str()
 				current_case = self.get_case(name)
-				current_case.status = 'started'
+				current_case.status = 'case_started'
 			elif verb == "TESTER_TEST_FINISHED":
-				if current_case: current_case.status = 'finished'
+				if current_case: current_case.status = 'case_finished'
 			elif verb == "TESTER_EXPECT":
 				if current_case: current_case.expects.append(parse_test_expect())
 			else:
 				raise ParseResultsException(f"Unknown verb {verb}")
 
 	def run(self):
-		process = self.tester.run_exec(f'{self.exec_path} --write_test_results_to_stderr', stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		process = self.tester.run_exec(self.exec_path, ['--write_test_results_to_stderr'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		try:
 			self.parse_results(process.stderr)
 		except ParseResultsException as e:
 			self.tester.test_run_failed(self, e)
+			return
+		self.status = 'test_finished'
 
 	def build(self):
 		self.tester.print(f'Building: {self.path}')
@@ -256,8 +275,9 @@ class CppTest(Test):
 		res = builder.build(self.path, stdout=stdout, scope=scope)	
 		if isinstance(res, builder.RunnableExecutable):
 			self.exec_path = res.path
-			self.build_ok = True
+			self.status = 'test_built'
 		else:
+			self.status = 'test_failed_to_build'
 			self.tester.test_build_failed(self, output=stdout.getvalue())
 
 def main():
@@ -267,7 +287,8 @@ def main():
 	parser.add_argument('--verbose', action='store_true')
 	ARGS = parser.parse_args()
 	builder.VERBOSE = ARGS.verbose
-	tester = Tester(Path(__file__).parent)
+	os.chdir(ARGS.path)
+	tester = Tester(Path('.'))
 	sys.modules['test_mod'] = tester
 	return tester.run()
 

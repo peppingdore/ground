@@ -1,10 +1,10 @@
-#include "../error.h"
-#include "../log.h"
+#include "../grd_error.h"
+#include "../grd_log.h"
 #include "../grd_defer.h"
 #include "c_like_parser.h"
 #include "ast_printer.h" 
 #include "ssa.h"
-#include "../file.h"
+#include "../grd_file.h"
 
 // https://twitter.com/zozuar/status/1755381710227755046
 //
@@ -19,7 +19,7 @@
 
 #define PROGRAM_ID 0
 
-UnicodeString PROGRAM = 
+GrdUnicodeString PROGRAM = 
 #if PROGRAM_ID == 0
 UR"GRD_TAG(
 float PI = 3.14f;
@@ -79,7 +79,7 @@ int main() {
 		print_parser_error(e);
 		return -1;
 	}
-	// println(print_ast_node(program));
+	// grd_println(print_ast_node(program));
 
 	for (auto it: program->globals) {
 		if (auto f = grd_reflect_cast<AstFunction>(it)) {
@@ -112,12 +112,12 @@ int main() {
 				return -1;
 			}
 
-			e = write_file(&file, m.spv.data, len(m.spv) * sizeof(u32));
+			e = write_file(&file, m.spv.data, grd_len(m.spv) * sizeof(u32));
 			if (e) {
 				print_parser_error(e);
 				return -1;
 			}
-			println("Emitted ssa");
+			grd_println("Emitted ssa");
 		}
 	}
 

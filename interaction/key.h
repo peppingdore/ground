@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../reflect.h"
-#include "../optional.h"
+#include "../grd_reflect.h"
+#include "../grd_optional.h"
 
 // Keys should be serialized by names.
 enum class Key: u32 {
@@ -534,7 +534,7 @@ enum class Key: u32 {
 // 	GRD_ENUM_VALUE(Play);
 // }
 
-Optional<Key> map_mouse_button_index(int index) {
+GrdOptional<Key> map_mouse_button_index(int index) {
 	switch (index) {
 		case 0:  return Key::LMB;
 		case 1:  return Key::RMB;

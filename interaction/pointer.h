@@ -1,8 +1,8 @@
 #pragma once
 
-#include "../reflect.h"
-#include "../math/vector.h"
-#include "../hash_map.h"
+#include "../grd_reflect.h"
+#include "../math/grd_vector.h"
+#include "../grd_hash_map.h"
 #include "event.h"
 #include "window_interface.h"
 
@@ -79,7 +79,7 @@ GRD_REFLECT(PointerEvent) {
 }
 
 struct OsPointerIdMapper {
-	HashMap<u64, u64> map;
+	GrdHashMap<u64, u64> map;
 	s64               next_pointer_id = 1;
 
 	void free() {

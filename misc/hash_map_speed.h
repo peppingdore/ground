@@ -1,43 +1,43 @@
 #pragma once
 
-#include "../hash_map.h"
-#include "../stopwatch.h"
-#include "../range.h"
-#include "../random.h"
-#include "../array.h"
-#include "../format.h"
+#include "../grd_hash_map.h"
+#include "../grd_stopwatch.h"
+#include "../grd_range.h"
+#include "../grd_random.h"
+#include "../grd_array.h"
+#include "../grd_format.h"
 
 int main() {
-	HashMap<s64, s64> map;
+	GrdHashMap<s64, s64> map;
 	map.capacity = 100;
 
-	Array<s64> keys;
-	Array<s64> values;
+	GrdArray<s64> keys;
+	GrdArray<s64> values;
 
 	s64 COUNT = 1000000;
 	for (auto i: grd_range(COUNT)) {
-		add(&keys, rand_s64());
-		add(&values, rand_s64());
+		grd_add(&keys, rand_s64());
+		grd_add(&values, rand_s64());
 	}
 
-	Stopwatch w = grd_make_stopwatch();
+	GrdStopwatch w = grd_make_stopwatch();
 	for (auto i: grd_range(COUNT)) {
 		if (i % 65536 == 0) {
-			println("insert %, %", keys[i], values[i]);
+			grd_println("insert %, %", keys[i], values[i]);
 		}
-		put(&map, keys[i], values[i]);
+		grd_put(&map, keys[i], values[i]);
 	}
 	
-	s64 time = nanos_elapsed_s64(&w);
+	s64 time = grd_nanos_elapsed_s64(&w);
 
-	println("Avg insert time: % ns", f64(time) / f64(COUNT));
+	grd_println("Avg insert time: % ns", f64(time) / f64(COUNT));
 
-	reset(&w);
+	grd_reset(&w);
 	for (auto i: grd_range(COUNT)) {
-		get(&map, keys[i]);
+		grd_get(&map, keys[i]);
 	}
-	time = nanos_elapsed_s64(&w);
-	println("Avg lookup time: % ns", f64(time) / f64(COUNT));
+	time = grd_nanos_elapsed_s64(&w);
+	grd_println("Avg lookup time: % ns", f64(time) / f64(COUNT));
 
 	return 0;
 }

@@ -1,10 +1,10 @@
 #include "preprocess.h"
 #include "../grd_testing.h"
 
-Tuple<Error*, Prep*> simple_preprocess(UnicodeString str, Span<Tuple<UnicodeString, UnicodeString>> files) {
+Tuple<Error*, Prep*> simple_preprocess(GrdUnicodeString str, GrdSpan<Tuple<GrdUnicodeString, GrdUnicodeString>> files) {
 	auto prep = grd_make_prep();
 	prep->aux_data = &files;
-	prep->load_file_hook = [](Prep* p, UnicodeString fullpath) -> PrepFileSource* {
+	prep->load_file_hook = [](Prep* p, GrdUnicodeString fullpath) -> PrepFileSource* {
 		for (auto [name, content]: *(decltype(files)*) p->aux_data) {
 			if (name == fullpath) {
 				auto file = grd_make_mem_prep_file(p, content, fullpath);
@@ -18,17 +18,17 @@ Tuple<Error*, Prep*> simple_preprocess(UnicodeString str, Span<Tuple<UnicodeStri
 }
 
 // GRD_TEST(include_add_missing_line_breaks) {
-// 	Array<Tuple<UnicodeString, UnicodeString>> files;
-// 	add(&files, { U"file.txt"_b, U"FILE_CONTENT"_b });
+// 	GrdArray<Tuple<GrdUnicodeString, GrdUnicodeString>> files;
+// 	grd_add(&files, { U"file.txt"_b, U"FILE_CONTENT"_b });
 // 	auto [e, prep] = simple_preprocess(U"#include \"file.txt\""_b, files);
 // 	if (e) {
 // 		print_prep_error(e);
 // 	}
-// 	println("prep_str: %", prep_str(prep));
+// 	grd_println("prep_str: %", prep_str(prep));
 // 	for (auto tok: prep->tokens) {
-// 		println("%, '%', %", tok->kind, tok_str(tok), tok->src_kind);
+// 		grd_println("%, '%', %", tok->kind, tok_str(tok), tok->src_kind);
 // 		if (tok->src_kind == PREP_TOKEN_SOURCE_INCLUDED_FILE) {
-// 			println("  %", tok->included_file->file->fullpath);
+// 			grd_println("  %", tok->included_file->file->fullpath);
 // 		}
 // 	}
 // 	// One newline for file.txt and other for <root_file>.
@@ -36,9 +36,9 @@ Tuple<Error*, Prep*> simple_preprocess(UnicodeString str, Span<Tuple<UnicodeStri
 // }
 
 // GRD_TEST(include_computed_include) {
-//     Array<Tuple<UnicodeString, UnicodeString>> files;
+//     GrdArray<Tuple<GrdUnicodeString, GrdUnicodeString>> files;
 //     // Add test files with content
-//     add(&files, { U"computed_include.txt"_b, U"COMPUTED_CONTENT"_b });
+//     grd_add(&files, { U"computed_include.txt"_b, U"COMPUTED_CONTENT"_b });
 //     // Preprocess code that includes a file via macro expansion
 //     auto [e, prep] = simple_preprocess(
 //         U"#define FILE_NAME \"computed_include.txt\"\n#include FILE_NAME"_b,
@@ -48,7 +48,7 @@ Tuple<Error*, Prep*> simple_preprocess(UnicodeString str, Span<Tuple<UnicodeStri
 //         print_prep_error(e);
 //     }
 //     // Output the preprocessed string for verification
-//     println("prep_str: %", prep_str(prep));
+//     grd_println("prep_str: %", prep_str(prep));
 //     // Expect the content of the included file followed by two newlines
 //     EXPECT(prep_str(prep) == U"COMPUTED_CONTENT\n\n"_b);
 // }
@@ -61,7 +61,7 @@ GRD_TEST(error_gen) {
 		print_prep_error(e);
 	}
 	for (auto tok: prep->tokens) {
-		println("%, '%', %", tok->kind, tok_str(tok), tok->src_kind);
+		grd_println("%, '%', %", tok->kind, tok_str(tok), tok->src_kind);
 	}
-	println("prep_str: %", prep_str(prep));
+	grd_println("prep_str: %", prep_str(prep));
 }

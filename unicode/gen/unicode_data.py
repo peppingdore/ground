@@ -168,8 +168,8 @@ def generate(*, version=unicode_version.UNICODE_VERSION):
 		x = list(map(lambda it: f'"{it[0]}"', x))
 		return ['""', *x]
 
-	replace.replace(Path(__file__).parent / "unicode_data_names.h", codepoint_names=',\n'.join(map(lambda it: f'"{it}"', names)))
-	replace.replace(Path(__file__).parent / "unicode_data.h",
+	replace.replace(Path(__file__).parent / "grd_unicode_data_names.h", codepoint_names=',\n'.join(map(lambda it: f'"{it}"', names)))
+	replace.replace(Path(__file__).parent / "grd_unicode_data.h",
 		category_mask=hex(build_mask(CATEGORY_SHIFT, CATEGORY_SIZE)),
 		category_shift=CATEGORY_SHIFT,
 		bidi_category_mask=hex(build_mask(BIDI_CATEGORY_SHIFT, BIDI_CATEGORY_SIZE)),

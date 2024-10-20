@@ -1,10 +1,10 @@
 #include "window.h"
-#include "../log.h"
+#include "../grd_log.h"
 
 int main() {
 	auto [window, e] = create_window({ .title = U"Window"_b });
 	if (e) {
-		Log(e);
+		GrdLog(e);
 		return -1;
 	}
 

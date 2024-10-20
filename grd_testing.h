@@ -151,10 +151,6 @@ void grd_test_expect(bool cond, const char* cond_str, const char* message, GrdCo
 	}
 }
 
-// void grd_test_expect(bool cond, const char* cond_str, Unicode_String message, GrdCodeLoc loc = caller_loc()) {
-// 	grd_test_expect(cond, cond_str, encode_utf8(message), loc);
-// }
-
 void grd_test_expect(bool cond, const char* cond_str, GrdCodeLoc loc = grd_caller_loc()) {
 	char* str = grd_heap_sprintf("Expected '%s'", cond_str);
 	grd_test_expect(cond, cond_str, str, loc);
@@ -186,6 +182,6 @@ inline void grd_test_##name()
 
 #define GRD_FAIL(message) grd_test_expect(false, "", message)
 #define GRD_EXPECT(cond, ...) grd_test_expect(cond, #cond, ## __VA_ARGS__);
-// Requires "format.h"
-// #define EXPECT_OP(a, op, b, ...) EXPECT(a op b, sprint("Expected % " #op " %", a, b), ## __VA_ARGS__);
+// Requires "grd_format.h"
+// #define EXPECT_OP(a, op, b, ...) EXPECT(a op b, grd_sprint("Expected % " #op " %", a, b), ## __VA_ARGS__);
 // #define EXPECT_EQ(a, b, ...) EXPECT_OP(a, ==, b, ## __VA_ARGS__)

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "grd_base.h"
-#include "math/basic_functions.h"
+#include "math/grd_basic_functions.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -33,9 +33,9 @@ char* grd_heap_join(const char* start, const char* joiner, const char* end, auto
 	int  cursor = 0;
 
 	auto append = [&](const char* x) {
-		auto len = strlen(x);
+		auto grd_len = strlen(x);
 		auto remaining = s64(sizeof(buf)) - cursor - 1;
-		auto copy_len = grd_min(remaining, len);
+		auto copy_len = grd_min(remaining, grd_len);
 		memcpy(buf + cursor, x, copy_len);
 		cursor += copy_len;
 		assert(cursor <= sizeof(buf));
