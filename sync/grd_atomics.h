@@ -56,9 +56,9 @@ T grd_atomic_exchange(T* dst, std::type_identity_t<T> value) {
 
 	#if COMPILER_MSVC
 		#if ARCH_X64
-			#define INTERLOCKED_EXCHANGE(postfix, ...) result = _InterlockedExchange##postfix((N*) dst, __VA_ARGS__);
+			#define GRD_INTERLOCKED_EXCHANGE(postfix, ...) result = _InterlockedExchange##postfix((N*) dst, __VA_ARGS__);
 		#elif ARCH_ARM64
-			#define INTERLOCKED_EXCHANGE(postfix)\
+			#define GRD_INTERLOCKED_EXCHANGE(postfix)\
 			if consteval(mo == GrdMemoryOrder::Relaxed) result = _InterlockedExchange##postfix##_nf((N*) dst, __VA_ARGS__);\
 			if consteval(mo == GrdMemoryOrder::Consume) result = _InterlockedExchange##postfix##_acq((N*) dst, __VA_ARGS__);\
 			if consteval(mo == GrdMemoryOrder::Acquire) result = _InterlockedExchange##postfix##_acq((N*) dst, __VA_ARGS__);\
@@ -71,21 +71,21 @@ T grd_atomic_exchange(T* dst, std::type_identity_t<T> value) {
 
 		N prev;
 		if consteval (sizeof(T) == 1) {
-			INTERLOCKED_EXCHANGE(8, grd_bitcast<N>(value), *(N*) *dst);
+			GRD_INTERLOCKED_EXCHANGE(8, grd_bitcast<N>(value), *(N*) *dst);
 		} else if consteval (sizeof(T) == 2) {
-			INTERLOCKED_EXCHANGE(16, grd_bitcast<N>(value), *(N*) *dst);
+			GRD_INTERLOCKED_EXCHANGE(16, grd_bitcast<N>(value), *(N*) *dst);
 		} else if consteval (sizeof(T) == 4) {
-			INTERLOCKED_EXCHANGE(, grd_bitcast<N>(value), *(N*) *dst);
+			GRD_INTERLOCKED_EXCHANGE(, grd_bitcast<N>(value), *(N*) *dst);
 		} else if consteval (sizeof(T) == 8) {
-			INTERLOCKED_EXCHANGE(64, grd_bitcast<N>(value), *(N*) *dst);
+			GRD_INTERLOCKED_EXCHANGE(64, grd_bitcast<N>(value), *(N*) *dst);
 		} else if consteval (sizeof(T) == 16) {
 			prev = *(N*)dst;
-			INTERLOCKED_EXCHANGE(128, grd_bitcast<N>(value).high, grd_bitcast<N>(value).low, &prev);
+			GRD_INTERLOCKED_EXCHANGE(128, grd_bitcast<N>(value).high, grd_bitcast<N>(value).low, &prev);
 		} else {
 			static_assert(false);
 		}
 		return grd_bitcast<T>(prev);
-		#undef INTERLOCKED_EXCHANGE
+		#undef GRD_INTERLOCKED_EXCHANGE
 
 	#else
 		N prev_value;
@@ -113,9 +113,9 @@ T grd_compare_and_swap(T* dst, T comp_v, T xchg_v) {
 
 	#if COMPILER_MSVC
 		#if ARCH_X64
-			#define INTERLOCKED_COMPARE_EXCHANGE(postfix) return _InterlockedCompareExchange##postfix((N*) dst, grd_bitcast<N>(xchg_v), grd_bitcast<N>(comp_v));
+			#define GRD_INTERLOCKED_COMPARE_EXCHANGE(postfix) return _InterlockedCompareExchange##postfix((N*) dst, grd_bitcast<N>(xchg_v), grd_bitcast<N>(comp_v));
 		#elif ARCH_ARM64
-			#define INTERLOCKED_COMPARE_EXCHANGE(postfix)\
+			#define GRD_INTERLOCKED_COMPARE_EXCHANGE(postfix)\
 			if consteval(success_mo == GrdMemoryOrder::Relaxed) return _InterlockedCompareExchange##postfix##_nf((N*) dst, grd_bitcast<N>(xchg_v), grd_bitcast<N>(comp_v));\
 			if consteval(success_mo == GrdMemoryOrder::Consume) return _InterlockedCompareExchange##postfix##_acq((N*) dst, grd_bitcast<N>(xchg_v), grd_bitcast<N>(comp_v));\
 			if consteval(success_mo == GrdMemoryOrder::Acquire) return _InterlockedCompareExchange##postfix##_acq((N*) dst, grd_bitcast<N>(xchg_v), grd_bitcast<N>(comp_v));\
@@ -127,18 +127,18 @@ T grd_compare_and_swap(T* dst, T comp_v, T xchg_v) {
 		#endif
 
 		if consteval (sizeof(T) == 1) {
-			INTERLOCKED_COMPARE_EXCHANGE(8);
+			GRD_INTERLOCKED_COMPARE_EXCHANGE(8);
 		} else if consteval (sizeof(T) == 2) {
-			INTERLOCKED_COMPARE_EXCHANGE(16);
+			GRD_INTERLOCKED_COMPARE_EXCHANGE(16);
 		} else if consteval (sizeof(T) == 4) {
-			INTERLOCKED_COMPARE_EXCHANGE();
+			GRD_INTERLOCKED_COMPARE_EXCHANGE();
 		} else if consteval (sizeof(T) == 8) {
-			INTERLOCKED_COMPARE_EXCHANGE(64);
+			GRD_INTERLOCKED_COMPARE_EXCHANGE(64);
 		} else {
 			static_assert(false);
 		}
 
-		#undef INTERLOCKED_COMPARE_EXCHANGE
+		#undef GRD_INTERLOCKED_COMPARE_EXCHANGE
 
 	#else
 		__atomic_compare_exchange((N*) dst, (N*) &comp_v, (N*) &xchg_v, false, grd_memory_order_to_gcc(success_mo), grd_memory_order_to_gcc(failure_mo));

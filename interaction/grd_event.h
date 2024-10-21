@@ -1,12 +1,12 @@
 #pragma once
 
 #include "../grd_reflect.h"
-#include "key.h"
+#include "grd_key.h"
 
-struct Event {
-	Type* type = NULL;
+struct GrdEvent {
+	GrdType* type = NULL;
 };
-GRD_REFLECT(Event) {
+GRD_REFLECT(GrdEvent) {
 	GRD_MEMBER(type); GRD_TAG(GrdRealTypeMember{});
 }
 

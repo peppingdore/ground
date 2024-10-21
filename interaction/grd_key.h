@@ -4,18 +4,18 @@
 #include "../grd_optional.h"
 
 // Keys should be serialized by names.
-enum class Key: u32 {
+enum class GrdKey: u32 {
 	Unknown = 0,
-	Number_0 = '0',
-	Number_1 = '1',
-	Number_2 = '2',
-	Number_3 = '3',
-	Number_4 = '4',
-	Number_5 = '5',
-	Number_6 = '6',
-	Number_7 = '7',
-	Number_8 = '8',
-	Number_9 = '9',
+	Number0 = '0',
+	Number1 = '1',
+	Number2 = '2',
+	Number3 = '3',
+	Number4 = '4',
+	Number5 = '5',
+	Number6 = '6',
+	Number7 = '7',
+	Number8 = '8',
+	Number9 = '9',
 	A = 'A',
 	B = 'B',
 	C = 'C',
@@ -49,38 +49,38 @@ enum class Key: u32 {
 	Slash = '/',
 	Tilde = '~',
 
-	Left_Square_Bracket = '[',
-	Right_Square_Bracket = ']',
+	LeftSquareBracket = '[',
+	RightSquareBracket = ']',
 	Backslash = '\\',
 	Quote = '\'',
 
 	ASCII_RANGE_START = 0xff,
 
-	Mouse_Wheel_Up,
-	Mouse_Wheel_Down,	
+	MouseWheelUp,
+	MouseWheelDown,	
 
-	Up_Arrow,
-	Down_Arrow,
-	Left_Arrow,
-	Right_Arrow,
+	UpArrow,
+	DownArrow,
+	LeftArrow,
+	RightArrow,
 
-	Any_Shift,
-	Any_Control,
-	Any_Alt,
+	AnyShift,
+	AnyControl,
+	AnyAlt,
 
-	Left_Shift,
-	Right_Shift,
-	Left_Control,
-	Right_Control,
-	Left_Alt,
-	Right_Alt,
+	LeftShift,
+	RightShift,
+	LeftControl,
+	RightControl,
+	LeftAlt,
+	RightAlt,
 
 	Option,
 	Fn,
 
 	Backspace,
 	Delete,
-	Forward_Delete,
+	ForwardDelete,
 
 	Insert,
 	Enter,
@@ -92,12 +92,12 @@ enum class Key: u32 {
 	RMB,
 	MMB,
 
-	Mouse_4,
-	Mouse_5,
-	Mouse_6,
-	Mouse_7,
-	Mouse_8,
-	Mouse_9,
+	Mouse4,
+	Mouse5,
+	Mouse6,
+	Mouse7,
+	Mouse8,
+	Mouse9,
 
 	F1,
 	F2,
@@ -124,27 +124,27 @@ enum class Key: u32 {
 	F23,
 	F24,
 
-	Page_Up,
-	Page_Down,
+	PageUp,
+	PageDown,
 
 	Plus,
 	Minus,
 
-	Ctrl_Break,
+	CtrlBreak,
 	Clear,
 	Pause,
-	Caps_Lock, // Name: Caps Lock
+	CapsLock, // Name: Caps Lock
 
-	Kana_Or_Hangul, // @TODO: Distinguish using OS Key name api.
+	KanaOrHangul, // @TODO: Distinguish using OS Key name api.
 
 	Junja,
 	Final,
-	Hanja_Or_Kanji,
+	HanjaOrKanji,
 
 	Convert,
-	Non_Convert, // Name: Don't convert
+	NonConvert, // Name: Don't convert
 	Accept,
-	Mode_Change, // Name: Mode change
+	ModeChange, // Name: Mode change
 
 	End,
 	Home,
@@ -152,77 +152,77 @@ enum class Key: u32 {
 	Select,
 	Print,
 	Execute,
-	Print_Screen, // Name: Print Screen
+	PrintScreen, // Name: Print Screen
 	Help,
 
-	Left_Windows,
-	Right_Windows,
+	LeftWindows,
+	RightWindows,
 	Command,
 	Menu,
 
 	Sleep,
 
-	Numpad_0,
-	Numpad_1,
-	Numpad_2,
-	Numpad_3,
-	Numpad_4,
-	Numpad_5,
-	Numpad_6,
-	Numpad_7,
-	Numpad_8,
-	Numpad_9,
+	Numpad0,
+	Numpad1,
+	Numpad2,
+	Numpad3,
+	Numpad4,
+	Numpad5,
+	Numpad6,
+	Numpad7,
+	Numpad8,
+	Numpad9,
 
-	Numpad_Multiply,
+	NumpadMultiply,
 	Separator,
-	Numpad_Slash,
+	NumpadSlash,
 
-	Numpad_Dot,
-	Numpad_Plus,
-	Numpad_Minus,
-	Numpad_Enter, // @TODO: detect this on windows. https://microsoft.public.vc.mfc.narkive.com/4NhbZpGJ/numpad-enter-vs-keyboad-enter-different-virtual-key-codes
-	Numpad_Equal,
+	NumpadDot,
+	NumpadPlus,
+	NumpadMinus,
+	NumpadEnter, // @TODO: detect this on windows. https://microsoft.public.vc.mfc.narkive.com/4NhbZpGJ/numpad-enter-vs-keyboad-enter-different-virtual-key-codes
+	NumpadEqual,
 
 	Numlock,
-	Scroll_Lock, // Name: Scroll Lock
+	ScrollLock, // Name: Scroll Lock
 
 	Equal,
 
 	Dictionary,
-	Unregister_Word,
-	Register_Word,
-	Left_OYAYUBI,
-	Right_OYAYUBI,
+	UnregisterWord,
+	RegisterWord,
+	LeftOYAYUBI,
+	RightOYAYUBI,
 
-	Browser_Back,
-	Browser_Forward,
-	Browser_Refresh,
-	Browser_Stop,
-	Browser_Search,
-	Browser_Favorites,
-	Browser_Home,
+	BrowserBack,
+	BrowserForward,
+	BrowserRefresh,
+	BrowserStop,
+	BrowserSearch,
+	BrowserFavorites,
+	BrowserHome,
 
-	Volume_Mute,
-	Volume_Down,
-	Volume_Up,
-	Media_Next_Track,
-	Media_Previous_Track,
-	Media_Stop,
-	Media_Play_Pause,
-	Launch_Mail,
-	Launch_Media_Select,
-	Launch_App1,
-	Launch_App2,
+	VolumeMute,
+	VolumeDown,
+	VolumeUp,
+	MediaNextTrack,
+	MediaPreviousTrack,
+	MediaStop,
+	MediaPlayPause,
+	LaunchMail,
+	LaunchMediaSelect,
+	LaunchApp1,
+	LaunchApp2,
 
 	AX,
-	Zero_Zero,
+	ZeroZero,
 
 	Process,
 
 	Attn,
 	CrSel,
 	ExSel,
-	Erase_EOF,
+	EraseEOF,
 
 	Zoom,
 	Play,
@@ -296,39 +296,39 @@ enum class Key: u32 {
 // // @TODO: add missing keys.
 // GRD_REFLECT(Key) {
 
-// 	GRD_ENUM_VALUE(Mouse_Wheel_Up);
+// 	GRD_ENUM_VALUE(MouseWheelUp);
 // 		GRD_TAG("Mouse Wheel Up"_b);
-// 	GRD_ENUM_VALUE(Mouse_Wheel_Down);
+// 	GRD_ENUM_VALUE(MouseWheelDown);
 // 		GRD_TAG("Mouse Wheel Down"_b);
 
-// 	GRD_ENUM_VALUE(Up_Arrow);
+// 	GRD_ENUM_VALUE(UpArrow);
 // 		GRD_TAG("Up Arrow"_b);
-// 	GRD_ENUM_VALUE(Down_Arrow);
+// 	GRD_ENUM_VALUE(DownArrow);
 // 		GRD_TAG("Down Arrow"_b);
-// 	GRD_ENUM_VALUE(Left_Arrow);
+// 	GRD_ENUM_VALUE(LeftArrow);
 // 		GRD_TAG("Left Arrow"_b);
-// 	GRD_ENUM_VALUE(Right_Arrow);
+// 	GRD_ENUM_VALUE(RightArrow);
 // 		GRD_TAG("Right Arrow"_b);
 
-// 	GRD_ENUM_VALUE(Any_Shift);
+// 	GRD_ENUM_VALUE(AnyShift);
 // 		GRD_TAG("Shift"_b);
-// 	GRD_ENUM_VALUE(Any_Control);
+// 	GRD_ENUM_VALUE(AnyControl);
 // 		GRD_TAG("Ctrl"_b);
-// 	GRD_ENUM_VALUE(Any_Alt);
+// 	GRD_ENUM_VALUE(AnyAlt);
 // 		GRD_TAG("Alt"_b);
 
-// 	GRD_ENUM_VALUE(Left_Shift);
+// 	GRD_ENUM_VALUE(LeftShift);
 // 		GRD_TAG("Left Shift"_b);
-// 	GRD_ENUM_VALUE(Left_Control);
+// 	GRD_ENUM_VALUE(LeftControl);
 // 		GRD_TAG("Left Ctrl"_b);
-// 	GRD_ENUM_VALUE(Left_Alt);
+// 	GRD_ENUM_VALUE(LeftAlt);
 // 		GRD_TAG("Left Alt"_b);
 
-// 	GRD_ENUM_VALUE(Right_Shift);
+// 	GRD_ENUM_VALUE(RightShift);
 // 		GRD_TAG("Right Shift"_b);
-// 	GRD_ENUM_VALUE(Right_Control);
+// 	GRD_ENUM_VALUE(RightControl);
 // 		GRD_TAG("Right Ctrl"_b);
-// 	GRD_ENUM_VALUE(Right_Alt);
+// 	GRD_ENUM_VALUE(RightAlt);
 // 		GRD_TAG("Right Alt"_b);
 
 
@@ -337,7 +337,7 @@ enum class Key: u32 {
 
 // 	GRD_ENUM_VALUE(Backspace);
 // 	GRD_ENUM_VALUE(Delete);
-// 	GRD_ENUM_VALUE(Forward_Delete);
+// 	GRD_ENUM_VALUE(ForwardDelete);
 
 // 	GRD_ENUM_VALUE(Insert);
 // 	GRD_ENUM_VALUE(Enter);
@@ -349,17 +349,17 @@ enum class Key: u32 {
 // 	GRD_ENUM_VALUE(RMB);
 // 	GRD_ENUM_VALUE(MMB);
 
-// 	GRD_ENUM_VALUE(Mouse_4);
+// 	GRD_ENUM_VALUE(Mouse4);
 // 		GRD_TAG("Mouse 4"_b);
-// 	GRD_ENUM_VALUE(Mouse_5);
+// 	GRD_ENUM_VALUE(Mouse5);
 // 		GRD_TAG("Mouse 5"_b);
-// 	GRD_ENUM_VALUE(Mouse_6);
+// 	GRD_ENUM_VALUE(Mouse6);
 // 		GRD_TAG("Mouse 6"_b);
-// 	GRD_ENUM_VALUE(Mouse_7);
+// 	GRD_ENUM_VALUE(Mouse7);
 // 		GRD_TAG("Mouse 7"_b);
-// 	GRD_ENUM_VALUE(Mouse_8);
+// 	GRD_ENUM_VALUE(Mouse8);
 // 		GRD_TAG("Mouse 8"_b);
-// 	GRD_ENUM_VALUE(Mouse_9);
+// 	GRD_ENUM_VALUE(Mouse9);
 // 		GRD_TAG("Mouse 9"_b);
 
 // 	GRD_ENUM_VALUE(F1);
@@ -387,19 +387,19 @@ enum class Key: u32 {
 // 	GRD_ENUM_VALUE(F23);
 // 	GRD_ENUM_VALUE(F24);
 
-// 	GRD_ENUM_VALUE(Page_Up);   GRD_TAG("Page Up"_b);
-// 	GRD_ENUM_VALUE(Page_Down); GRD_TAG("Page Down"_b);
+// 	GRD_ENUM_VALUE(PageUp);   GRD_TAG("Page Up"_b);
+// 	GRD_ENUM_VALUE(PageDown); GRD_TAG("Page Down"_b);
 
-// 	GRD_ENUM_VALUE(Number_0); GRD_TAG("0"_b);
-// 	GRD_ENUM_VALUE(Number_1); GRD_TAG("1"_b);
-// 	GRD_ENUM_VALUE(Number_2); GRD_TAG("2"_b);
-// 	GRD_ENUM_VALUE(Number_3); GRD_TAG("3"_b);
-// 	GRD_ENUM_VALUE(Number_4); GRD_TAG("4"_b);
-// 	GRD_ENUM_VALUE(Number_5); GRD_TAG("5"_b);
-// 	GRD_ENUM_VALUE(Number_6); GRD_TAG("6"_b);
-// 	GRD_ENUM_VALUE(Number_7); GRD_TAG("7"_b);
-// 	GRD_ENUM_VALUE(Number_8); GRD_TAG("8"_b);
-// 	GRD_ENUM_VALUE(Number_9); GRD_TAG("9"_b);
+// 	GRD_ENUM_VALUE(Number0); GRD_TAG("0"_b);
+// 	GRD_ENUM_VALUE(Number1); GRD_TAG("1"_b);
+// 	GRD_ENUM_VALUE(Number2); GRD_TAG("2"_b);
+// 	GRD_ENUM_VALUE(Number3); GRD_TAG("3"_b);
+// 	GRD_ENUM_VALUE(Number4); GRD_TAG("4"_b);
+// 	GRD_ENUM_VALUE(Number5); GRD_TAG("5"_b);
+// 	GRD_ENUM_VALUE(Number6); GRD_TAG("6"_b);
+// 	GRD_ENUM_VALUE(Number7); GRD_TAG("7"_b);
+// 	GRD_ENUM_VALUE(Number8); GRD_TAG("8"_b);
+// 	GRD_ENUM_VALUE(Number9); GRD_TAG("9"_b);
 
 // 	// Imagine I did a typo here..
 // 	GRD_ENUM_VALUE(A); GRD_TAG("A"_b);
@@ -432,8 +432,8 @@ enum class Key: u32 {
 // 	GRD_ENUM_VALUE(Slash);     GRD_TAG("/"_b);
 // 	GRD_ENUM_VALUE(Tilde);     GRD_TAG("~"_b);
 
-// 	GRD_ENUM_VALUE(Left_Square_Bracket);  GRD_TAG("["_b);
-// 	GRD_ENUM_VALUE(Right_Square_Bracket); GRD_TAG("]"_b);
+// 	GRD_ENUM_VALUE(LeftSquareBracket);  GRD_TAG("["_b);
+// 	GRD_ENUM_VALUE(RightSquareBracket); GRD_TAG("]"_b);
 // 	GRD_ENUM_VALUE(Backslash);            GRD_TAG("\\"_b);
 // 	GRD_ENUM_VALUE(Quote);                GRD_TAG("\'"_b);
 
@@ -441,21 +441,21 @@ enum class Key: u32 {
 // 	GRD_ENUM_VALUE(Plus);  GRD_TAG("+"_b);
 // 	GRD_ENUM_VALUE(Minus); GRD_TAG("-"_b);
 
-// 	GRD_ENUM_VALUE(Ctrl_Break); GRD_TAG("Ctrl+Break"_b);
+// 	GRD_ENUM_VALUE(CtrlBreak); GRD_TAG("Ctrl+Break"_b);
 // 	GRD_ENUM_VALUE(Clear);
 // 	GRD_ENUM_VALUE(Pause);
-// 	GRD_ENUM_VALUE(Caps_Lock); GRD_TAG("Caps Lock"_b);
+// 	GRD_ENUM_VALUE(CapsLock); GRD_TAG("Caps Lock"_b);
 
-// 	GRD_ENUM_VALUE(Kana_Or_Hangul); // @TODO: Distinguish using OS Key name api.
+// 	GRD_ENUM_VALUE(KanaOrHangul); // @TODO: Distinguish using OS Key name api.
 
 // 	GRD_ENUM_VALUE(Junja);
 // 	GRD_ENUM_VALUE(Final);
-// 	GRD_ENUM_VALUE(Hanja_Or_Kanji);  // @TODO: Distinguish using OS Key name api.
+// 	GRD_ENUM_VALUE(HanjaOrKanji);  // @TODO: Distinguish using OS Key name api.
 
 // 	GRD_ENUM_VALUE(Convert);
-// 	GRD_ENUM_VALUE(Non_Convert); GRD_TAG("Don't convert"_b);
+// 	GRD_ENUM_VALUE(NonConvert); GRD_TAG("Don't convert"_b);
 // 	GRD_ENUM_VALUE(Accept);
-// 	GRD_ENUM_VALUE(Mode_Change); GRD_TAG("Mode change"_b);
+// 	GRD_ENUM_VALUE(ModeChange); GRD_TAG("Mode change"_b);
 
 // 	GRD_ENUM_VALUE(End);
 // 	GRD_ENUM_VALUE(Home);
@@ -463,88 +463,88 @@ enum class Key: u32 {
 // 	GRD_ENUM_VALUE(Select);
 // 	GRD_ENUM_VALUE(Print);
 // 	GRD_ENUM_VALUE(Execute);
-// 	GRD_ENUM_VALUE(Print_Screen); GRD_TAG("Print Screen"_b);
+// 	GRD_ENUM_VALUE(PrintScreen); GRD_TAG("Print Screen"_b);
 // 	GRD_ENUM_VALUE(Help);
 
-// 	GRD_ENUM_VALUE(Left_Windows);  GRD_TAG("Left Windows"_b);
-// 	GRD_ENUM_VALUE(Right_Windows); GRD_TAG("Right Windows"_b);
+// 	GRD_ENUM_VALUE(LeftWindows);  GRD_TAG("Left Windows"_b);
+// 	GRD_ENUM_VALUE(RightWindows); GRD_TAG("Right Windows"_b);
 // 	GRD_ENUM_VALUE(Menu);
 
 // 	GRD_ENUM_VALUE(Sleep);
 
-// 	GRD_ENUM_VALUE(Numpad_0); GRD_TAG("Num 0"_b);
-// 	GRD_ENUM_VALUE(Numpad_1); GRD_TAG("Num 1"_b);
-// 	GRD_ENUM_VALUE(Numpad_2); GRD_TAG("Num 2"_b);
-// 	GRD_ENUM_VALUE(Numpad_3); GRD_TAG("Num 3"_b);
-// 	GRD_ENUM_VALUE(Numpad_4); GRD_TAG("Num 4"_b);
-// 	GRD_ENUM_VALUE(Numpad_5); GRD_TAG("Num 5"_b);
-// 	GRD_ENUM_VALUE(Numpad_6); GRD_TAG("Num 6"_b);
-// 	GRD_ENUM_VALUE(Numpad_7); GRD_TAG("Num 7"_b);
-// 	GRD_ENUM_VALUE(Numpad_8); GRD_TAG("Num 8"_b);
-// 	GRD_ENUM_VALUE(Numpad_9); GRD_TAG("Num 9"_b);
+// 	GRD_ENUM_VALUE(Numpad0); GRD_TAG("Num 0"_b);
+// 	GRD_ENUM_VALUE(Numpad1); GRD_TAG("Num 1"_b);
+// 	GRD_ENUM_VALUE(Numpad2); GRD_TAG("Num 2"_b);
+// 	GRD_ENUM_VALUE(Numpad3); GRD_TAG("Num 3"_b);
+// 	GRD_ENUM_VALUE(Numpad4); GRD_TAG("Num 4"_b);
+// 	GRD_ENUM_VALUE(Numpad5); GRD_TAG("Num 5"_b);
+// 	GRD_ENUM_VALUE(Numpad6); GRD_TAG("Num 6"_b);
+// 	GRD_ENUM_VALUE(Numpad7); GRD_TAG("Num 7"_b);
+// 	GRD_ENUM_VALUE(Numpad8); GRD_TAG("Num 8"_b);
+// 	GRD_ENUM_VALUE(Numpad9); GRD_TAG("Num 9"_b);
 
-// 	GRD_ENUM_VALUE(Numpad_Multiply); GRD_TAG("*"_b);
+// 	GRD_ENUM_VALUE(NumpadMultiply); GRD_TAG("*"_b);
 // 	GRD_ENUM_VALUE(Separator);
-// 	GRD_ENUM_VALUE(Numpad_Slash); GRD_TAG("Num /"_b);
+// 	GRD_ENUM_VALUE(NumpadSlash); GRD_TAG("Num /"_b);
 
-// 	GRD_ENUM_VALUE(Numpad_Dot); GRD_TAG("Num ."_b);
+// 	GRD_ENUM_VALUE(NumpadDot); GRD_TAG("Num ."_b);
 
 // 	GRD_ENUM_VALUE(Numlock);     GRD_TAG("Num Lock"_b);
-// 	GRD_ENUM_VALUE(Scroll_Lock); GRD_TAG("Scroll Lock"_b);
+// 	GRD_ENUM_VALUE(ScrollLock); GRD_TAG("Scroll Lock"_b);
 
 // 	GRD_ENUM_VALUE(Equal); GRD_TAG("="_b);
 
 // 	GRD_ENUM_VALUE(Dictionary);
-// 	GRD_ENUM_VALUE(Unregister_Word); GRD_TAG("Unregister Word"_b);
-// 	GRD_ENUM_VALUE(Register_Word);   GRD_TAG("Register Word"_b);
-// 	GRD_ENUM_VALUE(Left_OYAYUBI);    GRD_TAG("Left OYAYUBI"_b);
-// 	GRD_ENUM_VALUE(Right_OYAYUBI);   GRD_TAG("Right OYAYUBI"_b);
+// 	GRD_ENUM_VALUE(UnregisterWord); GRD_TAG("Unregister Word"_b);
+// 	GRD_ENUM_VALUE(RegisterWord);   GRD_TAG("Register Word"_b);
+// 	GRD_ENUM_VALUE(LeftOYAYUBI);    GRD_TAG("Left OYAYUBI"_b);
+// 	GRD_ENUM_VALUE(RightOYAYUBI);   GRD_TAG("Right OYAYUBI"_b);
 
-// 	GRD_ENUM_VALUE(Browser_Back);     GRD_TAG("Browser Back"_b);
-// 	GRD_ENUM_VALUE(Browser_Forward);  GRD_TAG("Browser Forward"_b);
-// 	GRD_ENUM_VALUE(Browser_Refresh);  GRD_TAG("Browser Refresh"_b);
-// 	GRD_ENUM_VALUE(Browser_Stop);     GRD_TAG("Browser Stop"_b);
-// 	GRD_ENUM_VALUE(Browser_Search);   GRD_TAG("Browser Search"_b);
-// 	GRD_ENUM_VALUE(Browser_Favorites);GRD_TAG("Browser Favorites"_b);
-// 	GRD_ENUM_VALUE(Browser_Home);     GRD_TAG("Browser Home"_b);
+// 	GRD_ENUM_VALUE(BrowserBack);     GRD_TAG("Browser Back"_b);
+// 	GRD_ENUM_VALUE(BrowserForward);  GRD_TAG("Browser Forward"_b);
+// 	GRD_ENUM_VALUE(BrowserRefresh);  GRD_TAG("Browser Refresh"_b);
+// 	GRD_ENUM_VALUE(BrowserStop);     GRD_TAG("Browser Stop"_b);
+// 	GRD_ENUM_VALUE(BrowserSearch);   GRD_TAG("Browser Search"_b);
+// 	GRD_ENUM_VALUE(BrowserFavorites);GRD_TAG("Browser Favorites"_b);
+// 	GRD_ENUM_VALUE(BrowserHome);     GRD_TAG("Browser Home"_b);
 
-// 	GRD_ENUM_VALUE(Volume_Mute);          GRD_TAG("Mute"_b);
-// 	GRD_ENUM_VALUE(Volume_Down);          GRD_TAG("Volume Down"_b);
-// 	GRD_ENUM_VALUE(Volume_Up);            GRD_TAG("Volume Up"_b);
-// 	GRD_ENUM_VALUE(Media_Next_Track);     GRD_TAG("Next Track"_b);
-// 	GRD_ENUM_VALUE(Media_Previous_Track); GRD_TAG("Previous Track"_b);
-// 	GRD_ENUM_VALUE(Media_Stop);           GRD_TAG("Stop"_b);
-// 	GRD_ENUM_VALUE(Media_Play_Pause);     GRD_TAG("Play/Pause"_b);
-// 	GRD_ENUM_VALUE(Launch_Mail);          GRD_TAG("Mail"_b);
-// 	GRD_ENUM_VALUE(Launch_Media_Select);  GRD_TAG("Media select"_b);
-// 	GRD_ENUM_VALUE(Launch_App1);          GRD_TAG("App 1"_b);
-// 	GRD_ENUM_VALUE(Launch_App2);          GRD_TAG("App 2"_b);
+// 	GRD_ENUM_VALUE(VolumeMute);          GRD_TAG("Mute"_b);
+// 	GRD_ENUM_VALUE(VolumeDown);          GRD_TAG("Volume Down"_b);
+// 	GRD_ENUM_VALUE(VolumeUp);            GRD_TAG("Volume Up"_b);
+// 	GRD_ENUM_VALUE(MediaNextTrack);     GRD_TAG("Next Track"_b);
+// 	GRD_ENUM_VALUE(MediaPreviousTrack); GRD_TAG("Previous Track"_b);
+// 	GRD_ENUM_VALUE(MediaStop);           GRD_TAG("Stop"_b);
+// 	GRD_ENUM_VALUE(MediaPlayPause);     GRD_TAG("Play/Pause"_b);
+// 	GRD_ENUM_VALUE(LaunchMail);          GRD_TAG("Mail"_b);
+// 	GRD_ENUM_VALUE(LaunchMediaSelect);  GRD_TAG("Media select"_b);
+// 	GRD_ENUM_VALUE(LaunchApp1);          GRD_TAG("App 1"_b);
+// 	GRD_ENUM_VALUE(LaunchApp2);          GRD_TAG("App 2"_b);
 
 // 	GRD_ENUM_VALUE(AX);
-// 	GRD_ENUM_VALUE(Zero_Zero); GRD_TAG("00"_b);
+// 	GRD_ENUM_VALUE(ZeroZero); GRD_TAG("00"_b);
 
 // 	GRD_ENUM_VALUE(Process);
 
 // 	GRD_ENUM_VALUE(Attn);
 // 	GRD_ENUM_VALUE(CrSel);
 // 	GRD_ENUM_VALUE(ExSel);
-// 	GRD_ENUM_VALUE(Erase_EOF); GRD_TAG("Erase EOF"_b);
+// 	GRD_ENUM_VALUE(EraseEOF); GRD_TAG("Erase EOF"_b);
 
 // 	GRD_ENUM_VALUE(Zoom);
 // 	GRD_ENUM_VALUE(Play);
 // }
 
-GrdOptional<Key> map_mouse_button_index(int index) {
+GrdOptional<GrdKey> grd_map_mouse_button_index(int index) {
 	switch (index) {
-		case 0:  return Key::LMB;
-		case 1:  return Key::RMB;
-		case 2:  return Key::MMB;
-		case 3:  return Key::Mouse_4;
-		case 4:  return Key::Mouse_5;
-		case 5:  return Key::Mouse_6;
-		case 6:  return Key::Mouse_7;
-		case 7:  return Key::Mouse_8;
-		case 8:  return Key::Mouse_9;
+		case 0:  return GrdKey::LMB;
+		case 1:  return GrdKey::RMB;
+		case 2:  return GrdKey::MMB;
+		case 3:  return GrdKey::Mouse4;
+		case 4:  return GrdKey::Mouse5;
+		case 5:  return GrdKey::Mouse6;
+		case 6:  return GrdKey::Mouse7;
+		case 7:  return GrdKey::Mouse8;
+		case 8:  return GrdKey::Mouse9;
 	}
 	return {};
 }

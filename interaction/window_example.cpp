@@ -11,7 +11,7 @@ int main() {
 	while (true) {
 		auto events = read_window_events(window);
 		for (auto event: events) {
-			if (auto e = as<WindowCloseEvent>(event)) {
+			if (auto e = as<GrdWindowCloseEvent>(event)) {
 				return 0;
 			}
 		}

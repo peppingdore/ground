@@ -8,9 +8,6 @@ constexpr T grd_sign(T a) {
 	return a < 0 ? -1 : 1;
 }
 
-#undef max
-#undef min
-
 template <typename T>
 constexpr T grd_max(T a, std::type_identity_t<T> b) {
 	return a > b ? a : b;

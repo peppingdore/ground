@@ -3,14 +3,14 @@
 #include "../grd_base.h"
 
 #if GRD_OS_WINDOWS
-	#include "win_window.h"
+	#include "grd_win_window.h"
 #endif
 
-Tuple<Window*, Error*> create_window(WindowParams params) {
-	auto [window, e] = os_create_window(params);
+GrdTuple<GrdWindow*, GrdError*> create_window(GrdWindowParams params) {
+	auto [window, e] = grd_os_create_window(params);
 	return { window, e };
 }
 
-GrdArray<Event*> read_window_events(Window* window) {
-	return os_read_window_events((WindowsWindow*) window);
+GrdArray<GrdEvent*> read_window_events(GrdWindow* window) {
+	return grd_os_read_window_events((GrdWindowsWindow*) window);
 }

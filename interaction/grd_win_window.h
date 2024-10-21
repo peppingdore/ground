@@ -1,11 +1,11 @@
 #pragma once
 
 #include "../grd_build.h"
-#include "window_interface.h"
-#include "event.h"
-#include "win_key.h"
-#include "pointer.h"
-#include "win_message_codes.h"
+#include "grd_window_interface.h"
+#include "grd_event.h"
+#include "grd_win_key.h"
+#include "grd_pointer.h"
+#include "grd_win_message_codes.h"
 #include "../grd_log.h"
 
 #include <windowsx.h>
@@ -13,32 +13,32 @@
 GRD_BUILD_RUN("params.add_lib('user32.lib')");
 
 
-struct WindowsWindow: Window {
+struct GrdWindowsWindow: GrdWindow {
 	HWND               hwnd;
 	wchar_t*           utf16_title = NULL;
-	GrdArray<Event*>      events;
+	GrdArray<Event*>   events;
 	char16_t           wm_char_high_surrogate = 0;
-	LRESULT          (*wnd_proc)(WindowsWindow* window, HWND h, UINT m, WPARAM wParam, LPARAM lParam) = NULL;
+	LRESULT          (*wnd_proc)(GrdWindowsWindow* window, HWND h, UINT m, WPARAM wParam, LPARAM lParam) = NULL;
 	OsPointerIdMapper  os_pointer_mapper;
 	LONG               last_wmmousemove_time = 0;
 };
 
-Spinlock WINDOWS_WINDOW_CREATE_LOCK;
-bool     WINDOWS_IS_WINDOW_CLASS_CREATED = false;
+GrdSpinlock GRD_WINDOWS_WINDOW_CREATE_LOCK;
+bool        GRD_WINDOWS_IS_WINDOW_CLASS_CREATED = false;
 // Windows sends WM_GETMINMAXINFO event before WM_NCCREATE,
 //  which means we can't read Window* pointer from GWLP_USERDATA, because we set GWLP_USERDATA in WM_NCCREATE,
 //  so the solution is to have a global lock with global Window* pointer, which we can use in WM_GETMINMAXINFO.
-WindowsWindow* WINDOWS_GETMINMAXINFO_WINDOW_POINTER = NULL;
+GrdWindowsWindow* GRD_WINDOWS_GETMINMAXINFO_WINDOW_POINTER = NULL;
 
-LRESULT ground_wnd_proc(HWND h, UINT m, WPARAM wParam, LPARAM lParam);
+LRESULT grd_wnd_proc(HWND h, UINT m, WPARAM wParam, LPARAM lParam);
 
-const wchar_t* windows_get_window_class() {
+const wchar_t* grd_windows_get_window_class() {
 	// This function assumes you have taken the creation lock.
-	auto class_name = L"GROUND_WINDOW_CLASS";
-	if (!WINDOWS_IS_WINDOW_CLASS_CREATED) {
-		WINDOWS_IS_WINDOW_CLASS_CREATED = true;
+	auto class_name = L"GRD_WINDOW_CLASS";
+	if (!GRD_WINDOWS_IS_WINDOW_CLASS_CREATED) {
+		GRD_WINDOWS_IS_WINDOW_CLASS_CREATED = true;
 		WNDCLASSW wc = { 
-			.lpfnWndProc = ground_wnd_proc,
+			.lpfnWndProc = grd_wnd_proc,
 			.hInstance = GetModuleHandle(NULL),
 			.lpszClassName = class_name,
 		};
@@ -47,8 +47,8 @@ const wchar_t* windows_get_window_class() {
 	return class_name;
 }
 
-Tuple<WindowsWindow*, Error*> os_create_window(WindowParams params) {
-	GrdScopedLock(WINDOWS_WINDOW_CREATE_LOCK);
+GrdTuple<GrdWindowsWindow*, GrdError*> grd_os_create_window(GrdWindowParams params) {
+	GrdScopedLock(GRD_WINDOWS_WINDOW_CREATE_LOCK);
 
 	s32 window_width  = GetSystemMetrics(SM_CXSCREEN) / 2 - params.initial_size.x / 2;
 	s32 window_height = GetSystemMetrics(SM_CYSCREEN) / 2 - params.initial_size.y / 2;
@@ -56,16 +56,16 @@ Tuple<WindowsWindow*, Error*> os_create_window(WindowParams params) {
 	DWORD window_style = WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX;
 	AdjustWindowRect(&window_rect, window_style, false);
 
-	auto window = grd_make<WindowsWindow>();
-	window->type = grd_reflect_type_of<WindowsWindow>();
+	auto window = grd_make<GrdWindowsWindow>();
+	window->type = grd_reflect_type_of<GrdWindowsWindow>();
 	window->params = params;
 	window->utf16_title = (wchar_t*) grd_encode_utf16(params.title).data;
 	
-	WINDOWS_GETMINMAXINFO_WINDOW_POINTER = window;
+	GRD_WINDOWS_GETMINMAXINFO_WINDOW_POINTER = window;
 
 	window->hwnd = CreateWindowExW(
 		WS_EX_APPWINDOW,
-		windows_get_window_class(),
+		grd_windows_get_window_class(),
 		window->utf16_title,
 		window_style,
 		window_rect.left,
@@ -81,7 +81,7 @@ Tuple<WindowsWindow*, Error*> os_create_window(WindowParams params) {
 	if (window->hwnd == NULL) {
 		GrdFree(window->utf16_title);
 		GrdFree(window);
-		return { NULL, windows_error() };
+		return { NULL, grd_windows_error() };
 	}
 
 	ShowWindow(window->hwnd, SW_SHOWDEFAULT);
@@ -89,8 +89,8 @@ Tuple<WindowsWindow*, Error*> os_create_window(WindowParams params) {
 	return { window, NULL };
 }
 
-LRESULT ground_wnd_proc(HWND h, UINT m, WPARAM wParam, LPARAM lParam) {
-	auto window = (WindowsWindow*) GetWindowLongPtrW(h, GWLP_USERDATA);
+LRESULT grd_wnd_proc(HWND h, UINT m, WPARAM wParam, LPARAM lParam) {
+	auto window = (GrdWindowsWindow*) GetWindowLongPtrW(h, GWLP_USERDATA);
 
 	switch (m) {
 		case WM_NCHITTEST: {
@@ -196,7 +196,7 @@ LRESULT ground_wnd_proc(HWND h, UINT m, WPARAM wParam, LPARAM lParam) {
 		}
 		break;
 		case WM_GETMINMAXINFO: {
-			window = WINDOWS_GETMINMAXINFO_WINDOW_POINTER;
+			window = GRD_WINDOWS_GETMINMAXINFO_WINDOW_POINTER;
 			LPMINMAXINFO lpMMI = (LPMINMAXINFO) lParam;
 			lpMMI->ptMinTrackSize.x = window->params.min_size.x;
 			lpMMI->ptMinTrackSize.y = window->params.min_size.y;
@@ -213,57 +213,57 @@ LRESULT ground_wnd_proc(HWND h, UINT m, WPARAM wParam, LPARAM lParam) {
 	return DefWindowProcW(h, m, wParam, lParam);
 }
 
-f64 get_windows_time_from_start(DWORD message_time) {
+f64 grd_get_windows_time_from_start(DWORD message_time) {
 	u64 time = GetTickCount64();
 	// Adjust the lower bits.
 	*((u32*) &time) = message_time;
 	return ((f64) time) / 1000.0;
 }
 
-void push_windows_window_event(WindowsWindow* window, WindowEvent* event, GrdOptional<DWORD> custom_time = {}) {
+void grd_push_windows_window_event(GrdWindowsWindow* window, WindowEvent* event, GrdOptional<DWORD> custom_time = {}) {
 	// GetMessageTime() is like GetTickCount(), but casted to LONG instead of DWORD.
-	auto time = custom_time.has_value ? custom_time.value : bitcast<DWORD>(GetMessageTime());
-	event->time_from_system_start = get_windows_time_from_start(time);
+	auto time = custom_time.has_value ? custom_time.value : grd_bitcast<DWORD>(GetMessageTime());
+	event->time_from_system_start = grd_get_windows_time_from_start(time);
 	grd_add(&window->events, event);
 }
 
-PointerButtonFlags wparam_to_pointer_buttons(WPARAM wParam) {
+GrdPointerButtonFlags grd_wparam_to_pointer_buttons(WPARAM wParam) {
 	u64 buttons = 0;
 	if (wParam & MK_LBUTTON)  buttons |= 1 << 0;
 	if (wParam & MK_RBUTTON)  buttons |= 1 << 1;
 	if (wParam & MK_MBUTTON)  buttons |= 1 << 2;
 	if (wParam & MK_XBUTTON1) buttons |= 1 << 3;
 	if (wParam & MK_XBUTTON2) buttons |= 1 << 4;
-	return (PointerButtonFlags) buttons;
+	return (GrdPointerButtonFlags) buttons;
 }
 
-Vector2 convert_windows_coords(HWND hwnd, POINT p) {
+GrdVector2 grd_convert_windows_coords(HWND hwnd, POINT p) {
 	RECT window_rect;
 	GetWindowRect(hwnd, &window_rect);
-	return Vector2::grd_make(p.x, window_rect.bottom - p.y);
+	return grd_make_vector2(p.x, window_rect.bottom - p.y);
 }
 
-void push_windows_mouse_button_event(WindowsWindow* window, WPARAM wParam, LPARAM lParam, PointerAction action, PointerButtonFlags button) {
+void grd_push_windows_mouse_button_event(GrdWindowsWindow* window, WPARAM wParam, LPARAM lParam, GrdPointerAction action, GrdPointerButtonFlags button) {
 	POINT p = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
-	Pointer pointer = {
-		.id       = map_os_mouse_to_pointer_id(&window->os_pointer_mapper),
-		.kind     = PointerKind::Mouse,
-		.position = convert_windows_coords(window->hwnd, p),
-		.buttons  = wparam_to_pointer_buttons(wParam),
+	GrdPointer pointer = {
+		.id       = grd_map_os_mouse_to_pointer_id(&window->os_pointer_mapper),
+		.kind     = GrdPointerKind::Mouse,
+		.position = grd_convert_windows_coords(window->hwnd, p),
+		.buttons  = grd_wparam_to_pointer_buttons(wParam),
 	};
-	PointerEvent* event = grd_make_event<PointerEvent>();
+	GrdPointerEvent* event = grd_make_event<GrdPointerEvent>();
 	event->pointer = pointer;
 	event->action = action;
 	event->changed_buttons = button;
-	push_windows_window_event(window, event);
+	grd_push_windows_window_event(window, event);
 }
 
-LRESULT read_event_wnd_proc(WindowsWindow* window, HWND h, UINT m, WPARAM wParam, LPARAM lParam) {
+LRESULT grd_read_event_wnd_proc(GrdWindowsWindow* window, HWND h, UINT m, WPARAM wParam, LPARAM lParam) {
 	switch (m) {
 		case WM_ACTIVATE: {
 			auto event = grd_make_event<FocusEvent>();
 			event->have_focus = LOWORD(wParam) != 0;
-			push_windows_window_event(window, event);
+			grd_push_windows_window_event(window, event);
 		}
 		break;
 
@@ -296,7 +296,7 @@ LRESULT read_event_wnd_proc(WindowsWindow* window, HWND h, UINT m, WPARAM wParam
 			}
 			auto event = grd_make_event<CharEvent>();
 			event->character = c;
-			push_windows_window_event(window, event);
+			grd_push_windows_window_event(window, event);
 
 			window->wm_char_high_surrogate = 0;
 		}
@@ -310,7 +310,7 @@ LRESULT read_event_wnd_proc(WindowsWindow* window, HWND h, UINT m, WPARAM wParam
 			event->action = (m == WM_KEYDOWN || m == WM_SYSKEYDOWN) ? KeyAction::Down : KeyAction::Up;
 			event->key = map_windows_key(wParam, lParam);
 			event->os_key_code = wParam;
-			push_windows_window_event(window, event);
+			grd_push_windows_window_event(window, event);
 		}
 		break;
 
@@ -323,18 +323,18 @@ LRESULT read_event_wnd_proc(WindowsWindow* window, HWND h, UINT m, WPARAM wParam
 			ScreenToClient(window->hwnd, &p);
 
 			Pointer pointer = {
-				.id = map_os_mouse_to_pointer_id(&window->os_pointer_mapper),
-				.kind = PointerKind::Mouse,
-				.position = convert_windows_coords(window->hwnd, p),
-				.buttons = wparam_to_pointer_buttons(wParam),
+				.id = grd_map_os_mouse_to_pointer_id(&window->os_pointer_mapper),
+				.kind = GrdPointerKind::Mouse,
+				.position = grd_convert_windows_coords(window->hwnd, p),
+				.buttons = grd_wparam_to_pointer_buttons(wParam),
 			};
 
-			PointerEvent* event = grd_make_event<PointerEvent>();
+			GrdPointerEvent* event = grd_make_event<GrdPointerEvent>();
 			event->pointer = pointer;
-			event->action = PointerAction::Scroll;
+			event->action = GrdPointerAction::Scroll;
 			event->scroll_delta = { 0, float_delta };
 			event->is_scroll_in_lines = true;
-			push_windows_window_event(window, event);
+			grd_push_windows_window_event(window, event);
 		}
 		break;
 
@@ -348,7 +348,7 @@ LRESULT read_event_wnd_proc(WindowsWindow* window, HWND h, UINT m, WPARAM wParam
 			MOUSEMOVEPOINT current_point = {
 				.x    = p.x,
 				.y    = p.y,
-				.time = bitcast<DWORD>(GetMessageTime()),
+				.time = grd_bitcast<DWORD>(GetMessageTime()),
 			};
 
 			MOUSEMOVEPOINT points[65]; // 64 + 1 (+1 for the current_point)
@@ -359,7 +359,7 @@ LRESULT read_event_wnd_proc(WindowsWindow* window, HWND h, UINT m, WPARAM wParam
 				if (points[i].x > 32767) points[i].x -= 65536;
 				if (points[i].y > 32767) points[i].y -= 65536;
 
-				auto point_time = get_windows_time_from_start(points[i].time);
+				auto point_time = grd_get_windows_time_from_start(points[i].time);
 				if (point_time < window->last_wmmousemove_time) {
 					break;
 				}
@@ -378,35 +378,35 @@ LRESULT read_event_wnd_proc(WindowsWindow* window, HWND h, UINT m, WPARAM wParam
 				POINT p = { .x = points[i].x, .y = points[i].y };
 				ScreenToClient(window->hwnd, &p);
 				Pointer pointer = {
-					.id       = map_os_mouse_to_pointer_id(&window->os_pointer_mapper),
-					.kind     = PointerKind::Mouse,
-					.position = convert_windows_coords(window->hwnd, p),
-					.buttons  = wparam_to_pointer_buttons(wParam),
+					.id       = grd_map_os_mouse_to_pointer_id(&window->os_pointer_mapper),
+					.kind     = GrdPointerKind::Mouse,
+					.position = grd_convert_windows_coords(window->hwnd, p),
+					.buttons  = grd_wparam_to_pointer_buttons(wParam),
 				};
 
-				PointerEvent* event = grd_make_event<PointerEvent>();
+				GrdPointerEvent* event = grd_make_event<GrdPointerEvent>();
 				event->pointer = pointer;
-				event->action = PointerAction::Move;
-				push_windows_window_event(window, event, points[i].time);
+				event->action = GrdPointerAction::Move;
+				grd_push_windows_window_event(window, event, points[i].time);
 			}
 			window->last_wmmousemove_time = GetMessageTime();
 		}
 		break;
 
-		case WM_LBUTTONDOWN: push_windows_mouse_button_event(window, wParam, lParam, PointerAction::Down, POINTER_BUTTON_MOUSE_LEFT); break;
-		case WM_RBUTTONDOWN: push_windows_mouse_button_event(window, wParam, lParam, PointerAction::Down, POINTER_BUTTON_MOUSE_RIGHT); break;
-		case WM_MBUTTONDOWN: push_windows_mouse_button_event(window, wParam, lParam, PointerAction::Down, POINTER_BUTTON_MOUSE_MIDDLE); break;
+		case WM_LBUTTONDOWN: grd_push_windows_mouse_button_event(window, wParam, lParam, GrdPointerAction::Down, GRD_POINTER_BUTTON_MOUSE_LEFT); break;
+		case WM_RBUTTONDOWN: grd_push_windows_mouse_button_event(window, wParam, lParam, GrdPointerAction::Down, GRD_POINTER_BUTTON_MOUSE_RIGHT); break;
+		case WM_MBUTTONDOWN: grd_push_windows_mouse_button_event(window, wParam, lParam, GrdPointerAction::Down, GRD_POINTER_BUTTON_MOUSE_MIDDLE); break;
 		case WM_LBUTTONUP:
-		case WM_NCLBUTTONUP: push_windows_mouse_button_event(window, wParam, lParam, PointerAction::Up, POINTER_BUTTON_MOUSE_LEFT); break;
+		case WM_NCLBUTTONUP: grd_push_windows_mouse_button_event(window, wParam, lParam, GrdPointerAction::Up, GRD_POINTER_BUTTON_MOUSE_LEFT); break;
 		case WM_RBUTTONUP:
-		case WM_NCRBUTTONUP: push_windows_mouse_button_event(window, wParam, lParam, PointerAction::Up, POINTER_BUTTON_MOUSE_RIGHT); break;
+		case WM_NCRBUTTONUP: grd_push_windows_mouse_button_event(window, wParam, lParam, GrdPointerAction::Up, GRD_POINTER_BUTTON_MOUSE_RIGHT); break;
 		case WM_MBUTTONUP:
-		case WM_NCMBUTTONUP: push_windows_mouse_button_event(window, wParam, lParam, PointerAction::Up, POINTER_BUTTON_MOUSE_MIDDLE); break;
+		case WM_NCMBUTTONUP: grd_push_windows_mouse_button_event(window, wParam, lParam, GrdPointerAction::Up, GRD_POINTER_BUTTON_MOUSE_MIDDLE); break;
 
 		case WM_DESTROY:
 		case WM_CLOSE: {
 			auto event = grd_make_event<WindowCloseEvent>();
-			push_windows_window_event(window, event);
+			grd_push_windows_window_event(window, event);
 		}
 		break;
 	}
@@ -416,9 +416,9 @@ LRESULT read_event_wnd_proc(WindowsWindow* window, HWND h, UINT m, WPARAM wParam
 
 // @TODO: Add a check that grd_makes sure that this function is called from the same thread that created the window, because Windows requires that.
 //   And the check must be present on all OSs (not Windows only) for consistency.
-GrdArray<Event*> os_read_window_events(WindowsWindow* window) {
+GrdArray<Event*> grd_os_read_window_events(GrdWindowsWindow* window) {
 	GrdScopedRestore(window->wnd_proc);
-	window->wnd_proc = read_event_wnd_proc;
+	window->wnd_proc = grd_read_event_wnd_proc;
 
 	MSG msg;
 	while (PeekMessageW(&msg, window->hwnd, 0, 0, PM_REMOVE)) {
