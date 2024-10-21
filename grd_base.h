@@ -45,12 +45,10 @@
 	#define GRD_FORCE_INLINE __forceinline
 #endif
 
-#if GRD_OS_WINDOWS == 0
-	#if GRD_COMPILER_MSVC
-		#define GrdDebugBreak() __DebugBreak()
-	#else
-		#define GrdDebugBreak() __builtin_debugtrap()
-	#endif
+#if GRD_COMPILER_MSVC
+	#define GrdDebugBreak() __DebugBreak()
+#else
+	#define GrdDebugBreak() __builtin_debugtrap()
 #endif
 
 #define GRD_STRINGIFY(x) #x
