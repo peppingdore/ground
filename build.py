@@ -538,7 +538,7 @@ def build_main():
 	
 	params.set_target(target)
 	params.set_optimization_level(args.opt_level)
-	params.add_natvis_file(builder.MODULE_ROOT / "gnd.natvis")
+	params.add_natvis_file(builder.MODULE_ROOT / "grd.natvis")
 
 	compile_results = builder.compile_units_parallel(params.units, params.compile_params, params.target)
 	builder.print_compile_results(stdout, compile_results)
