@@ -2,77 +2,49 @@
 
 #include "../grd_reflect.h"
 
+#define GRD_SSA_OP_LIST\
+	GRD_SSA_OP_WITH_VALUE(Nop, 0)\
+	GRD_SSA_OP(Phi)\
+	GRD_SSA_OP(Add)\
+	GRD_SSA_OP(Sub)\
+	GRD_SSA_OP(Mul)\
+	GRD_SSA_OP(Div)\
+	GRD_SSA_OP(Less)\
+	GRD_SSA_OP(Greater)\
+	GRD_SSA_OP(Equal)\
+	GRD_SSA_OP(Const)\
+	GRD_SSA_OP(Call)\
+	GRD_SSA_OP(MemberAccess)\
+	GRD_SSA_OP(SwizzleExpr)\
+	GRD_SSA_OP(SwizzleIndices)\
+	GRD_SSA_OP(Store)\
+	GRD_SSA_OP(Load)\
+	GRD_SSA_OP(Alloca)\
+	GRD_SSA_OP(Jump)\
+	GRD_SSA_OP(CondJump)\
+	GRD_SSA_OP(Return)\
+	GRD_SSA_OP(ReturnVoid)\
+	GRD_SSA_OP(UnaryNeg)\
+	GRD_SSA_OP(UnaryNot)\
+	GRD_SSA_OP(ZeroInit)\
+	GRD_SSA_OP(GetElementPtr)\
+	GRD_SSA_OP(FunctionArg)\
+	GRD_SSA_OP(InsertValue)\
+	GRD_SSA_OP(ExtractValue)\
+	GRD_SSA_OP(MakeStruct)\
+	GRD_SSA_OP(GlobalVar)\
+	GRD_SSA_OP_WITH_VALUE(SsaOpSpirvStart, 2000)\
+	GRD_SSA_OP(SpvUniform)\
+	GRD_SSA_OP(SpvBuiltinPosition)\
+	GRD_SSA_OP_WITH_VALUE(SsaOpSpirvEnd, 3000)
 
-enum class SsaOp {
-	Nop = 0,
-	Phi,
-	Add,
-	Sub,
-	Mul,
-	Div,
-	Less,
-	Greater,
-	Equal,
-	Const,
-	Call,
-	MemberAccess,
-	SwizzleExpr,
-	SwizzleIndices,
-	Store,
-	Load,
-	Alloca,
-	Jump,
-	CondJump,
-	Return,
-	ReturnVoid,
-	UnaryNeg,
-	UnaryNot,
-	ZeroInit,
-	GetElementPtr,
-	FunctionArg,
-	InsertValue,
-	ExtractValue,
-	MakeStruct,
-	GlobalVar,
-
-	SsaOpSpirvStart = 2000,
-	SpvUniform,
-	SpvBuiltinPosition,
-	SsaOpSpirvEnd = 3000,
+enum class GrdSsaOp {
+	#define GRD_SSA_OP_WITH_VALUE(name, value) name = value,
+	#define GRD_SSA_OP(name) name,
+	GRD_SSA_OP_LIST
 };
-GRD_REFLECT(SsaOp) {
-	GRD_ENUM_VALUE(Nop);
-	GRD_ENUM_VALUE(Phi);
-	GRD_ENUM_VALUE(Add);
-	GRD_ENUM_VALUE(Sub);
-	GRD_ENUM_VALUE(Mul);
-	GRD_ENUM_VALUE(Div);
-	GRD_ENUM_VALUE(Less);
-	GRD_ENUM_VALUE(Greater);
-	GRD_ENUM_VALUE(Equal);
-	GRD_ENUM_VALUE(Const);
-	GRD_ENUM_VALUE(Call);
-	GRD_ENUM_VALUE(MemberAccess);
-	GRD_ENUM_VALUE(SwizzleExpr);
-	GRD_ENUM_VALUE(SwizzleIndices);
-	GRD_ENUM_VALUE(Store);
-	GRD_ENUM_VALUE(Load);
-	GRD_ENUM_VALUE(Alloca);
-	GRD_ENUM_VALUE(Jump);
-	GRD_ENUM_VALUE(CondJump);
-	GRD_ENUM_VALUE(Return);
-	GRD_ENUM_VALUE(ReturnVoid);
-	GRD_ENUM_VALUE(UnaryNeg);
-	GRD_ENUM_VALUE(UnaryNot);
-	GRD_ENUM_VALUE(ZeroInit);
-	GRD_ENUM_VALUE(GetElementPtr);
-	GRD_ENUM_VALUE(FunctionArg);
-	GRD_ENUM_VALUE(InsertValue);
-	GRD_ENUM_VALUE(ExtractValue);
-	GRD_ENUM_VALUE(MakeStruct);
-	GRD_ENUM_VALUE(GlobalVar);
-	GRD_ENUM_VALUE(SsaOpSpirvStart);
-	GRD_ENUM_VALUE(SpvUniform);
-	GRD_ENUM_VALUE(SpvBuiltinPosition);
-	GRD_ENUM_VALUE(SsaOpSpirvEnd);
+GRD_REFLECT(GrdSsaOp) {
+	#define GRD_SSA_OP_WITH_VALUE(name, value) GRD_ENUM_VALUE(name);
+	#define GRD_SSA_OP(name) GRD_ENUM_VALUE(name);
+	GRD_SSA_OP_LIST
 }
