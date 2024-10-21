@@ -47,7 +47,7 @@
 
 #if GRD_OS_WINDOWS == 0
 	#if GRD_COMPILER_MSVC
-		#define GrdDebugBreak() __GrdDebugBreak()
+		#define GrdDebugBreak() __DebugBreak()
 	#else
 		#define GrdDebugBreak() __builtin_debugtrap()
 	#endif
