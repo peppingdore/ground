@@ -80,7 +80,7 @@ GRD_REFLECT(PrepTokenSourceKind) {
 struct IncludedFile;
 struct PrepFileSource;
 
-struct Token {
+struct GrdcToken {
 	PrepTokenKind          kind  = PREP_TOKEN_KIND_NONE;
 	s64                    flags = PREP_TOKEN_FLAG_NONE;
 	PrepTokenSourceKind    src_kind = PREP_TOKEN_SOURCE_NONE;
@@ -91,25 +91,25 @@ struct Token {
 	s64                    file_start = 0;
 	s64                    file_end = 0;
 	MacroExp*              stringize_exp = NULL;
-	Token*                 stringize_tok = NULL;
+	GrdcToken*                 stringize_tok = NULL;
 	MacroExp*              og_macro_exp = NULL;
-	Token*                 og_macro_tok = NULL;
-	Token*                 concat_lhs = NULL;
-	Token*                 concat_rhs = NULL;
-	Token*                 concat_lhs_content = NULL;
-	Token*                 concat_rhs_content = NULL;
-	Token*                 concat_residue_og = NULL;
+	GrdcToken*                 og_macro_tok = NULL;
+	GrdcToken*                 concat_lhs = NULL;
+	GrdcToken*                 concat_rhs = NULL;
+	GrdcToken*                 concat_lhs_content = NULL;
+	GrdcToken*                 concat_rhs_content = NULL;
+	GrdcToken*                 concat_residue_og = NULL;
 	MacroExp*              concat_exp = NULL;
-	Token*                 prescan_exp_og = NULL;
+	GrdcToken*                 prescan_exp_og = NULL;
 	MacroExp*              prescan_exp = NULL;
-	Token*                 included_file_og_tok = NULL;
+	GrdcToken*                 included_file_og_tok = NULL;
 };
 
 struct IncludedFile {
 	IncludedFile*   parent = NULL;
-	GrdArray<Token*>   site_toks;
+	GrdArray<GrdcToken*>   site_toks;
 	PrepFileSource* file = NULL;
-	GrdArray<Token*>   tokens;
+	GrdArray<GrdcToken*>   tokens;
 };
 
 // @TODO: rename back to PrepFile.
@@ -119,7 +119,7 @@ struct PrepFileSource {
 	GrdUnicodeString          src;
 	GrdArray<PrepFileMapping> splice_mappings;
 	GrdArray<PrepFileMapping> comment_mappings;
-	GrdArray<Token*>          tokens;
+	GrdArray<GrdcToken*>          tokens;
 	bool                   is_tokenized = false;
 };
 
@@ -127,9 +127,9 @@ struct PrepMacro {
 	IncludedFile* def_site = NULL;
 	s64           start_tok_idx = 0;
 	s64           end_tok_idx = 0;
-	Token*        name;
-	GrdArray<Token*> arg_defs;
-	GrdSpan<Token*>  tokens;
+	GrdcToken*        name;
+	GrdArray<GrdcToken*> arg_defs;
+	GrdSpan<GrdcToken*>  tokens;
 	bool          is_object = true;
 };
 
@@ -142,15 +142,15 @@ struct PrepMacroArg {
 struct MacroExp {
 	MacroExp*     parent = NULL;
 	PrepMacro*    macro = NULL;
-	GrdArray<Token*> body;
-	GrdArray<Token*> replaced;
+	GrdArray<GrdcToken*> body;
+	GrdArray<GrdcToken*> replaced;
 	GrdArray<PrepMacroArg> args;
 };
 
 struct Prep {
 	GrdAllocator         allocator;
 	GrdAllocator         arena;
-	GrdArray<Token*>     tokens;
+	GrdArray<GrdcToken*>     tokens;
 	GrdArray<PrepFileSource*> files;
 	GrdArray<PrepMacro*> macros;
 	MacroExp*         macro_exp = NULL;
@@ -169,7 +169,7 @@ struct PrepFileError: Error {
 
 struct PrepTokenError: Error {
 	Prep*  prep = NULL;
-	Token* tok = NULL;
+	GrdcToken* tok = NULL;
 };
 
 PrepFileError* grd_make_prep_file_error(Prep* p, PrepFileSource* file, s64 start, s64 end, auto... args) {
@@ -182,9 +182,9 @@ PrepFileError* grd_make_prep_file_error(Prep* p, PrepFileSource* file, s64 start
 	return e;
 }
 
-Token* tok_file_tok(Token* tok);
+GrdcToken* tok_file_tok(GrdcToken* tok);
 
-PrepTokenError* grd_make_prep_file_error(Prep* p, Token* tok, auto... args) {
+PrepTokenError* grd_make_prep_file_error(Prep* p, GrdcToken* tok, auto... args) {
 	auto msg = grd_sprint(p->allocator, args...);
 	auto e = grd_make_error<PrepTokenError>(msg);
 	e->prep = p;
@@ -233,7 +233,7 @@ s64 get_residual_lines_below(GrdUnicodeString src, s64 anchor, s64 lines_count) 
 	return grd_len(src);
 }
 
-GrdUnicodeString tok_str(Token* tok);
+GrdUnicodeString tok_str(GrdcToken* tok);
 
 void print_file_range_highlighted(PrepFileSource* file, s64 h_start, s64 h_end, s64 color) {
 	s64 mapped_start = og_file_index(file, h_start);
@@ -263,13 +263,13 @@ void print_file_range_highlighted(PrepFileSource* file, s64 h_start, s64 h_end, 
 	grd_println();
 }
 
-void print_prep_token_error(Token* tok, s64 color) {
+void print_prep_token_error(GrdcToken* tok, s64 color) {
 	assert(tok->src_kind == PREP_TOKEN_SOURCE_FILE_SOURCE);
 	auto file = tok->file_source;
 	print_file_range_highlighted(file, tok->file_start, tok->file_end, color);
 }
 
-void print_single_error_token(Token* tok) {
+void print_single_error_token(GrdcToken* tok) {
 	switch (tok->src_kind) {
 		case PREP_TOKEN_SOURCE_FILE_SOURCE: {
 			grd_println("  at file: %", tok->file_source->fullpath);
@@ -303,13 +303,13 @@ void print_single_error_token(Token* tok) {
 	}
 }
 
-void print_debug_tok(Token* tok) {
+void print_debug_tok(GrdcToken* tok) {
 	grd_println("tok: %, \"%\"", tok->kind, tok_str(tok));
 }
 
 
 struct TokenGrdSpan {
-	GrdSpan<Token*> tokens;
+	GrdSpan<GrdcToken*> tokens;
 	s64          color = 0;
 };
 
@@ -399,7 +399,7 @@ MacroExp* get_root_macro_exp(MacroExp* exp) {
 	return exp;
 }
 
-void dump_token(TokenDumper* dumper, Token* tok, s64 color) {
+void dump_token(TokenDumper* dumper, GrdcToken* tok, s64 color) {
 	switch (tok->src_kind) {
 		// case PREP_TOKEN_SOURCE_FILE_SOURCE:{
 		// 	dump_file_grd_range(dumper, tok->file_source, tok->file_start, tok->file_end, color);
@@ -461,11 +461,11 @@ struct DpGrdSpan {
 };
 
 struct DetailedPrinter {
-	GrdSpan<Token*>  tokens;
+	GrdSpan<GrdcToken*>  tokens;
 	GrdArray<DpGrdSpan> spans;
 };
 
-bool do_token_sources_match(Token* a, Token* b) {
+bool do_token_sources_match(GrdcToken* a, GrdcToken* b) {
 	if (a->src_kind != b->src_kind) {
 		return false;
 	}
@@ -498,13 +498,13 @@ bool do_token_sources_match(Token* a, Token* b) {
 	}
 }
 
-DetailedPrinter* grd_make_detailed_printer(GrdSpan<Token*> tokens) {
+DetailedPrinter* grd_make_detailed_printer(GrdSpan<GrdcToken*> tokens) {
 	auto dp = grd_make<DetailedPrinter>();
 	dp->tokens = tokens;
 	return dp;
 }
 
-s64 get_residual_tokens(GrdSpan<Token*> tokens, s64 cursor, s64 dir) {
+s64 get_residual_tokens(GrdSpan<GrdcToken*> tokens, s64 cursor, s64 dir) {
 	s64 lines = 0;
 	bool fwd = dir >= 0;
 	dir = fwd ? 1 : -1;
@@ -647,9 +647,9 @@ void do_detailed_print(DetailedPrinter* dp, bool expand_site) {
 			if (end <= start) {
 				continue;
 			}
-			Token* tok = dp->tokens[start];
+			GrdcToken* tok = dp->tokens[start];
 			grd_println("Site %:", zone);
-			void print_dp_site(Token* tok);
+			void print_dp_site(GrdcToken* tok);
 			print_dp_site(tok);
 		}
 	}	
@@ -662,7 +662,7 @@ void print_include_site(IncludedFile* inc) {
 	}
 }
 
-void print_dp_site(Token* tok) {
+void print_dp_site(GrdcToken* tok) {
 	switch (tok->src_kind) {
 		case PREP_TOKEN_SOURCE_FILE_SOURCE: {
 			auto dp = grd_make_detailed_printer(tok->file_source->tokens);
@@ -754,14 +754,14 @@ void print_prep_error(Error* e) {
 }
 
 Token* grd_make_token(Prep* p, PrepTokenKind kind, PrepTokenSourceKind src_kind) {
-	Token* tok = grd_make<Token>(p->arena);
+	Token* tok = grd_make<GrdcToken>(p->arena);
 	tok->kind = kind;
 	tok->custom_str.allocator = null_allocator;
 	tok->src_kind = src_kind;
 	return tok;
 }
 
-Token* grd_make_file_token(Prep* p, PrepTokenKind kind, PrepFileSource* file, s64 file_start, s64 file_end) {
+GrdcToken* grd_make_file_token(Prep* p, PrepTokenKind kind, PrepFileSource* file, s64 file_start, s64 file_end) {
 	auto tok = grd_make_token(p, kind, PREP_TOKEN_SOURCE_FILE_SOURCE);
 	tok->file_source = file;
 	tok->file_start = file_start;
@@ -769,7 +769,7 @@ Token* grd_make_file_token(Prep* p, PrepTokenKind kind, PrepFileSource* file, s6
 	return tok;
 }
 
-void prep_use_custom_str(Prep* p, Token* tok) {
+void prep_use_custom_str(Prep* p, GrdcToken* tok) {
 	tok->flags |= PREP_TOKEN_FLAG_CUSTOM_STR;
 	tok->custom_str.allocator = p->allocator;
 }
@@ -960,7 +960,7 @@ Tuple<s64, PrepTokenKind> get_str_token_at(GrdUnicodeString src, s64 cursor) {
 	return { 0 };
 }
 
-Tuple<Token*, Error*> get_token_at(Prep* p, PrepFileSource* file, s64 cursor) {
+Tuple<GrdcToken*, Error*> get_token_at(Prep* p, PrepFileSource* file, s64 cursor) {
 	if (file->src[cursor] == '#') {
 		if (grd_starts_with(file->src[{cursor, {}}], "##")) {
 			return { grd_make_file_token(p, PREP_TOKEN_KIND_GRD_CONCAT, file, cursor, cursor + 2) };
@@ -988,7 +988,7 @@ Tuple<Token*, Error*> get_token_at(Prep* p, PrepFileSource* file, s64 cursor) {
 	return { NULL, grd_make_prep_file_error(p, file, cursor, grd_len(file->src), "Invalid token. First char: %", file->src[cursor]) };
 }
 
-Tuple<Token*, Error*> prep_file_next_token(Prep* p, PrepFileSource* file, s64* cursor) {
+Tuple<GrdcToken*, Error*> prep_file_next_token(Prep* p, PrepFileSource* file, s64* cursor) {
 	while (*cursor < grd_len(file->src)) {
 		auto lb_len = grd_get_line_break_len(file->src, *cursor);
 		if (lb_len > 0) {
@@ -1013,7 +1013,7 @@ Tuple<Token*, Error*> prep_file_next_token(Prep* p, PrepFileSource* file, s64* c
 	return { tok, NULL };
 }
 
-GrdUnicodeString tok_str(Token* tok) {
+GrdUnicodeString tok_str(GrdcToken* tok) {
 	if (tok->flags & PREP_TOKEN_KIND_LINE_BREAK) {
 		return U"\n"_b;
 	}
@@ -1039,12 +1039,12 @@ GrdUnicodeString tok_str(Token* tok) {
 	return {};
 }
 
-GrdUnicodeString tok_str_content(Token* tok) {
+GrdUnicodeString tok_str_content(GrdcToken* tok) {
 	assert(tok->kind == PREP_TOKEN_KIND_STRING);
 	return tok_str(tok)[{1, -1}];
 }
 
-void push_source_file_token(PrepFileSource* file, Token* tok) {
+void push_source_file_token(PrepFileSource* file, GrdcToken* tok) {
 	tok->file_tok_idx = grd_len(file->tokens);
 	grd_add(&file->tokens, tok);
 }
@@ -1124,7 +1124,7 @@ GrdAllocatedUnicodeString prep_str(Prep* p) {
 	return str;
 }
 
-s64 get_next_token_idx(GrdSpan<Token*> tokens, s64 cursor) {
+s64 grd_get_next_token_idx(GrdSpan<GrdcToken*> tokens, s64 cursor) {
 	while (++cursor < grd_len(tokens)) {
 		auto tok = tokens[cursor];
 		if (tok->kind != PREP_TOKEN_KIND_SPACE &&
@@ -1136,9 +1136,9 @@ s64 get_next_token_idx(GrdSpan<Token*> tokens, s64 cursor) {
 	return grd_len(tokens);
 }
 
-// After get_next_token() cursor points to the returned token.
-Token* get_next_token(GrdSpan<Token*> tokens, s64* cursor) {
-	*cursor = get_next_token_idx(tokens, *cursor);
+// After grd_get_next_token() cursor points to the returned token.
+GrdcToken* grd_get_next_token(GrdSpan<GrdcToken*> tokens, s64* cursor) {
+	*cursor = grd_get_next_token_idx(tokens, *cursor);
 	if (*cursor >= grd_len(tokens)) {
 		assert(grd_len(tokens) > 0);
 		assert(tokens[-1]->kind == PREP_TOKEN_KIND_EOF);
@@ -1147,13 +1147,13 @@ Token* get_next_token(GrdSpan<Token*> tokens, s64* cursor) {
 	return tokens[*cursor];
 }
 
-bool is_prep_macro_variadic(PrepMacro* macro) {
+bool grd_is_prep_macro_variadic(PrepMacro* macro) {
 	return grd_len(macro->arg_defs) > 0 && tok_str(macro->arg_defs[-1]) == "...";
 }
 
-s64 find_macro_arg_def_tok_idx(PrepMacro* macro, GrdUnicodeString name) {
+s64 grd_find_macro_arg_def_tok_idx(PrepMacro* macro, GrdUnicodeString name) {
 	if (name == "__VA_ARGS__") {
-		if (is_prep_macro_variadic(macro)) {
+		if (grd_is_prep_macro_variadic(macro)) {
 			return grd_len(macro->arg_defs) - 1;
 		}
 	} else {
@@ -1166,9 +1166,9 @@ s64 find_macro_arg_def_tok_idx(PrepMacro* macro, GrdUnicodeString name) {
 	return -1;
 }
 
-Error* preprocess_file(Prep* p, PrepFileSource* file);
+Error* grd_preprocess_file(Prep* p, PrepFileSource* file);
 
-bool does_include_stack_contain_file(Prep* p, PrepFileSource* file) {
+bool grd_does_include_stack_contain_file(Prep* p, PrepFileSource* file) {
 	auto entry = p->include_site;
 	while (entry) {
 		if (entry->file == file) {
@@ -1179,18 +1179,18 @@ bool does_include_stack_contain_file(Prep* p, PrepFileSource* file) {
 	return false;
 }
 
-void prep_stringize_tok(Token* dst, Token* arg) {
+void grd_prep_stringize_tok(GrdcToken* dst, GrdcToken* arg) {
 	// @TODO: escape.
 	grd_add(&dst->custom_str, tok_str(arg));
 }
 
-Tuple<Error*, GrdArray<PrepMacroArg>> parse_macro_args(Prep* p, PrepMacro* macro, GrdSpan<Token*> tokens, s64* cursor, Token* paren_tok) {
+Tuple<Error*, GrdArray<PrepMacroArg>> grd_parse_macro_args(Prep* p, PrepMacro* macro, GrdSpan<GrdcToken*> tokens, s64* cursor, GrdcToken* paren_tok) {
 	GrdArray<PrepMacroArg> args = { .capacity = grd_len(macro->arg_defs), .allocator = p->allocator };
 	s64 paren_level = 0;
 	s64 arg_start = -1;
 	s64 arg_end = -1;
 	while (true) {
-		auto arg_tok = get_next_token(tokens, cursor);
+		auto arg_tok = grd_get_next_token(tokens, cursor);
 		if (arg_start == -1) {
 			arg_start = *cursor;
 		}
@@ -1212,7 +1212,7 @@ Tuple<Error*, GrdArray<PrepMacroArg>> parse_macro_args(Prep* p, PrepMacro* macro
 		}
 		s64 def_tok_idx = -1;
 		if (grd_len(args) >= grd_len(macro->arg_defs)) {
-			if (!is_prep_macro_variadic(macro)) {
+			if (!grd_is_prep_macro_variadic(macro)) {
 				return { grd_make_prep_file_error(p, arg_tok, "Expected % arguments at most for a macro", grd_len(macro->arg_defs)) };
 			} else {
 				def_tok_idx = -1;
@@ -1227,7 +1227,7 @@ Tuple<Error*, GrdArray<PrepMacroArg>> parse_macro_args(Prep* p, PrepMacro* macro
 			break;
 		}
 	}
-	if (is_prep_macro_variadic(macro)) {
+	if (grd_is_prep_macro_variadic(macro)) {
 		if (grd_len(args) < grd_len(macro->arg_defs)) {
 			return { grd_make_prep_file_error(p, paren_tok, "Expected % arguments at least for a macro", grd_len(macro->arg_defs)) };
 		}
@@ -1267,11 +1267,11 @@ PrepMacro* find_macro(Prep* p, GrdUnicodeString name) {
 }
 
 struct TokenSlice {
-	GrdSpan<Token*> tokens;
+	GrdSpan<GrdcToken*> tokens;
 	s64          start = 0;
 	s64          end = 0;
 
-	Token*& operator[](s64 idx) {
+	GrdcToken*& operator[](s64 idx) {
 		return tokens[idx + start];
 	}
 
@@ -1279,7 +1279,7 @@ struct TokenSlice {
 		return { .tokens = tokens, .start = x._0 + start, .end = x._1 + start };
 	}
 
-	GrdSpan<Token*> span() {
+	GrdSpan<GrdcToken*> span() {
 		return tokens[{start, end}];
 	}
 };
@@ -1288,16 +1288,16 @@ s64 grd_len(TokenSlice slice) {
 	return slice.end - slice.start;
 }
 
-TokenSlice grd_make_tok_slice(GrdSpan<Token*> tokens, s64 start, s64 end) {
+TokenSlice grd_make_tok_slice(GrdSpan<GrdcToken*> tokens, s64 start, s64 end) {
 	return { .tokens = tokens, .start = start, .end = end };
 }
 
-TokenSlice grd_make_tok_slice(GrdSpan<Token*> tokens) {
+TokenSlice grd_make_tok_slice(GrdSpan<GrdcToken*> tokens) {
 	return grd_make_tok_slice(tokens, 0, grd_len(tokens));
 }
 
-GrdOptional<TokenSlice> get_arg_tokens(PrepMacro* macro, GrdSpan<Token*> tokens, GrdSpan<PrepMacroArg> args, GrdUnicodeString name) {
-	auto def_idx = find_macro_arg_def_tok_idx(macro, name);
+GrdOptional<TokenSlice> get_arg_tokens(PrepMacro* macro, GrdSpan<GrdcToken*> tokens, GrdSpan<PrepMacroArg> args, GrdUnicodeString name) {
+	auto def_idx = grd_find_macro_arg_def_tok_idx(macro, name);
 	if (def_idx == -1) {
 		return {};
 	}
@@ -1321,9 +1321,9 @@ MaybeExpandedMacro maybe_expand_macro(Prep* p, TokenSlice tokens, s64* cursor) {
 	if (!macro) {
 		return { };
 	}
-	Token* paren_tok = NULL;
+	GrdcToken* paren_tok = NULL;
 	if (!macro->is_object) {
-		paren_tok = get_next_token(tokens.span(), cursor);
+		paren_tok = grd_get_next_token(tokens.span(), cursor);
 		if (tok_str(paren_tok) != "(" || paren_tok->file_start != name_tok->file_end) {
 			return { };
 		}
@@ -1348,7 +1348,7 @@ MaybeExpandedMacro maybe_expand_macro(Prep* p, TokenSlice tokens, s64* cursor) {
 	}
 
 	if (!macro->is_object) {
-		auto [e, args] = parse_macro_args(p, macro, tokens.span(), cursor, paren_tok);
+		auto [e, args] = grd_parse_macro_args(p, macro, tokens.span(), cursor, paren_tok);
 		if (e) {
 			return { e };
 		}
@@ -1369,7 +1369,7 @@ MaybeExpandedMacro maybe_expand_macro(Prep* p, TokenSlice tokens, s64* cursor) {
 					return { grd_make_prep_file_error(p, exp->body[i], "Macro argument is not found for stringizing") };
 				}
 				for (auto tok: arg_tokens.span()) {
-					prep_stringize_tok(str_tok, tok);
+					grd_prep_stringize_tok(str_tok, tok);
 				}
 				grd_append(&str_tok->custom_str, U"\"");
 				exp->body[i] = str_tok;
@@ -1384,7 +1384,7 @@ MaybeExpandedMacro maybe_expand_macro(Prep* p, TokenSlice tokens, s64* cursor) {
 				if (i + 1 >= grd_len(exp->body) || grd_contains({PREP_TOKEN_KIND_SPACE, PREP_TOKEN_KIND_EOF}, exp->body[i + 1]->kind)) {
 					return { grd_make_prep_file_error(p, exp->body[i], "Missing right argument for ## operator") };
 				}
-				Token* tok = grd_make_token(p, PREP_TOKEN_KIND_NONE, PREP_TOKEN_SOURCE_GRD_CONCATTED);
+				GrdcToken* tok = grd_make_token(p, PREP_TOKEN_KIND_NONE, PREP_TOKEN_SOURCE_GRD_CONCATTED);
 				tok->concat_exp = exp;
 				prep_use_custom_str(p, tok);
 				auto lhs = grd_make_tok_slice(exp->body, i - 1, i);
@@ -1500,7 +1500,7 @@ Error* handle_prep_directive(Prep* p, TokenSlice tokens, s64* cursor) {
 			*cursor += 1;
 		}
 
-		GrdArray<Token*> path_toks;
+		GrdArray<GrdcToken*> path_toks;
 		path_toks.allocator = p->allocator;
 		grd_defer { path_toks.free(); };
 
@@ -1587,10 +1587,10 @@ Error* handle_prep_directive(Prep* p, TokenSlice tokens, s64* cursor) {
 			}
 			grd_add(&p->files, source);
 		}
-		if (!does_include_stack_contain_file(p, source)) {
+		if (!grd_does_include_stack_contain_file(p, source)) {
 // S			inc_file->site_toks = grd_clear_array(p->allocator, path_toks);
 // 			path_toks = {};
-			auto e = preprocess_file(p, source);
+			auto e = grd_preprocess_file(p, source);
 			if (e) {
 				return e;
 			}
@@ -1600,7 +1600,7 @@ Error* handle_prep_directive(Prep* p, TokenSlice tokens, s64* cursor) {
 		// *cursor = include_trailing_newline_idx == -1 ? end - 1 : end;
 	} else if (tok_str(first_directive_tok) == "#define") {
 		s64 start_tok_idx = *cursor;
-		auto ident_tok = get_next_token(tokens.span(), cursor);
+		auto ident_tok = grd_get_next_token(tokens.span(), cursor);
 		if (ident_tok->kind != PREP_TOKEN_KIND_IDENT) {
 			return grd_make_prep_file_error(p, ident_tok, "Expected an identifier after #define");
 		}
@@ -1618,7 +1618,7 @@ Error* handle_prep_directive(Prep* p, TokenSlice tokens, s64* cursor) {
 			*cursor += 1;
 			macro->is_object = false;
 			while (true) {
-				auto arg_tok = get_next_token(tokens.span(), cursor);
+				auto arg_tok = grd_get_next_token(tokens.span(), cursor);
 				if (tok_str(arg_tok) == ")") {
 					*cursor += 1;
 					break;
@@ -1627,7 +1627,7 @@ Error* handle_prep_directive(Prep* p, TokenSlice tokens, s64* cursor) {
 					if (tok_str(arg_tok) != ",") {
 						return grd_make_prep_file_error(p, arg_tok, "Expected ',' after macro argument");
 					}
-					arg_tok = get_next_token(tokens.span(), cursor);
+					arg_tok = grd_get_next_token(tokens.span(), cursor);
 				}
 				if (arg_tok->kind != PREP_TOKEN_KIND_IDENT) {
 					return grd_make_prep_file_error(p, arg_tok, "Expected an identifier as a macro argument");
@@ -1649,7 +1649,7 @@ Error* handle_prep_directive(Prep* p, TokenSlice tokens, s64* cursor) {
 			if (macro_tok->kind == PREP_TOKEN_KIND_EOF || macro_tok->kind == PREP_TOKEN_KIND_LINE_BREAK) {
 				break;
 			} else if (macro_tok->kind == PREP_TOKEN_KIND_STRINGIZE) {
-				auto def_tok_idx = find_macro_arg_def_tok_idx(macro, tok_str(macro_tok)[{1, {}}]);
+				auto def_tok_idx = grd_find_macro_arg_def_tok_idx(macro, tok_str(macro_tok)[{1, {}}]);
 				if (def_tok_idx == -1) {
 					return grd_make_prep_file_error(p, macro_tok, "Macro argument is not found for stringizing");
 				}
@@ -1676,7 +1676,7 @@ Error* handle_prep_directive(Prep* p, TokenSlice tokens, s64* cursor) {
 	return NULL;
 }
 
-Error* preprocess_file(Prep* p, PrepFileSource* source_file) {
+Error* grd_preprocess_file(Prep* p, PrepFileSource* source_file) {
 	auto e = tokenize(p, source_file);
 	if (e) {
 		return e;
@@ -1726,7 +1726,7 @@ Error* preprocess_file(Prep* p, PrepFileSource* source_file) {
 Tuple<Error*, Prep*> preprocess(GrdUnicodeString str) {
 	auto p = grd_make_prep();
 	auto file = grd_make_mem_prep_file(p, str, U"<root_file>"_b);
-	auto e = preprocess_file(p, file);
+	auto e = grd_preprocess_file(p, file);
 	return { e, p };
 }
 

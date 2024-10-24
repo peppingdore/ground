@@ -82,7 +82,7 @@ int main() {
 	// grd_println(print_ast_node(program));
 
 	for (auto it: program->globals) {
-		if (auto f = grd_reflect_cast<AstFunction>(it)) {
+		if (auto f = grd_reflect_cast<GrdAstFunction>(it)) {
 			if (!f->block) {
 				continue;
 			}
@@ -104,7 +104,7 @@ int main() {
 				print_parser_error(e);
 				return -1;
 			}
-			print_ssa(ssa->entry);
+			grd_print_ssa(ssa->entry);
 
 			e = finalize_spirv(&m);
 			if (e) {

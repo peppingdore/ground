@@ -33,7 +33,7 @@ void print_expr(GrdAllocatedUnicodeString* sb, AstNode* expr) {
 		print_expr(sb, member_access->lhs);
 		grd_append(sb, ".");
 		grd_append(sb, member_access->member->name);
-	} else if (auto var_decl = grd_reflect_cast<AstVar>(expr)) {
+	} else if (auto var_decl = grd_reflect_cast<GrdAstVar>(expr)) {
 		grd_append(sb, var_decl->name);
 	} else if (auto literal = grd_reflect_cast<AstLiteralExpr>(expr)) {
 		auto any = grd_make_any(literal->lit_type, &literal->lit_value);
@@ -125,7 +125,7 @@ void print_stmt(GrdAllocatedUnicodeString* sb, AstNode* stmt) {
 		return print_for(sb, _for);
 	} else if (auto var_decl_group = grd_reflect_cast<AstVarDeclGroup>(stmt)) {
 		return print_var_decl_group(sb, var_decl_group);
-	} else if (auto expr = grd_reflect_cast<AstExpr>(stmt)) {
+	} else if (auto expr = grd_reflect_cast<GrdAstExpr>(stmt)) {
 		return print_expr(sb, expr);
 	} else {
 		grd_append(sb, "Unknown stmt type: ");
@@ -142,7 +142,7 @@ void print_block(GrdAllocatedUnicodeString* sb, AstBlock* block) {
 	grd_append(sb, "}");
 }
 
-void print_function(GrdAllocatedUnicodeString* sb, AstFunction* function) {
+void print_function(GrdAllocatedUnicodeString* sb, GrdAstFunction* function) {
 	grd_append(sb, function->return_ts->tp->name);
 	grd_append(sb, " ");
 	grd_append(sb, function->name);
@@ -169,7 +169,7 @@ void print_ast_node(GrdAllocatedUnicodeString* sb, AstNode* ast_node) {
 		return print_c_program(sb, program);
 	} else if (auto decl = grd_reflect_cast<AstVarDeclGroup>(ast_node)) {
 		return print_var_decl_group(sb, decl);
-	} else if (auto function = grd_reflect_cast<AstFunction>(ast_node)) {
+	} else if (auto function = grd_reflect_cast<GrdAstFunction>(ast_node)) {
 		return print_function(sb, function);
 	} else {
 		grd_append(sb, "Unknown node type: ");

@@ -42,9 +42,13 @@ enum class GrdSsaOp {
 	#define GRD_SSA_OP_WITH_VALUE(name, value) name = value,
 	#define GRD_SSA_OP(name) name,
 	GRD_SSA_OP_LIST
+	#undef GRD_SSA_OP_WITH_VALUE
+	#undef GRD_SSA_OP
 };
 GRD_REFLECT(GrdSsaOp) {
 	#define GRD_SSA_OP_WITH_VALUE(name, value) GRD_ENUM_VALUE(name);
 	#define GRD_SSA_OP(name) GRD_ENUM_VALUE(name);
 	GRD_SSA_OP_LIST
+	#undef GRD_SSA_OP_WITH_VALUE
+	#undef GRD_SSA_OP
 }
