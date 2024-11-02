@@ -10,89 +10,89 @@
 #include "../grd_panic.h"
 
 
-enum AstOperatorFlags {
-	AST_OP_FLAG_LEFT_ASSOC = 1 << 0,
-	AST_OP_FLAG_MOD_ASSIGN = 1 << 1,
-	AST_OP_FLAG_BOOL       = 1 << 3,
-	AST_OP_FLAG_INT        = 1 << 4,
-	AST_OP_FLAG_PRIMITIVE  = 1 << 5,
-	AST_OP_FLAG_NUMERIC    = 1 << 6,
-	AST_OP_FLAG_POSTFIX    = 1 << 7,
-	AST_OP_FLAG_PREFIX     = 1 << 8,
+enum GrdcAstOperatorFlags {
+	GRDC_AST_OP_FLAG_LEFT_ASSOC = 1 << 0,
+	GRDC_AST_OP_FLAG_MOD_ASSIGN = 1 << 1,
+	GRDC_AST_OP_FLAG_BOOL       = 1 << 3,
+	GRDC_AST_OP_FLAG_INT        = 1 << 4,
+	GRDC_AST_OP_FLAG_PRIMITIVE  = 1 << 5,
+	GRDC_AST_OP_FLAG_NUMERIC    = 1 << 6,
+	GRDC_AST_OP_FLAG_POSTFIX    = 1 << 7,
+	GRDC_AST_OP_FLAG_PREFIX     = 1 << 8,
 };
 
-struct AstOperator {
+struct GrdcAstOperator {
 	GrdUnicodeString op;
-	s32           prec;
-	s32           flags = 0;
+	s32              prec;
+	s32              flags = 0;
 
-	GRD_REFLECT(AstOperator) {
+	GRD_REFLECT(GrdcAstOperator) {
 		GRD_MEMBER(op);
 		GRD_MEMBER(prec);
 		GRD_MEMBER(flags);
 	}
 };
 
-AstOperator AST_BINARY_OPERATORS_UNSORTED[] = { 
-	{ U","_b, 10, AST_OP_FLAG_LEFT_ASSOC },
+GrdcAstOperator GRDC_AST_BINARY_OPERATORS_UNSORTED[] = { 
+	{ U","_b, 10, GRDC_AST_OP_FLAG_LEFT_ASSOC },
 	{ U"="_b, 11, 0 },
-	{ U"|="_b, 11, AST_OP_FLAG_MOD_ASSIGN },
-	{ U"^="_b, 11, AST_OP_FLAG_MOD_ASSIGN },
-	{ U"&="_b, 11, AST_OP_FLAG_MOD_ASSIGN },
-	{ U"<<="_b, 11, AST_OP_FLAG_MOD_ASSIGN },
-	{ U">>="_b, 11, AST_OP_FLAG_MOD_ASSIGN },
-	{ U"+="_b, 11, AST_OP_FLAG_MOD_ASSIGN },
-	{ U"-="_b, 11, AST_OP_FLAG_MOD_ASSIGN },
-	{ U"*="_b, 11, AST_OP_FLAG_MOD_ASSIGN },
-	{ U"/="_b, 11, AST_OP_FLAG_MOD_ASSIGN },
-	{ U"%="_b, 11, AST_OP_FLAG_MOD_ASSIGN },
+	{ U"|="_b, 11, GRDC_AST_OP_FLAG_MOD_ASSIGN },
+	{ U"^="_b, 11, GRDC_AST_OP_FLAG_MOD_ASSIGN },
+	{ U"&="_b, 11, GRDC_AST_OP_FLAG_MOD_ASSIGN },
+	{ U"<<="_b, 11, GRDC_AST_OP_FLAG_MOD_ASSIGN },
+	{ U">>="_b, 11, GRDC_AST_OP_FLAG_MOD_ASSIGN },
+	{ U"+="_b, 11, GRDC_AST_OP_FLAG_MOD_ASSIGN },
+	{ U"-="_b, 11, GRDC_AST_OP_FLAG_MOD_ASSIGN },
+	{ U"*="_b, 11, GRDC_AST_OP_FLAG_MOD_ASSIGN },
+	{ U"/="_b, 11, GRDC_AST_OP_FLAG_MOD_ASSIGN },
+	{ U"%="_b, 11, GRDC_AST_OP_FLAG_MOD_ASSIGN },
 	{ U"?"_b, 12, 0 },
-	{ U"||"_b, 13, AST_OP_FLAG_LEFT_ASSOC | AST_OP_FLAG_BOOL },
-	{ U"&&"_b, 14, AST_OP_FLAG_LEFT_ASSOC | AST_OP_FLAG_BOOL },
-	{ U"|"_b, 15, AST_OP_FLAG_LEFT_ASSOC | AST_OP_FLAG_INT },
-	{ U"^"_b, 16, AST_OP_FLAG_LEFT_ASSOC | AST_OP_FLAG_INT},
-	{ U"&"_b, 17, AST_OP_FLAG_LEFT_ASSOC | AST_OP_FLAG_INT},
-	{ U"=="_b, 18, AST_OP_FLAG_LEFT_ASSOC | AST_OP_FLAG_PRIMITIVE },
-	{ U"!="_b, 18, AST_OP_FLAG_LEFT_ASSOC | AST_OP_FLAG_PRIMITIVE},
-	{ U"<"_b, 19, AST_OP_FLAG_LEFT_ASSOC | AST_OP_FLAG_NUMERIC },
-	{ U">"_b, 19, AST_OP_FLAG_LEFT_ASSOC | AST_OP_FLAG_NUMERIC},
-	{ U"<="_b, 19, AST_OP_FLAG_LEFT_ASSOC },
-	{ U">="_b, 19, AST_OP_FLAG_LEFT_ASSOC },
-	{ U"<<"_b, 20, AST_OP_FLAG_LEFT_ASSOC | AST_OP_FLAG_INT },
-	{ U">>"_b, 20, AST_OP_FLAG_LEFT_ASSOC | AST_OP_FLAG_INT },
-	{ U"+"_b, 21, AST_OP_FLAG_LEFT_ASSOC | AST_OP_FLAG_NUMERIC },
-	{ U"-"_b, 21, AST_OP_FLAG_LEFT_ASSOC | AST_OP_FLAG_NUMERIC },
-	{ U"*"_b, 22, AST_OP_FLAG_LEFT_ASSOC | AST_OP_FLAG_NUMERIC },
-	{ U"/"_b, 22, AST_OP_FLAG_LEFT_ASSOC | AST_OP_FLAG_NUMERIC },
-	{ U"%"_b, 22, AST_OP_FLAG_LEFT_ASSOC | AST_OP_FLAG_INT },
+	{ U"||"_b, 13, GRDC_AST_OP_FLAG_LEFT_ASSOC | GRDC_AST_OP_FLAG_BOOL },
+	{ U"&&"_b, 14, GRDC_AST_OP_FLAG_LEFT_ASSOC | GRDC_AST_OP_FLAG_BOOL },
+	{ U"|"_b, 15, GRDC_AST_OP_FLAG_LEFT_ASSOC | GRDC_AST_OP_FLAG_INT },
+	{ U"^"_b, 16, GRDC_AST_OP_FLAG_LEFT_ASSOC | GRDC_AST_OP_FLAG_INT},
+	{ U"&"_b, 17, GRDC_AST_OP_FLAG_LEFT_ASSOC | GRDC_AST_OP_FLAG_INT},
+	{ U"=="_b, 18, GRDC_AST_OP_FLAG_LEFT_ASSOC | GRDC_AST_OP_FLAG_PRIMITIVE },
+	{ U"!="_b, 18, GRDC_AST_OP_FLAG_LEFT_ASSOC | GRDC_AST_OP_FLAG_PRIMITIVE},
+	{ U"<"_b, 19, GRDC_AST_OP_FLAG_LEFT_ASSOC | GRDC_AST_OP_FLAG_NUMERIC },
+	{ U">"_b, 19, GRDC_AST_OP_FLAG_LEFT_ASSOC | GRDC_AST_OP_FLAG_NUMERIC},
+	{ U"<="_b, 19, GRDC_AST_OP_FLAG_LEFT_ASSOC },
+	{ U">="_b, 19, GRDC_AST_OP_FLAG_LEFT_ASSOC },
+	{ U"<<"_b, 20, GRDC_AST_OP_FLAG_LEFT_ASSOC | GRDC_AST_OP_FLAG_INT },
+	{ U">>"_b, 20, GRDC_AST_OP_FLAG_LEFT_ASSOC | GRDC_AST_OP_FLAG_INT },
+	{ U"+"_b, 21, GRDC_AST_OP_FLAG_LEFT_ASSOC | GRDC_AST_OP_FLAG_NUMERIC },
+	{ U"-"_b, 21, GRDC_AST_OP_FLAG_LEFT_ASSOC | GRDC_AST_OP_FLAG_NUMERIC },
+	{ U"*"_b, 22, GRDC_AST_OP_FLAG_LEFT_ASSOC | GRDC_AST_OP_FLAG_NUMERIC },
+	{ U"/"_b, 22, GRDC_AST_OP_FLAG_LEFT_ASSOC | GRDC_AST_OP_FLAG_NUMERIC },
+	{ U"%"_b, 22, GRDC_AST_OP_FLAG_LEFT_ASSOC | GRDC_AST_OP_FLAG_INT },
 };
 
-AstOperator AST_PREFIX_UNARY_OPERATORS_UNSORTED[] = {
-	{ U"!"_b, 30, AST_OP_FLAG_PREFIX },
-	{ U"~"_b, 30, AST_OP_FLAG_PREFIX },
-	{ U"+"_b, 30, AST_OP_FLAG_PREFIX },
-	{ U"-"_b, 30, AST_OP_FLAG_PREFIX },
-	{ U"++"_b, 30, AST_OP_FLAG_PREFIX },
-	{ U"--"_b, 30, AST_OP_FLAG_PREFIX },
-	{ U"*"_b, 30, AST_OP_FLAG_PREFIX },
-	{ U"&"_b, 30, AST_OP_FLAG_PREFIX },
+GrdcAstOperator GRDC_AST_PREFIX_UNARY_OPERATORS_UNSORTED[] = {
+	{ U"!"_b, 30, GRDC_AST_OP_FLAG_PREFIX },
+	{ U"~"_b, 30, GRDC_AST_OP_FLAG_PREFIX },
+	{ U"+"_b, 30, GRDC_AST_OP_FLAG_PREFIX },
+	{ U"-"_b, 30, GRDC_AST_OP_FLAG_PREFIX },
+	{ U"++"_b, 30, GRDC_AST_OP_FLAG_PREFIX },
+	{ U"--"_b, 30, GRDC_AST_OP_FLAG_PREFIX },
+	{ U"*"_b, 30, GRDC_AST_OP_FLAG_PREFIX },
+	{ U"&"_b, 30, GRDC_AST_OP_FLAG_PREFIX },
 };
 
-AstOperator AST_POSTFIX_UNARY_OPERATORS_UNSORTED[] = {
-	{ U"++"_b, 40, AST_OP_FLAG_POSTFIX },
-	{ U"--"_b, 40, AST_OP_FLAG_POSTFIX },
+GrdcAstOperator GRDC_AST_POSTFIX_UNARY_OPERATORS_UNSORTED[] = {
+	{ U"++"_b, 40, GRDC_AST_OP_FLAG_POSTFIX },
+	{ U"--"_b, 40, GRDC_AST_OP_FLAG_POSTFIX },
 };
 
-enum CTokenFlags {
+enum GrdcTokenFlags {
 	CTOKEN_FLAG_FLOATING_POINT = 1 << 0,
 	CTOKEN_FLAG_INTEGER = 1 << 1,
 };
 
-struct ProgramTextRegion {
+struct GrdcProgramTextRegion {
 	s64 start  = 0;
 	s64 end    = 0;
 
-	GRD_REFLECT(ProgramTextRegion) {
+	GRD_REFLECT(GrdcProgramTextRegion) {
 		GRD_MEMBER(start);
 		GRD_MEMBER(end);
 	}
@@ -100,50 +100,50 @@ struct ProgramTextRegion {
 
 struct GrdcToken {
 	GrdUnicodeString     str;
-	ProgramTextRegion reg;
+	GrdcProgramTextRegion reg;
 	u32               flags = 0;
 };
 
-struct CLikeProgram;
-struct AstNode;
-struct GrdAstPrimitiveType;
-struct GrdAstStructType;
-struct GrdAstType;
+struct GrdcProgram;
+struct GrdcAstNode;
+struct GrdcAstPrimitiveType;
+struct GrdcAstStructType;
+struct GrdcAstType;
 
-struct GrdCcParser {
-	GrdAllocator            allocator;
-	CLikeProgram*        program;
-	GrdArray<AstNode*>      scope;
-	GrdUnicodeString        str;
-	s64                  cursor = 0;
-	GrdcToken                current_token;
-	GrdArray<GrdUnicodeString> op_tokens_sorted;
-	GrdHashMap<GrdAstType*, GrdAstType*> ptr_types;
+struct GrdcParser {
+	GrdAllocator                           allocator;
+	GrdcProgram*                           program;
+	GrdArray<GrdcAstNode*>                 scope;
+	GrdUnicodeString                       str;
+	s64                                    cursor = 0;
+	GrdcToken                              current_token;
+	GrdArray<GrdUnicodeString>             op_tokens_sorted;
+	GrdHashMap<GrdcAstType*, GrdcAstType*> ptr_types;
 
-	GrdAstPrimitiveType*    void_tp = NULL;
-	GrdAstPrimitiveType*    bool_tp = NULL;
-	GrdAstPrimitiveType*    s8_tp = NULL;
-	GrdAstPrimitiveType*    u8_tp = NULL;
-	GrdAstPrimitiveType*    s16_tp = NULL;
-	GrdAstPrimitiveType*    u16_tp = NULL;
-	GrdAstPrimitiveType*    s32_tp = NULL;
-	GrdAstPrimitiveType*    u32_tp = NULL;
-	GrdAstPrimitiveType*    s64_tp = NULL;
-	GrdAstPrimitiveType*    u64_tp = NULL;
-	GrdAstPrimitiveType*    f32_tp = NULL;
-	GrdAstPrimitiveType*    f64_tp = NULL;
+	GrdcAstPrimitiveType*    void_tp = NULL;
+	GrdcAstPrimitiveType*    bool_tp = NULL;
+	GrdcAstPrimitiveType*    s8_tp = NULL;
+	GrdcAstPrimitiveType*    u8_tp = NULL;
+	GrdcAstPrimitiveType*    s16_tp = NULL;
+	GrdcAstPrimitiveType*    u16_tp = NULL;
+	GrdcAstPrimitiveType*    s32_tp = NULL;
+	GrdcAstPrimitiveType*    u32_tp = NULL;
+	GrdcAstPrimitiveType*    s64_tp = NULL;
+	GrdcAstPrimitiveType*    u64_tp = NULL;
+	GrdcAstPrimitiveType*    f32_tp = NULL;
+	GrdcAstPrimitiveType*    f64_tp = NULL;
 
-	GrdAstStructType*       float2_tp = NULL;
-	GrdAstStructType*       float3_tp = NULL;
-	GrdAstStructType*       float4_tp = NULL;
+	GrdcAstStructType*       float2_tp = NULL;
+	GrdcAstStructType*       float3_tp = NULL;
+	GrdcAstStructType*       float4_tp = NULL;
 };
 
-struct AstNode {
-	Type*                       type;
-	GrdCcParser*                p = NULL;
-	GrdOptional<ProgramTextRegion> text_region;
+struct GrdcAstNode {
+	GrdType*                           type;
+	GrdcParser*                        p = NULL;
+	GrdOptional<GrdcProgramTextRegion> text_region;
 
-	GRD_REFLECT(AstNode) {
+	GRD_REFLECT(GrdcAstNode) {
 		GRD_MEMBER(p);
 		GRD_MEMBER(type);
 			GRD_TAG(GrdRealTypeMember{});
@@ -152,7 +152,7 @@ struct AstNode {
 };
 
 template <typename T>
-T* grd_make_ast_node(GrdCcParser* p, GrdOptional<ProgramTextRegion> text_region) {
+T* grdc_make_ast_node(GrdcParser* p, GrdOptional<GrdcProgramTextRegion> text_region) {
 	auto x = grd_make<T>(p->allocator);
 	x->type = grd_reflect_type_of<T>();
 	x->p = p;
@@ -160,29 +160,29 @@ T* grd_make_ast_node(GrdCcParser* p, GrdOptional<ProgramTextRegion> text_region)
 	return x;
 }
 
-struct AstSymbol: AstNode {
+struct GrdcAstSymbol: GrdcAstNode {
 	GrdUnicodeString name;
-	bool          is_global = false;
+	bool             is_global = false;
 
-	GRD_REFLECT(AstSymbol) {
-		GRD_BASE_TYPE(AstNode);
+	GRD_REFLECT(GrdcAstSymbol) {
+		GRD_BASE_TYPE(GrdcAstNode);
 		GRD_MEMBER(name);
 		GRD_MEMBER(is_global);
 	}
 };
 
-struct GrdAstType: AstSymbol {
+struct GrdcAstType: GrdcAstSymbol {
 	u64 size = 0;
 	u64 alignment = 0;
 
-	GRD_REFLECT(GrdAstType) {
-		GRD_BASE_TYPE(AstSymbol);
+	GRD_REFLECT(GrdcAstType) {
+		GRD_BASE_TYPE(GrdcAstSymbol);
 		GRD_MEMBER(size);
 		GRD_MEMBER(alignment);
 	}
 };
 
-enum class MetalAddrSpace {
+enum class GrdcMetalAddrSpace {
 	Unspecified = 0,
 	Device = 1,
 	Constant = 2,
@@ -192,7 +192,7 @@ enum class MetalAddrSpace {
 	// RayData = 5,
 	// ObjectData = 6,
 };
-GRD_REFLECT(MetalAddrSpace) {
+GRD_REFLECT(GrdcMetalAddrSpace) {
 	GRD_ENUM_VALUE(Unspecified);
 	GRD_ENUM_VALUE(Device);
 	GRD_ENUM_VALUE(Constant);
@@ -203,14 +203,14 @@ GRD_REFLECT(MetalAddrSpace) {
 	// GRD_ENUM_VALUE(ObjectData);
 }
 
-enum class VulkanStorageClass {
+enum class GrdcVulkanStorageClass {
 	Unspecified = 0,
 	Private = 1,
 	Uniform = 2,
 	Input = 3,
 	PushConstant = 4,
 };
-GRD_REFLECT(VulkanStorageClass) {
+GRD_REFLECT(GrdcVulkanStorageClass) {
 	GRD_ENUM_VALUE(Unspecified);
 	GRD_ENUM_VALUE(Private);
 	GRD_ENUM_VALUE(Uniform);
@@ -218,119 +218,119 @@ GRD_REFLECT(VulkanStorageClass) {
 	GRD_ENUM_VALUE(PushConstant);
 }
 
-struct GrdAstExpr: AstNode {
-	GrdAstType* expr_type = NULL;
-	bool     is_lvalue = false;
+struct GrdcAstExpr: GrdcAstNode {
+	GrdcAstType* expr_type = NULL;
+	bool         is_lvalue = false;
 
-	GRD_REFLECT(GrdAstExpr) {
-		GRD_BASE_TYPE(AstNode);
+	GRD_REFLECT(GrdcAstExpr) {
+		GRD_BASE_TYPE(GrdcAstNode);
 		GRD_MEMBER(expr_type);
 		GRD_MEMBER(is_lvalue);
 	}
 };
 
-constexpr bool AST_EXPR_LVALUE = true;
-constexpr bool AST_EXPR_RVALUE = false;
+constexpr bool GRDC_AST_EXPR_LVALUE = true;
+constexpr bool GRDC_AST_EXPR_RVALUE = false;
 
 template <typename T>
-T* grd_make_ast_expr(GrdCcParser* p, GrdAstType* expr_type, bool is_lvalue, GrdOptional<ProgramTextRegion> text_region) {
-	auto x = grd_make_ast_node<T>(p, text_region);
+T* grdc_make_ast_expr(GrdcParser* p, GrdcAstType* expr_type, bool is_lvalue, GrdOptional<GrdcProgramTextRegion> text_region) {
+	auto x = grdc_make_ast_node<T>(p, text_region);
 	if (!expr_type) {
-		panic("expr_type must be non-null");
+		grd_panic("expr_type must be non-null");
 	}
 	x->expr_type = expr_type;
 	x->is_lvalue = is_lvalue;
 	return x;
 }
 
-struct AstBlock: AstNode {
-	GrdArray<AstNode*> statements;
+struct GrdcAstBlock: GrdcAstNode {
+	GrdArray<GrdcAstNode*> statements;
 
-	GRD_REFLECT(AstBlock) {
-		GRD_BASE_TYPE(AstNode);
+	GRD_REFLECT(GrdcAstBlock) {
+		GRD_BASE_TYPE(GrdcAstNode);
 		GRD_MEMBER(statements);
 	}
 };
 
 
-struct CLikeProgram: AstNode {
-	GrdArray<AstNode*>   globals; // Main diff between globals and global_syms is var decl groups vs var decls.
-	GrdArray<AstSymbol*> global_syms;
+struct GrdcProgram: GrdcAstNode {
+	GrdArray<GrdcAstNode*>   globals; // Main diff between globals and global_syms is var decl groups vs var decls.
+	GrdArray<GrdcAstSymbol*> global_syms;
 
-	GRD_REFLECT(CLikeProgram) {
-		GRD_BASE_TYPE(AstNode);
+	GRD_REFLECT(GrdcProgram) {
+		GRD_BASE_TYPE(GrdcAstNode);
 		GRD_MEMBER(globals);
 		GRD_MEMBER(global_syms);
 	}
 };
 
-struct GrdAstPrimitiveType: GrdAstType {
+struct GrdcAstPrimitiveType: GrdcAstType {
 	GrdPrimitiveType* c_tp = NULL;
-	bool           is_signed = false;
+	bool              is_signed = false;
 
-	GRD_REFLECT(GrdAstPrimitiveType) {
-		GRD_BASE_TYPE(GrdAstType);
+	GRD_REFLECT(GrdcAstPrimitiveType) {
+		GRD_BASE_TYPE(GrdcAstType);
 		GRD_MEMBER(c_tp);
 		GRD_MEMBER(is_signed);
 	}
 };
 
 
-struct AstTypeSite;
+struct GrdcAstTypeSite;
 
-struct GrdAstVar: AstSymbol {
-	AstTypeSite* var_ts = NULL;
+struct GrdcAstVar: GrdcAstSymbol {
+	GrdcAstTypeSite* var_ts = NULL;
 	
-	GRD_REFLECT(GrdAstVar) {
-		GRD_BASE_TYPE(AstSymbol);
+	GRD_REFLECT(GrdcAstVar) {
+		GRD_BASE_TYPE(GrdcAstSymbol);
 		GRD_MEMBER(var_ts);
 	}
 };
 
-struct ShaderIntrinVar: GrdAstVar {
+struct GrdcShaderIntrinVar: GrdcAstVar {
 
-	GRD_REFLECT(ShaderIntrinVar) {
-		GRD_BASE_TYPE(GrdAstVar);
+	GRD_REFLECT(GrdcShaderIntrinVar) {
+		GRD_BASE_TYPE(GrdcAstVar);
 	}
 };
 
-struct GrdAstAttr;
+struct GrdcAstAttr;
 
-struct GrdAstFunctionArg: GrdAstVar {
-	GrdArray<GrdAstAttr*> attrs;
+struct GrdcAstFunctionArg: GrdcAstVar {
+	GrdArray<GrdcAstAttr*> attrs;
 
-	GRD_REFLECT(GrdAstFunctionArg) {
-		GRD_BASE_TYPE(GrdAstVar);
+	GRD_REFLECT(GrdcAstFunctionArg) {
+		GRD_BASE_TYPE(GrdcAstVar);
 		GRD_MEMBER(attrs);
 	}
 };
 
-enum class GrdAstFunctionKind {
+enum class GrdcAstFunctionKind {
 	Plain = 1,
 	Vertex = 2,
 	Fragment = 3,
 };
-GRD_REFLECT(GrdAstFunctionKind) {
+GRD_REFLECT(GrdcAstFunctionKind) {
 	GRD_ENUM_VALUE(Plain);
 	GRD_ENUM_VALUE(Vertex);
 	GRD_ENUM_VALUE(Fragment);
 }
 
-struct MtlBufferIdxAttr;
-struct VkSetBindingAttr;
+struct GrdcMtlBufferIdxAttr;
+struct GrdcVkSetBindingAttr;
 
-struct GrdAstFunction: AstSymbol {
-	AstTypeSite*           return_ts = NULL; 
-	GrdArray<GrdAstFunctionArg*> args;
-	GrdArray<GrdAstAttr*>        attrs;
-	GrdAstFunctionKind        kind = GrdAstFunctionKind::Plain;
-	AstBlock*              block = NULL;
-	GrdAstFunctionArg*        stage_in_arg = NULL;
-	GrdArray<MtlBufferIdxAttr*> mtl_buffers;
-	GrdArray<VkSetBindingAttr*> vk_set_bindings;
+struct GrdcAstFunction: GrdcAstSymbol {
+	GrdcAstTypeSite*                return_ts = NULL; 
+	GrdArray<GrdcAstFunctionArg*>   args;
+	GrdArray<GrdcAstAttr*>          attrs;
+	GrdcAstFunctionKind             kind = GrdcAstFunctionKind::Plain;
+	GrdcAstBlock*                   block = NULL;
+	GrdcAstFunctionArg*             stage_in_arg = NULL;
+	GrdArray<GrdcMtlBufferIdxAttr*> mtl_buffers;
+	GrdArray<GrdcVkSetBindingAttr*> vk_set_bindings;
 
-	GRD_REFLECT(GrdAstFunction) {
-		GRD_BASE_TYPE(AstSymbol);
+	GRD_REFLECT(GrdcAstFunction) {
+		GRD_BASE_TYPE(GrdcAstSymbol);
 		GRD_MEMBER(return_ts);
 		GRD_MEMBER(args);
 		GRD_MEMBER(attrs);
@@ -343,40 +343,40 @@ struct GrdAstFunction: AstSymbol {
 };
 
 template <typename T>
-T* grd_make_ast_symbol(GrdCcParser* p, GrdUnicodeString name, GrdOptional<ProgramTextRegion> text_region) {
-	auto node = grd_make_ast_node<T>(p, text_region);
+T* grdc_make_ast_symbol(GrdcParser* p, GrdUnicodeString name, GrdOptional<GrdcProgramTextRegion> text_region) {
+	auto node = grdc_make_ast_node<T>(p, text_region);
 	node->name = name;
 	return node;
 }
 
-struct AstUnaryExpr: GrdAstExpr {
-	GrdAstExpr*      expr;
-	AstOperator*  op;
+struct GrdcAstUnaryExpr: GrdcAstExpr {
+	GrdcAstExpr*      expr;
+	GrdcAstOperator*  op;
 
-	GRD_REFLECT(AstUnaryExpr) {
-		GRD_BASE_TYPE(GrdAstExpr);
+	GRD_REFLECT(GrdcAstUnaryExpr) {
+		GRD_BASE_TYPE(GrdcAstExpr);
 		GRD_MEMBER(expr);
 		GRD_MEMBER(op);
 	}
 };
 
-struct AstDerefExpr: GrdAstExpr {
-	GrdAstExpr* lhs;
+struct GrdcAstDerefExpr: GrdcAstExpr {
+	GrdcAstExpr* lhs;
 
-	GRD_REFLECT(AstDerefExpr) {
-		GRD_BASE_TYPE(GrdAstExpr);
+	GRD_REFLECT(GrdcAstDerefExpr) {
+		GRD_BASE_TYPE(GrdcAstExpr);
 		GRD_MEMBER(lhs);
 	}
 };
 
-struct AstBinaryExpr: GrdAstExpr {
-	GrdAstExpr*      lhs = NULL;
-	GrdAstExpr*      rhs = NULL;
-	AstOperator*  op = NULL;
-	AstOperator*  pure_op = NULL;
+struct GrdcAstBinaryExpr: GrdcAstExpr {
+	GrdcAstExpr*      lhs = NULL;
+	GrdcAstExpr*      rhs = NULL;
+	GrdcAstOperator*  op = NULL;
+	GrdcAstOperator*  pure_op = NULL;
 
-	GRD_REFLECT(AstBinaryExpr) {
-		GRD_BASE_TYPE(GrdAstExpr);
+	GRD_REFLECT(GrdcAstBinaryExpr) {
+		GRD_BASE_TYPE(GrdcAstExpr);
 		GRD_MEMBER(lhs);
 		GRD_MEMBER(rhs);
 		GRD_MEMBER(op);
@@ -384,37 +384,37 @@ struct AstBinaryExpr: GrdAstExpr {
 	}
 };
 
-struct GrdAstVarDecl: GrdAstVar { 
-	GrdAstExpr*      init = NULL;
+struct GrdcAstVarDecl: GrdcAstVar { 
+	GrdcAstExpr*      init = NULL;
 
-	GRD_REFLECT(GrdAstVarDecl) {
-		GRD_BASE_TYPE(GrdAstVar);
+	GRD_REFLECT(GrdcAstVarDecl) {
+		GRD_BASE_TYPE(GrdcAstVar);
 		GRD_MEMBER(init);
 	}
 };
 
 
-struct AstVarDeclGroup: AstNode {
-	GrdArray<GrdAstVarDecl*> var_decls;
+struct GrdcAstVarDeclGroup: GrdcAstNode {
+	GrdArray<GrdcAstVarDecl*> var_decls;
 
-	GRD_REFLECT(AstVarDeclGroup) {
-		GRD_BASE_TYPE(AstNode);
+	GRD_REFLECT(GrdcAstVarDeclGroup) {
+		GRD_BASE_TYPE(GrdcAstNode);
 		GRD_MEMBER(var_decls);
 	}
 };
 
-struct GrdAstStructType;
-struct GrdAstAttr;
+struct GrdcAstStructType;
+struct GrdcAstAttr;
 
-struct AstStructMember: AstNode {
-	GrdAstStructType*  struct_type = NULL;
-	AstTypeSite*    member_ts = NULL;
-	GrdUnicodeString   name;
-	s64             offset = 0;
-	GrdArray<GrdAstAttr*> attrs;
+struct GrdcAstStructMember: GrdcAstNode {
+	GrdcAstStructType*     struct_type = NULL;
+	GrdcAstTypeSite*       member_ts = NULL;
+	GrdUnicodeString       name;
+	s64                    offset = 0;
+	GrdArray<GrdcAstAttr*> attrs;
 
-	GRD_REFLECT(AstStructMember) {
-		GRD_BASE_TYPE(AstNode);
+	GRD_REFLECT(GrdcAstStructMember) {
+		GRD_BASE_TYPE(GrdcAstNode);
 		GRD_MEMBER(struct_type);
 		GRD_MEMBER(member_ts);
 		GRD_MEMBER(name);
@@ -423,56 +423,56 @@ struct AstStructMember: AstNode {
 	}
 };
 
-struct GrdAstStructType: GrdAstType {
-	GrdArray<AstStructMember*> members;
+struct GrdcAstStructType: GrdcAstType {
+	GrdArray<GrdcAstStructMember*> members;
 
-	GRD_REFLECT(GrdAstStructType) {
-		GRD_BASE_TYPE(GrdAstType);
+	GRD_REFLECT(GrdcAstStructType) {
+		GRD_BASE_TYPE(GrdcAstType);
 		GRD_MEMBER(members);
 	}
 };
 
-struct AstVarMemberAccess: GrdAstExpr {
-	GrdAstExpr*         lhs;
-	AstStructMember* member;
+struct GrdcAstVarMemberAccess: GrdcAstExpr {
+	GrdcAstExpr*         lhs;
+	GrdcAstStructMember* member;
 
-	GRD_REFLECT(AstVarMemberAccess) {
-		GRD_BASE_TYPE(GrdAstExpr);
+	GRD_REFLECT(GrdcAstVarMemberAccess) {
+		GRD_BASE_TYPE(GrdcAstExpr);
 		GRD_MEMBER(lhs);
 		GRD_MEMBER(member);
 	}
 };
 
-struct AstGrdArrayAccess: GrdAstExpr {
-	GrdAstExpr*      lhs;
-	GrdAstExpr*      index;
+struct GrdcAstGrdArrayAccess: GrdcAstExpr {
+	GrdcAstExpr*      lhs;
+	GrdcAstExpr*      index;
 
-	GRD_REFLECT(AstGrdArrayAccess) {
-		GRD_BASE_TYPE(GrdAstExpr);
+	GRD_REFLECT(GrdcAstGrdArrayAccess) {
+		GRD_BASE_TYPE(GrdcAstExpr);
 		GRD_MEMBER(lhs);
 		GRD_MEMBER(index);
 	}
 };
 
-struct AstLiteralExpr: GrdAstExpr {
+struct GrdcAstLiteralExpr: GrdcAstExpr {
 	GrdPrimitiveType* lit_type = NULL;
-	GrdPrimitiveValue lit_value = {};
+	GrdPrimitiveValue  lit_value = {};
 };
 
-struct GrdAstAttr: AstNode {
+struct GrdcAstAttr: GrdcAstNode {
 	GrdUnicodeString   name;
-	GrdArray<GrdAstExpr*> args;
+	GrdArray<GrdcAstExpr*> args;
 	bool            is_used = false;
 
-	GRD_REFLECT(GrdAstAttr) {
-		GRD_BASE_TYPE(AstNode);
+	GRD_REFLECT(GrdcAstAttr) {
+		GRD_BASE_TYPE(GrdcAstNode);
 		GRD_MEMBER(name);
 		GRD_MEMBER(args);
 		GRD_MEMBER(is_used);
 	}
 };
 
-GrdcToken set_current_token(GrdCcParser* p, s64 end, u32 flags = 0) {
+GrdcToken grdc_set_current_token(GrdcParser* p, s64 end, u32 flags = 0) {
 	grd_defer { p->cursor = end; };
 	GrdcToken tok = {
 		.str = p->str[p->cursor, end],
@@ -483,7 +483,7 @@ GrdcToken set_current_token(GrdCcParser* p, s64 end, u32 flags = 0) {
 	return tok;
 }
 
-s64 maybe_eat_floating_point_literal(GrdCcParser* p) {
+s64 grdc_maybe_eat_floating_point_literal(GrdcParser* p) {
 	s64 start = p->cursor;
 	s64 c = p->cursor;
 	
@@ -549,7 +549,7 @@ s64 maybe_eat_floating_point_literal(GrdCcParser* p) {
 	return c;
 }
 
-s64 maybe_eat_integer_literal(GrdCcParser* p) {
+s64 grdc_maybe_eat_integer_literal(GrdcParser* p) {
 	auto start = p->str[p->cursor, {}];
 
 	s32 prefix_len = 0;
@@ -566,7 +566,7 @@ s64 maybe_eat_integer_literal(GrdCcParser* p) {
 		prefix_len = 2;
 	}
 
-	for (auto i: range_from_to(p->cursor + prefix_len, grd_len(p->str))) {
+	for (auto i: grd_range_from_to(p->cursor + prefix_len, grd_len(p->str))) {
 		if (p->str[i] >= '0' && p->str[i] <= '9') {
 			continue;
 		}
@@ -583,72 +583,72 @@ s64 maybe_eat_integer_literal(GrdCcParser* p) {
 	return prefix_len > 0 ? grd_len(p->str) : 0;
 }
 
-GrdcToken next(GrdCcParser* p) {
-	for (auto i: range_from_to(p->cursor, grd_len(p->str))) {
+GrdcToken grdc_next(GrdcParser* p) {
+	for (auto i: grd_range_from_to(p->cursor, grd_len(p->str))) {
 		if (grd_is_whitespace(p->str[i])) {
 			if (p->cursor < i) {
-				return set_current_token(p, i);
+				return grdc_set_current_token(p, i);
 			} else {
 				p->cursor = i + 1;
 				continue;
 			}
 		}
 
-		s64 fp_end = maybe_eat_floating_point_literal(p);
+		s64 fp_end = grdc_maybe_eat_floating_point_literal(p);
 		if (fp_end != 0) {
-			return set_current_token(p, fp_end, CTOKEN_FLAG_FLOATING_POINT);
+			return grdc_set_current_token(p, fp_end, CTOKEN_FLAG_FLOATING_POINT);
 		}
 
-		s64 int_end = maybe_eat_integer_literal(p);
+		s64 int_end = grdc_maybe_eat_integer_literal(p);
 		if (int_end != 0) {
-			return set_current_token(p, int_end, CTOKEN_FLAG_INTEGER);
+			return grdc_set_current_token(p, int_end, CTOKEN_FLAG_INTEGER);
 		}
 
 		for (auto c: {',',';','/','.','-','=','(',')','?',':','+','*','-','<','>', '[', ']', '&'}) {
 			if (p->str[i] == c) {
 				if (p->cursor < i) {
-					return set_current_token(p, i);
+					return grdc_set_current_token(p, i);
 				} else {
 					// parse multichar operators.
 					auto txt = p->str[i, {}];
 					for (auto it: p->op_tokens_sorted) {
 						if (grd_starts_with(txt, it)) {
-							return set_current_token(p, i + grd_len(it));
+							return grdc_set_current_token(p, i + grd_len(it));
 						}
 					}
-					return set_current_token(p, i + 1);
+					return grdc_set_current_token(p, i + 1);
 				}
 			}
 		}
 	}
-	return set_current_token(p, grd_len(p->str));
+	return grdc_set_current_token(p, grd_len(p->str));
 }
 
-GrdcToken peek(GrdCcParser* p) {
+GrdcToken grdc_peek(GrdcParser* p) {
 	if (grd_len(p->current_token.str) == 0) {
-		return next(p);
+		return grdc_next(p);
 	}
 	return p->current_token;
 }
 
-struct PrepComment {
+struct GrdcPrepComment {
 	s64 start = 0;
 	s64 end   = 0;
 
-	GRD_REFLECT(PrepComment) {
+	GRD_REFLECT(GrdcPrepComment) {
 		GRD_MEMBER(start);
 		GRD_MEMBER(end);
 	}
 };
 
-struct Preprocessor;
+struct GrdcPreprocessor;
 
-struct PrepNode {
-	Type*         type = NULL;
-	Preprocessor* pp = NULL;
-	PrepNode*     parent = NULL;
+struct GrdcPrepNode {
+	GrdType*             type = NULL;
+	GrdcPreprocessor* pp = NULL;
+	GrdcPrepNode*     parent = NULL;
 
-	GRD_REFLECT(PrepNode) {
+	GRD_REFLECT(GrdcPrepNode) {
 		GRD_MEMBER(type); GRD_TAG(GrdRealTypeMember{});
 		GRD_MEMBER(pp);
 		GRD_MEMBER(parent);
@@ -656,48 +656,48 @@ struct PrepNode {
 };
 
 template <typename T>
-T* grd_make_prep_node(Preprocessor* pp) {
+T* grdc_make_prep_node(GrdcPreprocessor* pp) {
 	auto node = grd_make<T>(pp->allocator);
 	node->type = grd_reflect_type_of<T>();
 	node->pp = pp;
 	return node;
 }
 
-struct PrepFile {
+struct GrdcPrepFile {
 	GrdUnicodeString path;
 	GrdUnicodeString str;
 };
 
-struct PrepFileNode: PrepNode {
-	PrepFile* file = NULL;
-	s64       file_offset = 0;
+struct GrdcPrepFileNode: GrdcPrepNode {
+	GrdcPrepFile* file = NULL;
+	s64           file_offset = 0;
 
-	GRD_REFLECT(PrepFileNode) {
-		GRD_BASE_TYPE(PrepNode);
+	GRD_REFLECT(GrdcPrepFileNode) {
+		GRD_BASE_TYPE(GrdcPrepNode);
 		GRD_MEMBER(file);
 		GRD_MEMBER(file_offset);
 	}
 };
 
-struct PrepNodeReg {
-	PrepNode* node = NULL;
+struct GrdcPrepNodeReg {
+	GrdcPrepNode* node = NULL;
 	s64       start = 0;
 	s64       end = -1;
 };
 
-struct Preprocessor {
+struct GrdcPreprocessor {
 	GrdAllocator              allocator;
 	GrdAllocatedUnicodeString pr;
-	GrdArray<PrepNode*>       scope;
-	GrdArray<PrepFile*>       files;
-	GrdArray<PrepNodeReg*>    regs;
+	GrdArray<GrdcPrepNode*>       scope;
+	GrdArray<GrdcPrepFile*>       files;
+	GrdArray<GrdcPrepNodeReg*>    regs;
 };
 
-void push_reg(Preprocessor* pp) {
+void grdc_push_reg(GrdcPreprocessor* pp) {
 	if (grd_len(pp->scope) == 0) {
 		return;
 	}
-	auto reg = grd_make<PrepNodeReg>(pp->allocator);
+	auto reg = grd_make<GrdcPrepNodeReg>(pp->allocator);
 	reg->node = pp->scope[-1];
 	reg->start = grd_len(pp->pr);
 	while (grd_len(pp->regs) > 0) {
@@ -712,30 +712,30 @@ void push_reg(Preprocessor* pp) {
 	grd_add(&pp->regs, reg);
 }
 
-void push_scope(Preprocessor* pp, PrepNode* node) {
+void grdc_push_scope(GrdcPreprocessor* pp, GrdcPrepNode* node) {
 	if (grd_len(pp->scope) > 0) {
 		assert(node->parent == NULL);
 		node->parent = pp->scope[-1];
 	}
 	grd_add(&pp->scope, node);
-	push_reg(pp);
+	grdc_push_reg(pp);
 }
 
-void grd_pop_scope(Preprocessor* pp) {
+void grdc_pop_scope(GrdcPreprocessor* pp) {
 	grd_pop(&pp->scope);
-	push_reg(pp);
+	grdc_push_reg(pp);
 }
 
-Error* prep_file(Preprocessor* pp, GrdUnicodeString str, GrdUnicodeString path) {
-	auto file = grd_make<PrepFile>(pp->allocator);
+GrdError* grdc_prep_file(GrdcPreprocessor* pp, GrdUnicodeString str, GrdUnicodeString path) {
+	auto file = grd_make<GrdcPrepFile>(pp->allocator);
 	file->path = path;
 	file->str = str;
 	grd_add(&pp->files, file);
 
-	auto node = grd_make_prep_node<PrepFileNode>(pp);
+	auto node = grdc_make_prep_node<GrdcPrepFileNode>(pp);
 	node->file = file;
 	node->file_offset = 0;
-	push_scope(pp, node);
+	grdc_push_scope(pp, node);
 
 	s64 cursor = 0;
 	while (cursor < grd_len(str)) {
@@ -743,24 +743,24 @@ Error* prep_file(Preprocessor* pp, GrdUnicodeString str, GrdUnicodeString path) 
 		if (grd_starts_with(remaining, "//")) {
 			s64 start = cursor;
 			s64 end = grd_len(str);
-			for (auto i: range_from_to(cursor, grd_len(str))) {
+			for (auto i: grd_range_from_to(cursor, grd_len(str))) {
 				if (grd_is_line_break(str[i])) {
 					end = i;
 					break;
 				}
 			}
 			cursor = end;
-			grd_pop_scope(pp);
-			auto comment_node = grd_make_prep_node<PrepFileNode>(pp);
+			grdc_pop_scope(pp);
+			auto comment_node = grdc_make_prep_node<GrdcPrepFileNode>(pp);
 			comment_node->file = file;
 			comment_node->file_offset = start;
-			push_scope(pp, comment_node);
+			grdc_push_scope(pp, comment_node);
 			grd_add(&pp->pr, ' ');
-			grd_pop_scope(pp);
-			auto new_node = grd_make_prep_node<PrepFileNode>(pp);
+			grdc_pop_scope(pp);
+			auto new_node = grdc_make_prep_node<GrdcPrepFileNode>(pp);
 			new_node->file = file;
 			new_node->file_offset = end;
-			push_scope(pp, new_node);
+			grdc_push_scope(pp, new_node);
 			continue;
 		}
 		if (grd_starts_with(remaining, "/*")) {
@@ -795,8 +795,8 @@ Error* prep_file(Preprocessor* pp, GrdUnicodeString str, GrdUnicodeString path) 
 	return NULL;
 }
 
-Preprocessor* grd_make_preprocessor(GrdAllocator allocator) {
-	auto pp = grd_make<Preprocessor>(allocator);
+GrdcPreprocessor* grdc_make_preprocessor(GrdAllocator allocator) {
+	auto pp = grd_make<GrdcPreprocessor>(allocator);
 	pp->allocator = allocator;
 	pp->pr.allocator = allocator;
 	pp->files.allocator = allocator;
@@ -805,14 +805,14 @@ Preprocessor* grd_make_preprocessor(GrdAllocator allocator) {
 	return pp;
 }
 
-GrdGenerator<AstSymbol*> resolve_symbols(AstNode* node) {
-	if (auto sym = grd_reflect_cast<AstSymbol>(node)) {
+GrdGenerator<GrdcAstSymbol*> grdc_resolve_symbols(GrdcAstNode* node) {
+	if (auto sym = grd_reflect_cast<GrdcAstSymbol>(node)) {
 		co_yield sym;
 		co_return;
 	}
-	if (auto var_decl_group = grd_reflect_cast<AstVarDeclGroup>(node)) {
+	if (auto var_decl_group = grd_reflect_cast<GrdcAstVarDeclGroup>(node)) {
 		for (auto it: var_decl_group->var_decls) {
-			auto gen = resolve_symbols(it);
+			auto gen = grdc_resolve_symbols(it);
 			for (auto sym: gen) {
 				co_yield sym;
 			}
@@ -820,28 +820,28 @@ GrdGenerator<AstSymbol*> resolve_symbols(AstNode* node) {
 	}
 }
 
-AstNode* lookup_symbol(GrdCcParser* p, GrdUnicodeString name) {
+GrdcAstNode* grdc_lookup_symbol(GrdcParser* p, GrdUnicodeString name) {
 	for (auto i: grd_reverse(grd_range(grd_len(p->scope)))) { 
 		auto scope = p->scope[i];
-		if (auto program = grd_reflect_cast<CLikeProgram>(scope)) {
+		if (auto program = grd_reflect_cast<GrdcProgram>(scope)) {
 			for (auto child: program->globals) {
-				for (auto sym: resolve_symbols(child)) {
+				for (auto sym: grdc_resolve_symbols(child)) {
 					if (sym->name == name) {
 						return sym;
 					}
 				}
 			}
 		}
-		if (auto block = grd_reflect_cast<AstBlock>(scope)) {
+		if (auto block = grd_reflect_cast<GrdcAstBlock>(scope)) {
 			for (auto child: block->statements) {
-				for (auto sym: resolve_symbols(child)) {
+				for (auto sym: grdc_resolve_symbols(child)) {
 					if (sym->name == name) {
 						return sym;
 					}
 				}
 			}
 		}
-		if (auto f = grd_reflect_cast<GrdAstFunction>(scope)) {
+		if (auto f = grd_reflect_cast<GrdcAstFunction>(scope)) {
 			for (auto arg: f->args) {
 				if (arg->name == name) {
 					return arg;
@@ -852,11 +852,11 @@ AstNode* lookup_symbol(GrdCcParser* p, GrdUnicodeString name) {
 	return NULL;
 }
 
-Error* add_global(GrdCcParser* p, AstNode* s) {
-	for (auto sym: resolve_symbols(s)) {
-		auto found = lookup_symbol(p, sym->name);
+GrdError* grdc_add_global(GrdcParser* p, GrdcAstNode* s) {
+	for (auto sym: grdc_resolve_symbols(s)) {
+		auto found = grdc_lookup_symbol(p, sym->name);
 		if (found) {
-			auto e = grd_make_parser_error(p, grd_current_loc(), "Duplicate global variable '%'"_b, sym->name);
+			auto e = grdc_make_parser_error(p, grd_current_loc(), "Duplicate global variable '%'"_b, sym->name);
 			add_site(p, e, CParserErrorToken{ .reg = sym->text_region.value, .color = CPARSER_ERROR_TOKEN_COLOR_REGULAR_RED });
 			if (found->text_region.has_value) {
 				add_text(p, e, U"Previous definition was here:"_b);
@@ -870,7 +870,7 @@ Error* add_global(GrdCcParser* p, AstNode* s) {
 	return NULL;
 }
 
-GrdAstType* find_type(GrdCcParser* p, GrdUnicodeString name) {
+GrdcAstType* grdc_find_type(GrdcParser* p, GrdUnicodeString name) {
 	if (name == "float") {
 		name = U"f32"_b;
 	}
@@ -881,81 +881,81 @@ GrdAstType* find_type(GrdCcParser* p, GrdUnicodeString name) {
 		name = U"s32"_b;
 	}
 
-	auto symbol = lookup_symbol(p, name);
+	auto symbol = grdc_lookup_symbol(p, name);
 	if (symbol) {
-		if (auto tp = grd_reflect_cast<GrdAstType>(symbol)) {
+		if (auto tp = grd_reflect_cast<GrdcAstType>(symbol)) {
 			return tp;
 		}
 	}
 	return NULL;
 }
 
-struct AstGrdPointerType: GrdAstType {
-	GrdAstType*           pointee = NULL;
-	VulkanStorageClass ptr_vk = VulkanStorageClass::Unspecified;
-	MetalAddrSpace     ptr_mtl = MetalAddrSpace::Unspecified;
+struct GrdcAstPointerType: GrdcAstType {
+	GrdcAstType*           pointee = NULL;
+	GrdcVulkanStorageClass ptr_vk = GrdcVulkanStorageClass::Unspecified;
+	GrdcMetalAddrSpace     ptr_mtl = GrdcMetalAddrSpace::Unspecified;
 
-	GRD_REFLECT(AstGrdPointerType) {
-		GRD_BASE_TYPE(GrdAstType);
+	GRD_REFLECT(GrdcAstPointerType) {
+		GRD_BASE_TYPE(GrdcAstType);
 		GRD_MEMBER(pointee);
 		GRD_MEMBER(ptr_mtl);
 		GRD_MEMBER(ptr_vk);
 	}
 };
 
-struct AstTypeSite: AstNode {
-	GrdAstType* tp = NULL;
+struct GrdcAstTypeSite: GrdcAstNode {
+	GrdcAstType* tp = NULL;
 
-	GRD_REFLECT(AstTypeSite) {
-		GRD_BASE_TYPE(AstNode);
+	GRD_REFLECT(GrdcAstTypeSite) {
+		GRD_BASE_TYPE(GrdcAstNode);
 		GRD_MEMBER(tp);
 	}
 };
 
-struct AstGrdPointerTypeSite: AstTypeSite {
-	AstGrdPointerTypeSite* pointee = NULL;
+struct GrdcAstPointerTypeSite: GrdcAstTypeSite {
+	GrdcAstPointerTypeSite* pointee = NULL;
 
-	GRD_REFLECT(AstGrdPointerTypeSite) {
-		GRD_BASE_TYPE(AstTypeSite);
+	GRD_REFLECT(GrdcAstPointerTypeSite) {
+		GRD_BASE_TYPE(GrdcAstTypeSite);
 		GRD_MEMBER(pointee);
 	}
 };
 
-// GrdAstType* get_pointer_type(GrdCcParser* p, GrdAstType* type) {
+// GrdAstType* grdc_get_pointer_type(GrdcParser* p, GrdAstType* type) {
 // 	auto found = get(&p->ptr_types, type);
 // 	if (found) {
 // 		return *found;
 // 	}
 // 	auto name = sprint_unicode(p->allocator, U"%(*)*"_b, type->name);
-// 	auto ptr = grd_make_ast_symbol<AstGrdPointerType>(p, name, {});
+// 	auto ptr = grdc_make_ast_symbol<GrdcAstPointerType>(p, name, {});
 // 	ptr->pointee = type;
 // 	put(&p->ptr_types, type, ptr);
 // 	return ptr;
 // }
 
-struct PreType {
-	GrdAstType*          t = NULL;
-	s64               pointer_indir_level = 0;
-	ProgramTextRegion reg;
+struct GrdcPreType {
+	GrdcAstType*          t = NULL;
+	s64                   pointer_indir_level = 0;
+	GrdcProgramTextRegion reg;
 };
 
-Tuple<PreType, Error*> parse_pre_type(GrdCcParser* p) {
-	auto tok = peek(p);
+GrdTuple<GrdcPreType, GrdError*> grdc_parse_pre_type(GrdcParser* p) {
+	auto tok = grdc_peek(p);
 	auto c_str = grd_encode_utf8(tok.str);
 	grd_defer { c_str.free(); };
-	GrdAstType* type = find_type(p, tok.str);
+	GrdcAstType* type = grdc_find_type(p, tok.str);
 	if (!type) {
-		return { {}, grd_simple_parser_error(p, grd_current_loc(), tok.reg, U"Could not find type."_b) };
+		return { {}, grdc_simple_parser_error(p, grd_current_loc(), tok.reg, U"Could not find type."_b) };
 	}
-	PreType pt = { .t = type };
+	GrdcPreType pt = { .t = type };
 	pt.reg = { tok.reg.start, tok.reg.end };
-	next(p);
+	grdc_next(p);
 	while (true) {
-		tok = peek(p);
+		tok = grdc_peek(p);
 		if (tok.str == "*") {
 			pt.pointer_indir_level += 1;
 			pt.reg.end = tok.reg.end;
-			next(p);
+			grdc_next(p);
 		} else {
 			break;
 		}
@@ -963,9 +963,9 @@ Tuple<PreType, Error*> parse_pre_type(GrdCcParser* p) {
 	return { pt, NULL };
 }
 
-AstGrdPointerType* get_pointer_type(GrdCcParser* p, GrdAstType* tp, VulkanStorageClass st_class, MetalAddrSpace mtl_space) {
-	auto ptr = grd_make_ast_node<AstGrdPointerType>(p, tp->text_region);
-	ptr->name = sprint_unicode(p->allocator, U"%(*)*"_b, tp->name);
+GrdcAstPointerType* grdc_get_pointer_type(GrdcParser* p, GrdcAstType* tp, GrdcVulkanStorageClass st_class, GrdcMetalAddrSpace mtl_space) {
+	auto ptr = grdc_make_ast_node<GrdcAstPointerType>(p, tp->text_region);
+	ptr->name = grd_sprint_unicode(p->allocator, U"%(*)*"_b, tp->name);
 	ptr->pointee = tp;
 	ptr->size = 8;
 	ptr->alignment = 8;
@@ -974,12 +974,12 @@ AstGrdPointerType* get_pointer_type(GrdCcParser* p, GrdAstType* tp, VulkanStorag
 	return ptr;
 }
 
-Tuple<AstTypeSite*, Error*> finalize_type(GrdCcParser* p, PreType pt, GrdSpan<GrdAstAttr*> attrs) {
+GrdTuple<GrdcAstTypeSite*, GrdError*> grdc_finalize_type(GrdcParser* p, GrdcPreType pt, GrdSpan<GrdcAstAttr*> attrs) {
 	if (pt.pointer_indir_level > 0) {
-		auto st_class = VulkanStorageClass::Unspecified;
+		auto st_class = GrdcVulkanStorageClass::Unspecified;
 		for (auto attr: attrs) {
 			if (attr->name == "vk_uniform") {
-				if (st_class != VulkanStorageClass::Unspecified) {
+				if (st_class != GrdcVulkanStorageClass::Unspecified) {
 					auto e = grd_make_parser_error(p, grd_current_loc(), "Vulkan storage class must be specified for pointer type only once"_b);
 					add_site(p, e,
 						CParserErrorToken{
@@ -989,32 +989,32 @@ Tuple<AstTypeSite*, Error*> finalize_type(GrdCcParser* p, PreType pt, GrdSpan<Gr
 					);
 					return { {}, e };
 				}
-				st_class = VulkanStorageClass::Uniform;
+				st_class = GrdcVulkanStorageClass::Uniform;
 			}
 		}
-		if (st_class == VulkanStorageClass::Unspecified) {
+		if (st_class == GrdcVulkanStorageClass::Unspecified) {
 			return { {}, grd_simple_parser_error(p, grd_current_loc(), pt.reg, U"Vulkan storage class must be specified for pointer type."_b) };
 		}
-		// @TODO: implement MetalAddrSpace
-		auto tp = get_pointer_type(p, pt.t, st_class, MetalAddrSpace::Unspecified);
-		auto qt = grd_make_ast_node<AstGrdPointerTypeSite>(p, pt.reg);
+		// @TODO: implement GrdcMetalAddrSpace
+		auto tp = grdc_get_pointer_type(p, pt.t, st_class, GrdcMetalAddrSpace::Unspecified);
+		auto qt = grdc_make_ast_node<GrdcAstPointerTypeSite>(p, pt.reg);
 		qt->tp = tp;
 		for (auto i: grd_range(pt.pointer_indir_level - 1)) {
-			auto sub = grd_make_ast_node<AstGrdPointerTypeSite>(p, pt.reg);
-			auto sub_tp = get_pointer_type(p, qt->tp, st_class, MetalAddrSpace::Unspecified);
+			auto sub = grdc_make_ast_node<GrdcAstPointerTypeSite>(p, pt.reg);
+			auto sub_tp = grdc_get_pointer_type(p, qt->tp, st_class, GrdcMetalAddrSpace::Unspecified);
 			sub->tp = sub_tp;
 			qt = sub;
 		}
 		return { qt, NULL };
 	} else {
-		auto qt = grd_make_ast_node<AstGrdPointerTypeSite>(p, pt.reg);
+		auto qt = grdc_make_ast_node<GrdcAstPointerTypeSite>(p, pt.reg);
 		qt->tp = pt.t;
 		return { qt, NULL };
 	}
 }
 
-Tuple<GrdcToken, Error*> parse_ident(GrdCcParser* p) {
-	auto tok = peek(p);
+GrdTuple<GrdcToken, GrdError*> grdc_parse_ident(GrdcParser* p) {
+	auto tok = grdc_peek(p);
 	if (grd_len(tok.str) == 0) {
 		return { {}, grd_simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected an identifier."_b) };
 	}
@@ -1026,15 +1026,15 @@ Tuple<GrdcToken, Error*> parse_ident(GrdCcParser* p) {
 			return { {}, grd_simple_parser_error(p, grd_current_loc(), tok.reg, U"Only letters, numbers, and underscores are allowed in identifiers."_b) };
 		}
 	}
-	next(p);
+	grdc_next(p);
 	return { tok, NULL };
 }
 
-Tuple<GrdAstExpr*, Error*> parse_primary_expr(GrdCcParser* p);
-Tuple<GrdAstExpr*, Error*> parse_expr(GrdCcParser* p, s32 min_prec);
-Tuple<GrdArray<GrdAstAttr*>, Error*> parse_attrs(GrdCcParser* p);
+GrdTuple<GrdcAstExpr*, GrdError*> grdc_parse_primary_expr(GrdcParser* p);
+GrdTuple<GrdcAstExpr*, GrdError*> grdc_parse_expr(GrdcParser* p, s32 min_prec);
+GrdTuple<GrdArray<GrdcAstAttr*>, GrdError*> grdc_parse_attrs(GrdcParser* p);
 
-Error* check_if_attrs_used(GrdCcParser* p, GrdArray<GrdAstAttr*> attrs, GrdCodeLoc loc = grd_caller_loc()) {
+GrdError* grdc_check_if_attrs_used(GrdcParser* p, GrdArray<GrdcAstAttr*> attrs, GrdCodeLoc loc = grd_caller_loc()) {
 	for (auto attr: attrs) {
 		if (!attr->is_used) {
 			auto e = grd_simple_parser_error(p, loc, attr->text_region, "Attribute '%' is not used."_b, attr->name);
@@ -1044,11 +1044,11 @@ Error* check_if_attrs_used(GrdCcParser* p, GrdArray<GrdAstAttr*> attrs, GrdCodeL
 	return NULL;
 }
 
-Tuple<AstVarDeclGroup*, Error*> parse_var_decl(GrdCcParser* p, PreType pt, GrdcToken ident_tok, bool is_global) {
-	GrdArray<GrdAstVarDecl*> var_decls = { .allocator = p->allocator };
+GrdTuple<GrdcAstVarDeclGroup*, GrdError*> grdc_parse_var_decl(GrdcParser* p, GrdcPreType pt, GrdcToken ident_tok, bool is_global) {
+	GrdArray<GrdcAstVarDecl*> var_decls = { .allocator = p->allocator };
 	grd_defer { var_decls.free(); };
 
-	auto val_decl_attrs = [&](auto* p, GrdArray<GrdAstAttr*> attrs) -> Error* {
+	auto val_decl_attrs = [&](auto* p, GrdArray<GrdcAstAttr*> attrs) -> GrdError* {
 		for (auto attr: attrs) {
 			if (is_global) {
 				return grd_simple_parser_error(p, grd_current_loc(), attr->text_region, "Global variables cannot have attributes"_b);
@@ -1058,42 +1058,42 @@ Tuple<AstVarDeclGroup*, Error*> parse_var_decl(GrdCcParser* p, PreType pt, GrdcT
 		}
 		return NULL;
 	};
-	auto [attrs, e] = parse_attrs(p);
+	auto [attrs, e] = grdc_parse_attrs(p);
 	if (e) {
 		return { NULL, e };
 	}
-	auto [ts, e2] = finalize_type(p, pt, attrs);
+	auto [ts, e2] = grdc_finalize_type(p, pt, attrs);
 	if (e2) {
 		return { NULL, e2 };
 	}
-	auto e3 = check_if_attrs_used(p, attrs);
+	auto e3 = grdc_check_if_attrs_used(p, attrs);
 	if (e3) {
 		return { NULL, e3 };
 	}
 	auto current_ident = ident_tok;
 	while (true) {
-		auto node = grd_make_ast_node<GrdAstVarDecl>(p, {});
+		auto node = grdc_make_ast_node<GrdcAstVarDecl>(p, {});
 		node->var_ts = ts;
 		node->name = current_ident.str;
 		node->is_global = is_global;
 		grd_add(&var_decls, node);
 
-		auto tok = peek(p);
+		auto tok = grdc_peek(p);
 		if (tok.str != U","_b) {
 			break;
 		}
-		next(p);
-		auto [ident, e] = parse_ident(p);
+		grdc_next(p);
+		auto [ident, e] = grdc_parse_ident(p);
 		if (e) {
 			return { NULL, e };
 		}
 		current_ident = ident;
 	}
 
-	auto tok = peek(p);
+	auto tok = grdc_peek(p);
 	if (tok.str == U"="_b) {
-		next(p);
-		auto [expr, e] = parse_expr(p, 0);
+		grdc_next(p);
+		auto [expr, e] = grdc_parse_expr(p, 0);
 		if (e) {
 			return { NULL, e };
 		}
@@ -1101,38 +1101,38 @@ Tuple<AstVarDeclGroup*, Error*> parse_var_decl(GrdCcParser* p, PreType pt, GrdcT
 			return { NULL, grd_simple_parser_error(p, grd_current_loc(), tok.reg, U"Initializer type mismatch, expected '%' but got '%'.", ts->tp->name, expr->expr_type->name) };
 		}
 		for (auto it: var_decls) {
-			it->init = (GrdAstExpr*) expr;
+			it->init = (GrdcAstExpr*) expr;
 		}
 	}
 
-	tok = peek(p);
+	tok = grdc_peek(p);
 	if (tok.str != U";"_b) {
 		return { NULL, grd_simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected , or ;"_b) };
 	}
 
-	ProgramTextRegion text_region = { pt.reg.start, tok.reg.end };
+	GrdcProgramTextRegion text_region = { pt.reg.start, tok.reg.end };
 	for (auto it: var_decls) {
 		it->text_region = text_region;
 	}
 
-	auto node = grd_make_ast_node<AstVarDeclGroup>(p, text_region);
+	auto node = grdc_make_ast_node<GrdcAstVarDeclGroup>(p, text_region);
 	node->var_decls = var_decls;
 	var_decls = {};
 	return { node, NULL };
 }
 
-struct AstFunctionCall: GrdAstExpr {
-	AstNode*        f;
-	GrdArray<GrdAstExpr*> args;
+struct GrdcAstFunctionCall: GrdcAstExpr {
+	GrdcAstNode*           f;
+	GrdArray<GrdcAstExpr*> args;
 
-	GRD_REFLECT(AstFunctionCall) {
-		GRD_BASE_TYPE(GrdAstExpr);
+	GRD_REFLECT(GrdcAstFunctionCall) {
+		GRD_BASE_TYPE(GrdcAstExpr);
 		GRD_MEMBER(args);
 	}
 };
 
-AstOperator* find_binary_operator(GrdCcParser* p, GrdUnicodeString op) {
-	for (auto& it: AST_BINARY_OPERATORS_UNSORTED) {
+GrdcAstOperator* grdc_find_binary_operator(GrdcParser* p, GrdUnicodeString op) {
+	for (auto& it: GRDC_AST_BINARY_OPERATORS_UNSORTED) {
 		if (op == it.op) {
 			return &it;
 		}
@@ -1140,8 +1140,8 @@ AstOperator* find_binary_operator(GrdCcParser* p, GrdUnicodeString op) {
 	return NULL;
 }
 
-AstOperator* find_prefix_unary_operator(GrdCcParser* p, GrdUnicodeString op) {
-	for (auto& it: AST_PREFIX_UNARY_OPERATORS_UNSORTED) {
+GrdcAstOperator* grdc_find_prefix_unary_operator(GrdcParser* p, GrdUnicodeString op) {
+	for (auto& it: GRDC_AST_PREFIX_UNARY_OPERATORS_UNSORTED) {
 		if (op == it.op) {
 			return &it;
 		}
@@ -1149,8 +1149,8 @@ AstOperator* find_prefix_unary_operator(GrdCcParser* p, GrdUnicodeString op) {
 	return NULL;
 }
 
-AstOperator* find_postfix_unary_operator(GrdCcParser* p, GrdUnicodeString op) {
-	for (auto& it: AST_POSTFIX_UNARY_OPERATORS_UNSORTED) {
+GrdcAstOperator* grdc_find_postfix_unary_operator(GrdcParser* p, GrdUnicodeString op) {
+	for (auto& it: GRDC_AST_POSTFIX_UNARY_OPERATORS_UNSORTED) {
 		if (op == it.op) {
 			return &it;
 		}
@@ -1159,56 +1159,56 @@ AstOperator* find_postfix_unary_operator(GrdCcParser* p, GrdUnicodeString op) {
 }
 
 
-Tuple<GrdAstExpr*, Error*> parse_function_call(GrdCcParser* p, GrdcToken func_token, GrdAstFunction* func) {
-	auto tok = peek(p);
+GrdTuple<GrdcAstExpr*, GrdError*> grdc_parse_function_call(GrdcParser* p, GrdcToken func_token, GrdcAstFunction* func) {
+	auto tok = grdc_peek(p);
 	if (tok.str != "("_b) {
 		return { NULL, grd_simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected ("_b) };
 	}
-	auto call = grd_make_ast_expr<AstFunctionCall>(p, func->return_ts->tp, AST_EXPR_RVALUE, {});
+	auto call = grdc_make_ast_expr<GrdcAstFunctionCall>(p, func->return_ts->tp, GRDC_AST_EXPR_RVALUE, {});
 	call->args.allocator = p->allocator;
 	call->f = func;
-	next(p);
+	grdc_next(p);
 	while (true) {
-		auto tok = peek(p);
+		auto tok = grdc_peek(p);
 		if (tok.str == ")"_b) {
-			call->text_region = ProgramTextRegion { func_token.reg.start, tok.reg.end };
-			next(p);
+			call->text_region = GrdcProgramTextRegion { func_token.reg.start, tok.reg.end };
+			grdc_next(p);
 			break;
 		}
-		auto op = find_binary_operator(p, U","_b);
-		auto [expr, e] = parse_expr(p, op->prec + 1);
+		auto op = grdc_find_binary_operator(p, U","_b);
+		auto [expr, e] = grdc_parse_expr(p, op->prec + 1);
 		if (e) {
 			return { NULL, e };
 		}
 		grd_add(&call->args, expr);
-		if (peek(p).str == ","_b) {
-			next(p);
+		if (grdc_peek(p).str == ","_b) {
+			grdc_next(p);
 		}
 	}
 	return { call, NULL };
 }
 
-struct AstTernary: GrdAstExpr {
-	GrdAstExpr* cond;
-	GrdAstExpr* then;
-	GrdAstExpr* else_;
+struct GrdcAstTernary: GrdcAstExpr {
+	GrdcAstExpr* cond;
+	GrdcAstExpr* then;
+	GrdcAstExpr* else_;
 
-	GRD_REFLECT(AstTernary) {
-		GRD_BASE_TYPE(GrdAstExpr);
+	GRD_REFLECT(GrdcAstTernary) {
+		GRD_BASE_TYPE(GrdcAstExpr);
 		GRD_MEMBER(cond);
 		GRD_MEMBER(then);
 		GRD_MEMBER(else_);
 	}
 };
 
-struct AstIf: AstNode {
-	GrdAstExpr*  cond = NULL;
-	AstBlock* then = NULL;
-	AstBlock* else_block = NULL;
-	AstIf*    else_if = NULL;
+struct GrdcAstIf: GrdcAstNode {
+	GrdcAstExpr*  cond = NULL;
+	GrdcAstBlock* then = NULL;
+	GrdcAstBlock* else_block = NULL;
+	GrdcAstIf*    else_if = NULL;
 
-	GRD_REFLECT(AstIf) {
-		GRD_BASE_TYPE(AstNode);
+	GRD_REFLECT(GrdcAstIf) {
+		GRD_BASE_TYPE(GrdcAstNode);
 		GRD_MEMBER(cond);
 		GRD_MEMBER(then);
 		GRD_MEMBER(else_block);
@@ -1216,21 +1216,21 @@ struct AstIf: AstNode {
 	}
 };
 
-GrdAstType* resolve_type_alias(GrdAstType* type) {
+GrdcAstType* grdc_resolve_type_alias(GrdcAstType* type) {
 	// @TODO: implement.
 	return type;
 }
 
-bool is_floating_point(GrdAstType* type) {
-	type = resolve_type_alias(type);
+bool grdc_is_floating_point(GrdcAstType* type) {
+	type = grdc_resolve_type_alias(type);
 	if (type == type->p->f32_tp || type == type->p->f64_tp) {
 		return true;
 	}
 	return false;
 }
 
-bool is_integer(GrdAstType* type) {
-	type = resolve_type_alias(type);
+bool grdc_is_integer(GrdcAstType* type) {
+	type = grdc_resolve_type_alias(type);
 	if (
 		type == type->p->s8_tp ||
 		type == type->p->u8_tp ||
@@ -1246,51 +1246,51 @@ bool is_integer(GrdAstType* type) {
 	return false;
 }
 
-bool is_numeric(GrdAstType* type) {
-	type = resolve_type_alias(type);
-	return is_floating_point(type) || is_integer(type);
+bool grdc_is_numeric(GrdcAstType* type) {
+	type = grdc_resolve_type_alias(type);
+	return grdc_is_floating_point(type) || grdc_is_integer(type);
 }
 
-bool is_pointer(GrdAstType* type) {
-	type = resolve_type_alias(type);
-	if (auto ptr = grd_reflect_cast<AstGrdPointerType>(type)) {
+bool grdc_is_pointer(GrdcAstType* type) {
+	type = grdc_resolve_type_alias(type);
+	if (auto ptr = grd_reflect_cast<GrdcAstPointerType>(type)) {
 		return true;
 	}
 	return false;
 }
 
-bool is_array(GrdAstType* type) {
+bool grdc_is_array(GrdcAstType* type) {
 	// @TODO: implement.
 	return false;
 }
 
-GrdAstType* get_element_type(GrdAstType* type) {
-	if (auto ptr = grd_reflect_cast<AstGrdPointerType>(type)) {
+GrdcAstType* grdc_get_element_type(GrdcAstType* type) {
+	if (auto ptr = grd_reflect_cast<GrdcAstPointerType>(type)) {
 		return ptr->pointee;
 	}
 	return NULL;
 }
 
-struct AstVariableAccess: GrdAstExpr {
-	GrdAstVar* var = NULL;
+struct GrdcAstVariableAccess: GrdcAstExpr {
+	GrdcAstVar* var = NULL;
 
-	GRD_REFLECT(AstVariableAccess) {
-		GRD_BASE_TYPE(GrdAstExpr);
+	GRD_REFLECT(GrdcAstVariableAccess) {
+		GRD_BASE_TYPE(GrdcAstExpr);
 		GRD_MEMBER(var);
 	}
 };
 
-bool is_struct(GrdAstType* type) {
-	type = resolve_type_alias(type);
-	return grd_reflect_cast<GrdAstStructType>(type) != NULL;
+bool grdc_is_struct(GrdcAstType* type) {
+	type = grdc_resolve_type_alias(type);
+	return grd_reflect_cast<GrdcAstStructType>(type) != NULL;
 }
 
-bool is_bool(GrdAstType* type) {
-	type = resolve_type_alias(type);
+bool grdc_is_bool(GrdcAstType* type) {
+	type = grdc_resolve_type_alias(type);
 	return type == type->p->bool_tp;
 }
 
-AstStructMember* find_struct_member(GrdCcParser* p, GrdAstStructType* type, GrdUnicodeString name) {
+GrdcAstStructMember* grdc_find_struct_member(GrdcParser* p, GrdcAstStructType* type, GrdUnicodeString name) {
 	for (auto it: type->members) {
 		if (it->name == name) {
 			return it;
@@ -1299,20 +1299,20 @@ AstStructMember* find_struct_member(GrdCcParser* p, GrdAstStructType* type, GrdU
 	return NULL;
 }
 
-struct AstSwizzleExpr: GrdAstExpr {
-	GrdAstExpr* lhs;
-	s32      swizzle[4];
-	s32      swizzle_len = 0;
+struct GrdcAstSwizzleExpr: GrdcAstExpr {
+	GrdcAstExpr* lhs;
+	s32          swizzle[4];
+	s32          swizzle_len = 0;
 
-	GRD_REFLECT(AstSwizzleExpr) {
-		GRD_BASE_TYPE(GrdAstExpr);
+	GRD_REFLECT(GrdcAstSwizzleExpr) {
+		GRD_BASE_TYPE(GrdcAstExpr);
 		GRD_MEMBER(lhs);
 		GRD_MEMBER(swizzle);
 		GRD_MEMBER(swizzle_len);
 	}
 };
 
-bool parse_swizzle_ident(GrdCcParser* p, GrdUnicodeString ident, s32* swizzle, s32 src_len) {
+bool grdc_parse_swizzle_ident(GrdcParser* p, GrdUnicodeString ident, s32* swizzle, s32 src_len) {
 	s64 ident_len = grd_len(ident);
 	if (ident_len > 4) {
 		return false;
@@ -1351,20 +1351,20 @@ bool parse_swizzle_ident(GrdCcParser* p, GrdUnicodeString ident, s32* swizzle, s
 	return true;
 }
 
-Tuple<GrdAstExpr*, Error*> try_parse_swizzle_expr(GrdCcParser* p, GrdAstExpr* lhs, GrdAstStructType* struct_tp, GrdcToken ident) {
+GrdTuple<GrdcAstExpr*, GrdError*> grdc_try_parse_swizzle_expr(GrdcParser* p, GrdcAstExpr* lhs, GrdcAstStructType* struct_tp, GrdcToken ident) {
 	int swizzle_idx[4] = { -1, -1, -1, -1 };
 	if (struct_tp == p->float2_tp) {
-		bool ok = parse_swizzle_ident(p, ident.str, swizzle_idx, 2);
+		bool ok = grdc_parse_swizzle_ident(p, ident.str, swizzle_idx, 2);
 		if (!ok) {
 			return { NULL, NULL };
 		}
 	} else if (struct_tp == p->float3_tp) {
-		bool ok = parse_swizzle_ident(p, ident.str, swizzle_idx, 3);
+		bool ok = grdc_parse_swizzle_ident(p, ident.str, swizzle_idx, 3);
 		if (!ok) {
 			return { NULL, NULL };
 		}
 	} else if (struct_tp == p->float4_tp) {
-		bool ok = parse_swizzle_ident(p, ident.str, swizzle_idx, 4);
+		bool ok = grdc_parse_swizzle_ident(p, ident.str, swizzle_idx, 4);
 		if (!ok) {
 			return { NULL, NULL };
 		}
@@ -1380,7 +1380,7 @@ Tuple<GrdAstExpr*, Error*> try_parse_swizzle_expr(GrdCcParser* p, GrdAstExpr* lh
 		swizzle_len += 1;
 	}
 
-	GrdAstType* swizzle_type = NULL;
+	GrdcAstType* swizzle_type = NULL;
 	if (swizzle_len == 1) {
 		swizzle_type = p->f32_tp;
 	} else if (swizzle_len == 2) {
@@ -1390,18 +1390,18 @@ Tuple<GrdAstExpr*, Error*> try_parse_swizzle_expr(GrdCcParser* p, GrdAstExpr* lh
 	} else if (swizzle_len == 4) {
 		swizzle_type = p->float4_tp;
 	} else {
-		panic(p, U"Unexpected swizzle_len = %"_b, swizzle_len);
+		grd_panic(p, U"Unexpected swizzle_len = %"_b, swizzle_len);
 	}
 
-	ProgramTextRegion text_region = { ident.reg.start, peek(p).reg.start };
+	GrdcProgramTextRegion text_region = { ident.reg.start, grdc_peek(p).reg.start };
 	if (lhs->text_region.has_value) {
 		text_region.start = lhs->text_region.value.start;
 	}
 
 	if (swizzle_len == 1) {
-		auto expr = grd_make_ast_expr<AstVarMemberAccess>(p, swizzle_type, lhs->is_lvalue, text_region);
+		auto expr = grdc_make_ast_expr<GrdcAstVarMemberAccess>(p, swizzle_type, lhs->is_lvalue, text_region);
 		expr->lhs = lhs;
-		auto member = find_struct_member(p, struct_tp, ident.str);
+		auto member = grdc_find_struct_member(p, struct_tp, ident.str);
 		if (!member) {
 			return { NULL, grd_simple_parser_error(p, grd_current_loc(), ident.reg, U"Member '%' not found in struct '%'.", ident.str, lhs->expr_type->name) };
 		}
@@ -1419,7 +1419,7 @@ Tuple<GrdAstExpr*, Error*> try_parse_swizzle_expr(GrdCcParser* p, GrdAstExpr* lh
 		}
 	}
 
-	auto expr = grd_make_ast_expr<AstSwizzleExpr>(p, swizzle_type, lhs->is_lvalue && is_unique, text_region);
+	auto expr = grdc_make_ast_expr<GrdcAstSwizzleExpr>(p, swizzle_type, lhs->is_lvalue && is_unique, text_region);
 	expr->lhs = lhs;
 	expr->swizzle[0] = swizzle_idx[0];
 	expr->swizzle[1] = swizzle_idx[1];
@@ -1429,38 +1429,38 @@ Tuple<GrdAstExpr*, Error*> try_parse_swizzle_expr(GrdCcParser* p, GrdAstExpr* lh
 	return { expr, NULL };
 }
 
-struct AstStructInitMember {
-	GrdAstExpr*         expr = NULL;
-	AstStructMember* member;
+struct GrdcAstStructInitMember {
+	GrdcAstExpr*         expr = NULL;
+	GrdcAstStructMember* member;
 };
 
-struct AstStructInitializer: GrdAstExpr {
-	GrdAstType*                   struct_type = NULL;
-	GrdArray<AstStructInitMember> members;
+struct GrdcAstStructInitializer: GrdcAstExpr {
+	GrdcAstType*                      struct_type = NULL;
+	GrdArray<GrdcAstStructInitMember> members;
 
-	GRD_REFLECT(AstStructInitializer) {
-		GRD_BASE_TYPE(GrdAstExpr);
+	GRD_REFLECT(GrdcAstStructInitializer) {
+		GRD_BASE_TYPE(GrdcAstExpr);
 		GRD_MEMBER(struct_type);
 		GRD_MEMBER(members);
 	}
 };
 
-bool is_vector_type(GrdAstType* type) {
-	type = resolve_type_alias(type);
+bool grdc_is_vector_type(GrdcAstType* type) {
+	type = grdc_resolve_type_alias(type);
 	return type == type->p->float2_tp || type == type->p->float3_tp || type == type->p->float4_tp;
 }
 
-bool is_integral(GrdAstType* type) {
-	return is_integer(type) || is_bool(type);
+bool grdc_is_integral(GrdcAstType* type) {
+	return grdc_is_integer(type) || grdc_is_bool(type);
 }
 
-bool is_primitive(GrdAstType* type) {
-	return is_bool(type) || is_integer(type) || is_floating_point(type);
+bool grdc_is_primitive(GrdcAstType* type) {
+	return grdc_is_bool(type) || grdc_is_integer(type) || grdc_is_floating_point(type);
 }
 
-Tuple<GrdAstExpr*, Error*> typecheck_binary_expr(GrdCcParser* p, GrdAstExpr* lhs, GrdAstExpr* rhs, GrdcToken op_tok, AstOperator* op) {
+GrdTuple<GrdcAstExpr*, GrdError*> grdc_typecheck_binary_expr(GrdcParser* p, GrdcAstExpr* lhs, GrdcAstExpr* rhs, GrdcToken op_tok, GrdcAstOperator* op) {
 
-	ProgramTextRegion text_region = { op_tok.reg.start, peek(p).reg.end };
+	GrdcProgramTextRegion text_region = { op_tok.reg.start, grdc_peek(p).reg.end };
 	if (lhs->text_region.has_value) {
 		text_region.start = lhs->text_region.value.start;
 	}
@@ -1469,7 +1469,7 @@ Tuple<GrdAstExpr*, Error*> typecheck_binary_expr(GrdCcParser* p, GrdAstExpr* lhs
 	}
 
 	if (op->op == ",") {
-		auto node = grd_make_ast_expr<AstBinaryExpr>(p, rhs->expr_type, AST_EXPR_RVALUE, text_region);
+		auto node = grdc_make_ast_expr<GrdcAstBinaryExpr>(p, rhs->expr_type, GRDC_AST_EXPR_RVALUE, text_region);
 		node->lhs = lhs;
 		node->rhs = rhs;
 		node->op = op;
@@ -1478,27 +1478,27 @@ Tuple<GrdAstExpr*, Error*> typecheck_binary_expr(GrdCcParser* p, GrdAstExpr* lhs
 	}
 
 	auto pure_op = op;
-	GrdAstType* expr_result_type = NULL;
-	if ((op->flags & AST_OP_FLAG_MOD_ASSIGN) || op->op == "=") {
-		if (op->flags & AST_OP_FLAG_MOD_ASSIGN) {
-			pure_op = find_binary_operator(p, op->op[0, grd_len(op->op) - 1]);
+	GrdcAstType* expr_result_type = NULL;
+	if ((op->flags & GRDC_AST_OP_FLAG_MOD_ASSIGN) || op->op == "=") {
+		if (op->flags & GRDC_AST_OP_FLAG_MOD_ASSIGN) {
+			pure_op = grdc_find_binary_operator(p, op->op[0, grd_len(op->op) - 1]);
 		}
 		if (!lhs->is_lvalue) {
 			return { NULL, grd_simple_parser_error(p, grd_current_loc(), op_tok.reg, U"Left side of '%' must be an lvalue.", op->op) };
 		}
 	}
-	if (lhs->expr_type == find_type(p, U"void"_b)) {
+	if (lhs->expr_type == grdc_find_type(p, U"void"_b)) {
 		return { NULL, grd_simple_parser_error(p, grd_current_loc(), op_tok.reg, U"Cannot apply operator '%' to void", op->op) };
 	}
-	if (is_vector_type(lhs->expr_type)) {
+	if (grdc_is_vector_type(lhs->expr_type)) {
 		if (pure_op->op == "*" ||
 			pure_op->op == "/" ||
 			pure_op->op == "+" ||
 			pure_op->op == "-" ||
 			pure_op->op == "="
 		) {
-			if (rhs->expr_type != find_type(p, U"float"_b) && 
-				rhs->expr_type != find_type(p, U"double"_b) &&
+			if (rhs->expr_type != grdc_find_type(p, U"float"_b) && 
+				rhs->expr_type != grdc_find_type(p, U"double"_b) &&
 				lhs->expr_type != rhs->expr_type) {
 				return { NULL, grd_simple_parser_error(p, grd_current_loc(), op_tok.reg, U"Operator '%' for vector requires rhs to be float or double or matching vector type, got '%'. lhs type = '%'", op->op, rhs->expr_type->name, lhs->expr_type->name) };
 			}
@@ -1524,23 +1524,23 @@ Tuple<GrdAstExpr*, Error*> typecheck_binary_expr(GrdCcParser* p, GrdAstExpr* lhs
 			return { NULL, e };
 		}
 	} else {
-		if (pure_op->flags & AST_OP_FLAG_BOOL) {
-			if (!is_bool(lhs->expr_type)) {
+		if (pure_op->flags & GRDC_AST_OP_FLAG_BOOL) {
+			if (!grdc_is_bool(lhs->expr_type)) {
 				return { NULL, grd_simple_parser_error(p, grd_current_loc(), op_tok.reg, U"Operator '%' can only be applied to bool types, got '%'.", op->op, lhs->expr_type->name) };
 			}
 		}
-		if (pure_op->flags & AST_OP_FLAG_INT) {
-			if (!is_integer(lhs->expr_type)) {
+		if (pure_op->flags & GRDC_AST_OP_FLAG_INT) {
+			if (!grdc_is_integer(lhs->expr_type)) {
 				return { NULL, grd_simple_parser_error(p, grd_current_loc(), op_tok.reg, U"Operator '%' can only be applied to integer types, got '%'.", op->op, lhs->expr_type->name) };
 			}
 		}
-		if (pure_op->flags & AST_OP_FLAG_PRIMITIVE) {
-			if (!is_primitive(lhs->expr_type)) {
+		if (pure_op->flags & GRDC_AST_OP_FLAG_PRIMITIVE) {
+			if (!grdc_is_primitive(lhs->expr_type)) {
 				return { NULL, grd_simple_parser_error(p, grd_current_loc(), op_tok.reg, U"Operator '%' can only be applied to primitive types, got '%'.", op->op, lhs->expr_type->name) };
 			}
 		}
-		if (pure_op->flags & AST_OP_FLAG_NUMERIC) {
-			if (!is_numeric(lhs->expr_type)) {
+		if (pure_op->flags & GRDC_AST_OP_FLAG_NUMERIC) {
+			if (!grdc_is_numeric(lhs->expr_type)) {
 				return { NULL, grd_simple_parser_error(p, grd_current_loc(), op_tok.reg, U"Operator '%' can only be applied to numeric types, got '%'.", op->op, lhs->expr_type->name) };
 			}
 		}
@@ -1568,7 +1568,7 @@ Tuple<GrdAstExpr*, Error*> typecheck_binary_expr(GrdCcParser* p, GrdAstExpr* lhs
 			op->op == "<=" ||
 			op->op == ">="
 		) {
-			expr_result_type = find_type(p, U"bool"_b);
+			expr_result_type = grdc_find_type(p, U"bool"_b);
 			assert(expr_result_type);
 		} else {
 			expr_result_type = lhs->expr_type;
@@ -1577,7 +1577,7 @@ Tuple<GrdAstExpr*, Error*> typecheck_binary_expr(GrdCcParser* p, GrdAstExpr* lhs
 	if (!expr_result_type) {
 		return { NULL, grd_simple_parser_error(p, grd_current_loc(), op_tok.reg, U"Unexpected error: could not determine result type of binary expression '%'.", op->op) };
 	}
-	auto node = grd_make_ast_expr<AstBinaryExpr>(p, expr_result_type, AST_EXPR_RVALUE, text_region);
+	auto node = grdc_make_ast_expr<GrdcAstBinaryExpr>(p, expr_result_type, GRDC_AST_EXPR_RVALUE, text_region);
 	node->lhs = lhs;
 	node->rhs = rhs;
 	node->op = op;
@@ -1585,8 +1585,8 @@ Tuple<GrdAstExpr*, Error*> typecheck_binary_expr(GrdCcParser* p, GrdAstExpr* lhs
 	return { node, NULL };
 }
 
-Tuple<GrdAstExpr*, Error*> parse_primary_expr(GrdCcParser* p) {
-	auto tok = peek(p);
+GrdTuple<GrdcAstExpr*, GrdError*> grdc_parse_primary_expr(GrdcParser* p) {
+	auto tok = grdc_peek(p);
 
 	if (tok.flags & CTOKEN_FLAG_FLOATING_POINT) {
 		auto lit = tok.str;
@@ -1617,10 +1617,10 @@ Tuple<GrdAstExpr*, Error*> parse_primary_expr(GrdCcParser* p) {
 		if (!ok) {
 			return { NULL, grd_simple_parser_error(p, grd_current_loc(), tok.reg, U"Could not parse floating point literal."_b) };
 		}
-		auto literal = grd_make_ast_expr<AstLiteralExpr>(p, find_type(p, parse_as_float ? U"float"_b : U"double"_b), AST_EXPR_RVALUE, tok.reg);
+		auto literal = grdc_make_ast_expr<GrdcAstLiteralExpr>(p, grdc_find_type(p, parse_as_float ? U"float"_b : U"double"_b), GRDC_AST_EXPR_RVALUE, tok.reg);
 		literal->lit_type = lit_type;
 		literal->lit_value = lit_value;
-		next(p);
+		grdc_next(p);
 		return { literal, NULL };
 	}
 
@@ -1630,27 +1630,27 @@ Tuple<GrdAstExpr*, Error*> parse_primary_expr(GrdCcParser* p) {
 		if (!ok) {
 			return { NULL, grd_simple_parser_error(p, grd_current_loc(), tok.reg, U"Could not parse integer literal."_b) };
 		}
-		auto literal = grd_make_ast_expr<AstLiteralExpr>(p, find_type(p, U"int"_b), AST_EXPR_RVALUE, tok.reg);
+		auto literal = grdc_make_ast_expr<GrdcAstLiteralExpr>(p, grdc_find_type(p, U"int"_b), GRDC_AST_EXPR_RVALUE, tok.reg);
 		literal->lit_value.s64_value = u;
 		literal->lit_type = grd_reflect_type_of(u)->as<GrdPrimitiveType>();
-		next(p);
+		grdc_next(p);
 		return { literal, NULL };
 	}
 
-	auto unary_op = find_prefix_unary_operator(p, tok.str);
+	auto unary_op = grdc_find_prefix_unary_operator(p, tok.str);
 	if (unary_op) {
 		auto op = tok;
-		next(p);
-		auto [expr, e] = parse_expr(p, unary_op->prec);
+		grdc_next(p);
+		auto [expr, e] = grdc_parse_expr(p, unary_op->prec);
 		if (e) {
 			return { NULL, e };
 		}
 		if (tok.str == "*") {
-			auto ptr_tp = grd_reflect_cast<AstGrdPointerType>(expr->expr_type);
+			auto ptr_tp = grd_reflect_cast<GrdcAstPointerType>(expr->expr_type);
 			if (ptr_tp == NULL) {
 				return { NULL, grd_simple_parser_error(p, grd_current_loc(), tok.reg, U"Operator '*' can only be applied to pointer types, got '%'"_b, expr->expr_type->name) };
 			}
-			auto deref = grd_make_ast_expr<AstDerefExpr>(p, ptr_tp->pointee, AST_EXPR_LVALUE, tok.reg);
+			auto deref = grdc_make_ast_expr<GrdcAstDerefExpr>(p, ptr_tp->pointee, GRDC_AST_EXPR_LVALUE, tok.reg);
 			deref->lhs = expr;
 			return { deref, NULL };
 		}
@@ -1658,7 +1658,7 @@ Tuple<GrdAstExpr*, Error*> parse_primary_expr(GrdCcParser* p) {
 			if (!expr->is_lvalue) {
 				return { NULL, grd_simple_parser_error(p, grd_current_loc(), tok.reg, U"Operator '&' can only be applied to lvalues.", op.str) };
 			}
-			if (grd_reflect_cast<AstSwizzleExpr>(expr)) {
+			if (grd_reflect_cast<GrdcAstSwizzleExpr>(expr)) {
 				auto e = grd_make_parser_error(p, grd_current_loc(), U"Cannot take an address of a swizzle"_b, expr->expr_type->name);
 				add_site(p, e,
 					CParserErrorToken{ .reg = tok.reg, .color = CPARSER_ERROR_TOKEN_COLOR_REGULAR_RED },
@@ -1673,64 +1673,64 @@ Tuple<GrdAstExpr*, Error*> parse_primary_expr(GrdCcParser* p) {
 			}
 		}
 		if (tok.str == "!" || tok.str == "~") {
-			if (!is_integer(expr->expr_type)) {
+			if (!grdc_is_integer(expr->expr_type)) {
 				return { NULL, grd_simple_parser_error(p, grd_current_loc(), tok.reg, U"Operator '%' can only be applied to integer types.", op.str) };
 			}
 		}
-		if (!is_numeric(expr->expr_type)) {
+		if (!grdc_is_numeric(expr->expr_type)) {
 			return { NULL, grd_simple_parser_error(p, grd_current_loc(), tok.reg, U"Operator '%' can only be applied to numeric types, got '%'.", op.str, expr->expr_type->name) };
 		}
-		ProgramTextRegion text_region = { op.reg.start, peek(p).reg.start };
-		auto unary = grd_make_ast_expr<AstUnaryExpr>(p, expr->expr_type, AST_EXPR_RVALUE, text_region);
+		GrdcProgramTextRegion text_region = { op.reg.start, grdc_peek(p).reg.start };
+		auto unary = grdc_make_ast_expr<GrdcAstUnaryExpr>(p, expr->expr_type, GRDC_AST_EXPR_RVALUE, text_region);
 		unary->expr = expr;
 		unary->op = unary_op;
 		return { unary, NULL };
 	}
 
 	if (tok.str == "("_b) {
-		next(p);
-		auto [expr, e] = parse_expr(p, 0);
+		grdc_next(p);
+		auto [expr, e] = grdc_parse_expr(p, 0);
 		if (e) {
 			return { NULL, e };
 		}
-		if (peek(p).str != ")"_b) {
+		if (grdc_peek(p).str != ")"_b) {
 			return { NULL, grd_simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected ')'.", tok) };
 		}
-		next(p);
+		grdc_next(p);
 		return { expr, NULL };
 	}
 
-	AstNode* sym = lookup_symbol(p, tok.str);
+	GrdcAstNode* sym = grdc_lookup_symbol(p, tok.str);
 	if (!sym) {
 		return { NULL, grd_simple_parser_error(p, grd_current_loc(), tok.reg, U"Unknown identifier.") };
 	}
-	GrdAstExpr* lhs = NULL;
-	if (auto type = grd_reflect_cast<GrdAstType>(sym)) {
+	GrdcAstExpr* lhs = NULL;
+	if (auto type = grd_reflect_cast<GrdcAstType>(sym)) {
 		auto initializer_reg_start = tok.reg.start;
-		next(p);
-		if (peek(p).str == "("_b) {
-			next(p);
-			auto struct_tp = grd_reflect_cast<GrdAstStructType>(type);
+		grdc_next(p);
+		if (grdc_peek(p).str == "("_b) {
+			grdc_next(p);
+			auto struct_tp = grd_reflect_cast<GrdcAstStructType>(type);
 			if (!struct_tp) {
 				return { NULL, grd_simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected struct type but got '%'"_b, type->name) };
 			}
 			s64 member_index = 0;
-			GrdArray<GrdAstExpr*> args = { .allocator = p->allocator };
+			GrdArray<GrdcAstExpr*> args = { .allocator = p->allocator };
 			grd_defer { args.free(); };
 			while (true) {
-				auto tok = peek(p);
+				auto tok = grdc_peek(p);
 				if (tok.str == ")"_b) {
 					if (grd_len(args) != grd_len(struct_tp->members)) {
 						return { NULL, grd_simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected % arguments in initializer but got '%'.", grd_len(struct_tp->members), grd_len(args)) };
 					}
-					ProgramTextRegion text_region = { initializer_reg_start, tok.reg.end };
-					auto node = grd_make_ast_expr<AstStructInitializer>(p, type, AST_EXPR_RVALUE, text_region);
+					GrdcProgramTextRegion text_region = { initializer_reg_start, tok.reg.end };
+					auto node = grdc_make_ast_expr<GrdcAstStructInitializer>(p, type, GRDC_AST_EXPR_RVALUE, text_region);
 					node->struct_type = type;
 					node->members.allocator = p->allocator;
 					s64 idx = 0;
 					for (auto it: args) {
 						auto member = struct_tp->members[idx];
-						auto m = AstStructInitMember {
+						auto m = GrdcAstStructInitMember {
 							.expr = it,
 							.member = member,
 						};
@@ -1738,12 +1738,12 @@ Tuple<GrdAstExpr*, Error*> parse_primary_expr(GrdCcParser* p) {
 						idx += 1;
 					}
 					args = {};
-					next(p);
+					grdc_next(p);
 					lhs = node;
 					break;
 				}
-				auto op = find_binary_operator(p, U","_b);
-				auto [expr, e] = parse_expr(p, op->prec + 1);
+				auto op = grdc_find_binary_operator(p, U","_b);
+				auto [expr, e] = grdc_parse_expr(p, op->prec + 1);
 				if (e) {
 					return { NULL, e };
 				}
@@ -1756,22 +1756,22 @@ Tuple<GrdAstExpr*, Error*> parse_primary_expr(GrdCcParser* p) {
 				}
 				grd_add(&args, expr);
 				member_index += 1;
-				if (peek(p).str == ","_b) {
-					next(p);
+				if (grdc_peek(p).str == ","_b) {
+					grdc_next(p);
 				}
 			}
 		} else {
 			return { NULL, grd_simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected struct initializer, got '%'.", tok.str) };
 		}
-	} else if (auto var = grd_reflect_cast<GrdAstVar>(sym)) {
+	} else if (auto var = grd_reflect_cast<GrdcAstVar>(sym)) {
 		auto reg = tok.reg;
-		next(p);
-		auto expr = grd_make_ast_expr<AstVariableAccess>(p, var->var_ts->tp, AST_EXPR_LVALUE, reg);
+		grdc_next(p);
+		auto expr = grdc_make_ast_expr<GrdcAstVariableAccess>(p, var->var_ts->tp, GRDC_AST_EXPR_LVALUE, reg);
 		expr->var = var;
 		lhs = expr;
-	} else if (auto func = grd_reflect_cast<GrdAstFunction>(sym)) {
-		next(p);
-		auto [call, e] = parse_function_call(p, tok, func);
+	} else if (auto func = grd_reflect_cast<GrdcAstFunction>(sym)) {
+		grdc_next(p);
+		auto [call, e] = grdc_parse_function_call(p, tok, func);
 		if (e) {
 			return { NULL, e };
 		}
@@ -1781,24 +1781,24 @@ Tuple<GrdAstExpr*, Error*> parse_primary_expr(GrdCcParser* p) {
 	}
 
 	while (true) {
-		auto tok = peek(p);
+		auto tok = grdc_peek(p);
 
-		auto postfix_op = find_postfix_unary_operator(p, tok.str);
+		auto postfix_op = grdc_find_postfix_unary_operator(p, tok.str);
 		if (postfix_op) {
 			if (tok.str == "++"_b || tok.str == "--"_b) {
-				if (!is_numeric(lhs->expr_type)) {
+				if (!grdc_is_numeric(lhs->expr_type)) {
 					return { NULL, grd_simple_parser_error(p, grd_current_loc(), tok.reg, U"Operator '%' can only be applied to numeric types. Got '%'.", tok.str, lhs->expr_type->name) };
 				}
 				if (!lhs->is_lvalue) {
 					return { NULL, grd_simple_parser_error(p, grd_current_loc(), tok.reg, U"Operator '%' can only be applied to lvalues.", tok.str) };
 				}
 			}
-			next(p);
-			ProgramTextRegion text_region = { tok.reg.start, tok.reg.end };
+			grdc_next(p);
+			GrdcProgramTextRegion text_region = { tok.reg.start, tok.reg.end };
 			if (lhs->text_region.has_value) {
 				text_region.start = lhs->text_region.value.start;
 			}
-			auto node = grd_make_ast_expr<AstUnaryExpr>(p, lhs->expr_type, AST_EXPR_RVALUE, text_region);
+			auto node = grdc_make_ast_expr<GrdcAstUnaryExpr>(p, lhs->expr_type, GRDC_AST_EXPR_RVALUE, text_region);
 			node->expr = lhs;
 			node->op = postfix_op;
 			lhs = node;
@@ -1806,11 +1806,11 @@ Tuple<GrdAstExpr*, Error*> parse_primary_expr(GrdCcParser* p) {
 		}
 		if (tok.str == "("_b) {
 			// @TODO: support calling on function pointers.
-			auto func = grd_reflect_cast<GrdAstFunction>(lhs);
+			auto func = grd_reflect_cast<GrdcAstFunction>(lhs);
 			if (!func) {
 				return { NULL, grd_simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected a function, got '%'"_b, lhs->type->name) };
 			}
-			auto [call, e] = parse_function_call(p, tok, func);
+			auto [call, e] = grdc_parse_function_call(p, tok, func);
 			if (e) {
 				return { NULL, e };
 			}
@@ -1818,11 +1818,11 @@ Tuple<GrdAstExpr*, Error*> parse_primary_expr(GrdCcParser* p) {
 			continue;
 		}
 		if (tok.str == "."_b) {
-			GrdAstStructType* access_tp = NULL;
-			if (auto struct_tp = grd_reflect_cast<GrdAstStructType>(lhs->expr_type)) {
+			GrdcAstStructType* access_tp = NULL;
+			if (auto struct_tp = grd_reflect_cast<GrdcAstStructType>(lhs->expr_type)) {
 				access_tp = struct_tp;
-			} else if (auto ptr_tp = grd_reflect_cast<AstGrdPointerType>(lhs->expr_type)) {
-				if (auto struct_tp = grd_reflect_cast<GrdAstStructType>(ptr_tp->pointee)) {
+			} else if (auto ptr_tp = grd_reflect_cast<GrdcAstPointerType>(lhs->expr_type)) {
+				if (auto struct_tp = grd_reflect_cast<GrdcAstStructType>(ptr_tp->pointee)) {
 					access_tp = struct_tp;
 				} else {
 					return { NULL, grd_simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected struct type but got '%'"_b, ptr_tp->pointee->name) };
@@ -1830,13 +1830,13 @@ Tuple<GrdAstExpr*, Error*> parse_primary_expr(GrdCcParser* p) {
 			} else {
 				return { NULL, grd_simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected a struct, got '%'"_b, lhs->expr_type->name) };
 			}
-			next(p);
-			auto [ident, e] = parse_ident(p);
+			grdc_next(p);
+			auto [ident, e] = grdc_parse_ident(p);
 			if (e) {
 				return { NULL, e };
 			}
 			
-			auto [swizzle, ee] = try_parse_swizzle_expr(p, lhs, access_tp, ident);
+			auto [swizzle, ee] = grdc_try_parse_swizzle_expr(p, lhs, access_tp, ident);
 			if (ee) {
 				return { NULL, ee };
 			}
@@ -1845,46 +1845,46 @@ Tuple<GrdAstExpr*, Error*> parse_primary_expr(GrdCcParser* p) {
 				continue;
 			}
 
-			auto member = find_struct_member(p, access_tp, ident.str);
+			auto member = grdc_find_struct_member(p, access_tp, ident.str);
 			if (!member) {
 				return { NULL, grd_simple_parser_error(p, grd_current_loc(), tok.reg, U"Member '%' not found in struct '%'.", ident.str, lhs->expr_type->name) };
 			}
-			ProgramTextRegion text_region = { ident.reg.start, ident.reg.end };
+			GrdcProgramTextRegion text_region = { ident.reg.start, ident.reg.end };
 			if (lhs->text_region.has_value) {
 				text_region.start = lhs->text_region.value.start;
 			}
-			auto node = grd_make_ast_expr<AstVarMemberAccess>(p, member->member_ts->tp, lhs->is_lvalue, text_region);
+			auto node = grdc_make_ast_expr<GrdcAstVarMemberAccess>(p, member->member_ts->tp, lhs->is_lvalue, text_region);
 			node->lhs = lhs;
 			node->member = member;
 			lhs = node;
 			continue;
 		}
 		if (tok.str == "["_b) {
-			bool ok = is_pointer(lhs->expr_type) || is_array(lhs->expr_type);
+			bool ok = grdc_is_pointer(lhs->expr_type) || grdc_is_array(lhs->expr_type);
 			if (!ok) {
 				return { NULL, grd_simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected an array or pointer, got '%'"_b, lhs->expr_type->name) };
 			}
-			next(p);
-			auto [expr, e] = parse_expr(p, 0);
+			grdc_next(p);
+			auto [expr, e] = grdc_parse_expr(p, 0);
 			if (e) {
 				return { NULL, e };
 			}
-			if (!is_integer(expr->expr_type)) {
+			if (!grdc_is_integer(expr->expr_type)) {
 				return { NULL, grd_simple_parser_error(p, grd_current_loc(), tok.reg, U"GrdArray index must be an integer, got '%'"_b, expr->expr_type->name) };
 			}
-			if (peek(p).str != "]"_b) {
+			if (grdc_peek(p).str != "]"_b) {
 				return { NULL, grd_simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected a ]"_b) };
 			}
-			next(p);
-			auto element_type = get_element_type(lhs->expr_type);
+			grdc_next(p);
+			auto element_type = grdc_get_element_type(lhs->expr_type);
 			if (!element_type) {
 				panic(p, U"Unexpected error. expected an array or pointer, got %"_b, lhs->expr_type->name);
 			}
-			ProgramTextRegion text_region = { tok.reg.start, peek(p).reg.end };
+			GrdcProgramTextRegion text_region = { tok.reg.start, grdc_peek(p).reg.end };
 			if (lhs->text_region.has_value) {
 				text_region.start = lhs->text_region.value.start;
 			}
-			auto node = grd_make_ast_expr<AstGrdArrayAccess>(p, element_type, AST_EXPR_LVALUE, text_region);
+			auto node = grdc_make_ast_expr<GrdcAstGrdArrayAccess>(p, element_type, GRDC_AST_EXPR_LVALUE, text_region);
 			node->lhs = lhs;
 			node->index = expr;
 			lhs = node;
@@ -1896,15 +1896,15 @@ Tuple<GrdAstExpr*, Error*> parse_primary_expr(GrdCcParser* p) {
 	return { lhs, NULL };
 }
 
-Tuple<GrdAstExpr*, Error*> parse_expr(GrdCcParser* p, s32 min_prec) {
-	auto [lhs, e] = parse_primary_expr(p);
+GrdTuple<GrdcAstExpr*, GrdError*> grdc_parse_expr(GrdcParser* p, s32 min_prec) {
+	auto [lhs, e] = grdc_parse_primary_expr(p);
 	if (e) {
 		return { NULL, e };
 	}
 
 	while (true) {
-		auto tok = peek(p);
-		auto op = find_binary_operator(p, tok.str);
+		auto tok = grdc_peek(p);
+		auto op = grdc_find_binary_operator(p, tok.str);
 		if (!op) {
 			break;
 		}
@@ -1912,24 +1912,24 @@ Tuple<GrdAstExpr*, Error*> parse_expr(GrdCcParser* p, s32 min_prec) {
 			break;
 		}
 		if (tok.str == "?"_b) {
-			next(p);
-			auto [then_expr, e2] = parse_expr(p, 0);
+			grdc_next(p);
+			auto [then_expr, e2] = grdc_parse_expr(p, 0);
 			if (e2) {
 				return { NULL, e2 };
 			}
-			auto tok = peek(p);
+			auto tok = grdc_peek(p);
 			if (tok.str != ":"_b) {
 				return { NULL, grd_simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected :"_b) };
 			}
-			next(p);
-			auto [else_expr, e3] = parse_expr(p, (op->flags & AST_OP_FLAG_LEFT_ASSOC) ? op->prec + 1 : op->prec);
+			grdc_next(p);
+			auto [else_expr, e3] = grdc_parse_expr(p, (op->flags & GRDC_AST_OP_FLAG_LEFT_ASSOC) ? op->prec + 1 : op->prec);
 			if (e3) {
 				return { NULL, e3 };
 			}
 			if (lhs->expr_type != else_expr->expr_type) {
 				return { NULL, grd_simple_parser_error(p, grd_current_loc(), tok.reg, U"Ternary expression type mismatch, expected '%' but got '%'.", lhs->expr_type->name, else_expr->expr_type->name) };
 			}
-			ProgramTextRegion text_region = { tok.reg.start, peek(p).reg.end };
+			GrdcProgramTextRegion text_region = { tok.reg.start, grdc_peek(p).reg.end };
 			if (lhs->text_region.has_value) {
 				text_region.start = lhs->text_region.value.start;
 			}
@@ -1939,20 +1939,20 @@ Tuple<GrdAstExpr*, Error*> parse_expr(GrdCcParser* p, s32 min_prec) {
 			if (else_expr->text_region.has_value) {
 				text_region.end = else_expr->text_region.value.end;
 			}
-			auto node = grd_make_ast_expr<AstTernary>(p, lhs->expr_type, AST_EXPR_RVALUE, text_region);
+			auto node = grdc_make_ast_expr<GrdcAstTernary>(p, lhs->expr_type, GRDC_AST_EXPR_RVALUE, text_region);
 			node->cond = lhs;
 			node->then = then_expr;
 			node->else_ = else_expr;
 			lhs = node;
 			continue;
 		}
-		next(p);
-		auto [rhs, e] = parse_expr(p, (op->flags & AST_OP_FLAG_LEFT_ASSOC) ? op->prec + 1 : op->prec);
+		grdc_next(p);
+		auto [rhs, e] = grdc_parse_expr(p, (op->flags & GRDC_AST_OP_FLAG_LEFT_ASSOC) ? op->prec + 1 : op->prec);
 		if (e) {
 			return { NULL, e };
 		}
 
-		auto [expr, e2] = typecheck_binary_expr(p, lhs, rhs, tok, op);
+		auto [expr, e2] = grdc_typecheck_binary_expr(p, lhs, rhs, tok, op);
 		if (e2) {
 			return { NULL, e2 };
 		}
@@ -1961,13 +1961,13 @@ Tuple<GrdAstExpr*, Error*> parse_expr(GrdCcParser* p, s32 min_prec) {
 	return { lhs, NULL };
 }
 
-Tuple<AstBlock*, Error*> parse_block(GrdCcParser* p);
-Tuple<AstNode*, Error*, bool> parse_stmt(GrdCcParser* p);
-Tuple<AstBlock*, Error*> parse_block_or_one_stmt(GrdCcParser* p);
+GrdTuple<GrdcAstBlock*, GrdError*> grdc_parse_block(GrdcParser* p);
+GrdTuple<GrdcAstNode*, GrdError*, bool> grdc_parse_stmt(GrdcParser* p);
+GrdTuple<GrdcAstBlock*, GrdError*> grdc_parse_block_or_one_stmt(GrdcParser* p);
 
-Tuple<s64, Error*> eval_const_int_inner(GrdAstExpr* expr) {
+GrdTuple<s64, GrdError*> grdc_eval_const_int_inner(GrdcAstExpr* expr) {
 	auto p = expr->p;
-	if (auto i = grd_reflect_cast<AstLiteralExpr>(expr)) {
+	if (auto i = grd_reflect_cast<GrdcAstLiteralExpr>(expr)) {
 		if (i->lit_type == grd_reflect_type_of<s64>()) {
 			return { i->lit_value.s64_value, NULL };
 		} else if (i->lit_type == grd_reflect_type_of<s32>()) {
@@ -1975,9 +1975,9 @@ Tuple<s64, Error*> eval_const_int_inner(GrdAstExpr* expr) {
 		} else {
 			return { 0, grd_simple_parser_error(p, grd_current_loc(), expr->text_region, "Expected s32 or s64 literal, got '%*'", i->lit_type->name) };
 		}
-	} else if (auto i = grd_reflect_cast<AstUnaryExpr>(expr)) {
+	} else if (auto i = grd_reflect_cast<GrdcAstUnaryExpr>(expr)) {
 		if (i->op->op == "-"_b) {
-			auto [v, e] = eval_const_int_inner(i->expr);
+			auto [v, e] = grdc_eval_const_int_inner(i->expr);
 			if (e) {
 				return { 0, e };
 			}
@@ -1990,8 +1990,8 @@ Tuple<s64, Error*> eval_const_int_inner(GrdAstExpr* expr) {
 	}
 }
 
-Tuple<s64, Error*> eval_const_int(GrdAstExpr* expr, s64 min, s64 max_inclusive) {
-	auto [v, e] = eval_const_int_inner(expr);
+GrdTuple<s64, GrdError*> grdc_eval_const_int(GrdcAstExpr* expr, s64 min, s64 max_inclusive) {
+	auto [v, e] = grdc_eval_const_int_inner(expr);
 	if (e) {
 		return { 0, e };
 	}
@@ -2004,104 +2004,104 @@ Tuple<s64, Error*> eval_const_int(GrdAstExpr* expr, s64 min, s64 max_inclusive) 
 	return { v, NULL };
 }
 
-struct MtlBufferIdxAttr: GrdAstAttr {
+struct GrdcMtlBufferIdxAttr: GrdcAstAttr {
 	s64 index = 0;
 
-	GRD_REFLECT(MtlBufferIdxAttr) {
-		GRD_BASE_TYPE(GrdAstAttr);
+	GRD_REFLECT(GrdcMtlBufferIdxAttr) {
+		GRD_BASE_TYPE(GrdcAstAttr);
 		GRD_MEMBER(index);
 	}
 };
 
-struct MtlBufferAttr: MtlBufferIdxAttr {
-	GRD_REFLECT(MtlBufferAttr) {
-		GRD_BASE_TYPE(MtlBufferIdxAttr);
+struct GrdcMtlBufferAttr: GrdcMtlBufferIdxAttr {
+	GRD_REFLECT(GrdcMtlBufferAttr) {
+		GRD_BASE_TYPE(GrdcMtlBufferIdxAttr);
 	}
 };
 
-struct MtlConstantAttr: MtlBufferIdxAttr {
-	GRD_REFLECT(MtlConstantAttr) {
-		GRD_BASE_TYPE(MtlBufferIdxAttr);
+struct GrdcMtlConstantAttr: GrdcMtlBufferIdxAttr {
+	GRD_REFLECT(GrdcMtlConstantAttr) {
+		GRD_BASE_TYPE(GrdcMtlBufferIdxAttr);
 	}
 };
 
-struct VkSetBindingAttr: GrdAstAttr {
+struct GrdcVkSetBindingAttr: GrdcAstAttr {
 	s64 set = 0;
 	s64 binding = 0;
 
-	GRD_REFLECT(VkSetBindingAttr) {
-		GRD_BASE_TYPE(GrdAstAttr);
+	GRD_REFLECT(GrdcVkSetBindingAttr) {
+		GRD_BASE_TYPE(GrdcAstAttr);
 		GRD_MEMBER(set);
 		GRD_MEMBER(binding);
 	}
 };
 
-struct VkUniformAttr: VkSetBindingAttr {
-	GRD_REFLECT(VkUniformAttr) {
-		GRD_BASE_TYPE(VkSetBindingAttr);
+struct GrdcVkUniformAttr: GrdcVkSetBindingAttr {
+	GRD_REFLECT(GrdcVkUniformAttr) {
+		GRD_BASE_TYPE(GrdcVkSetBindingAttr);
 	}
 };
 
 
-struct PositionAttr: GrdAstAttr {
-	GRD_REFLECT(PositionAttr) {
-		GRD_BASE_TYPE(GrdAstAttr);
+struct GrdcPositionAttr: GrdcAstAttr {
+	GRD_REFLECT(GrdcPositionAttr) {
+		GRD_BASE_TYPE(GrdcAstAttr);
 	}
 };
 
-struct FragmentAttr: GrdAstAttr {
-	GRD_REFLECT(FragmentAttr) {
-		GRD_BASE_TYPE(GrdAstAttr);
+struct GrdcFragmentAttr: GrdcAstAttr {
+	GRD_REFLECT(GrdcFragmentAttr) {
+		GRD_BASE_TYPE(GrdcAstAttr);
 	}
 };
 
-struct VertexAttr: GrdAstAttr {
-	GRD_REFLECT(VertexAttr) {
-		GRD_BASE_TYPE(GrdAstAttr);
+struct GrdcVertexAttr: GrdcAstAttr {
+	GRD_REFLECT(GrdcVertexAttr) {
+		GRD_BASE_TYPE(GrdcAstAttr);
 	}
 };
 
-struct StageInAttr: GrdAstAttr {
-	GRD_REFLECT(StageInAttr) {
-		GRD_BASE_TYPE(GrdAstAttr);
+struct GrdcStageInAttr: GrdcAstAttr {
+	GRD_REFLECT(GrdcStageInAttr) {
+		GRD_BASE_TYPE(GrdcAstAttr);
 	}
 };
 
-struct ColorAttr: GrdAstAttr {
+struct GrdcColorAttr: GrdcAstAttr {
 	s64 idx = 0;
 
-	GRD_REFLECT(ColorAttr) {
-		GRD_BASE_TYPE(GrdAstAttr);
+	GRD_REFLECT(GrdcColorAttr) {
+		GRD_BASE_TYPE(GrdcAstAttr);
 		GRD_MEMBER(idx);
 	}
 };
 
 template <typename T>
-T* grd_make_ast_attr(GrdCcParser* p, GrdcToken name, GrdArray<GrdAstExpr*> args, ProgramTextRegion reg) {
-	auto node = grd_make_ast_node<T>(p, reg);
+T* grdc_make_ast_attr(GrdcParser* p, GrdcToken name, GrdArray<GrdcAstExpr*> args, GrdcProgramTextRegion reg) {
+	auto node = grdc_make_ast_node<T>(p, reg);
 	node->name = name.str;
 	node->args = args;
 	return node;
 }
 
-Tuple<GrdAstAttr*, Error*> parse_attr(GrdCcParser* p, GrdcToken name, GrdArray<GrdAstExpr*> args, ProgramTextRegion reg) {
+GrdTuple<GrdcAstAttr*, GrdError*> grdc_parse_attr(GrdcParser* p, GrdcToken name, GrdArray<GrdcAstExpr*> args, GrdcProgramTextRegion reg) {
 	if (name.str == "vk_uniform") {
-		auto attr = grd_make_ast_attr<VkUniformAttr>(p, name, args, reg);
+		auto attr = grdc_make_ast_attr<GrdcVkUniformAttr>(p, name, args, reg);
 		if (grd_len(args) == 0) {
 
 		} else if (grd_len(args) == 1) {
-			auto [v, e] = eval_const_int(args[0], 0, s64_max);
+			auto [v, e] = grdc_eval_const_int(args[0], 0, s64_max);
 			if (e) {
 				return { NULL, e };
 			}
 			attr->binding = v;
 		} else if (grd_len(args) == 2) {
-			auto [v, e] = eval_const_int(args[0], 0, s64_max);
+			auto [v, e] = grdc_eval_const_int(args[0], 0, s64_max);
 			if (e) {
 				return { NULL, e };
 			}
 			attr->set = v;
-			auto [v2, e2] = eval_const_int(args[1], 0, s64_max);
+			auto [v2, e2] = grdc_eval_const_int(args[1], 0, s64_max);
 			if (e2) {
 				return { NULL, e2 };
 			}
@@ -2111,11 +2111,11 @@ Tuple<GrdAstAttr*, Error*> parse_attr(GrdCcParser* p, GrdcToken name, GrdArray<G
 		}
 		return { attr, NULL };
 	} else if (name.str == "mtl_buffer") {
-		auto attr = grd_make_ast_attr<MtlBufferAttr>(p, name, args, reg);
+		auto attr = grdc_make_ast_attr<GrdcMtlBufferAttr>(p, name, args, reg);
 		if (grd_len(args) == 0) {
 
 		} else if (grd_len(args) == 1) {
-			auto [v, e] = eval_const_int(args[0], 0, s64_max);
+			auto [v, e] = grdc_eval_const_int(args[0], 0, s64_max);
 			if (e) {
 				return { NULL, e };
 			}
@@ -2125,11 +2125,11 @@ Tuple<GrdAstAttr*, Error*> parse_attr(GrdCcParser* p, GrdcToken name, GrdArray<G
 		}
 		return { attr, NULL };
 	} else if (name.str == "mtl_constant") {
-		auto attr = grd_make_ast_attr<MtlConstantAttr>(p, name, args, reg);
+		auto attr = grdc_make_ast_attr<GrdcMtlConstantAttr>(p, name, args, reg);
 		if (grd_len(args) == 0) {
 
 		} else if (grd_len(args) == 1) {
-			auto [v, e] = eval_const_int(args[0], 0, s64_max);
+			auto [v, e] = grdc_eval_const_int(args[0], 0, s64_max);
 			if (e) {
 				return { NULL, e };
 			}
@@ -2142,29 +2142,29 @@ Tuple<GrdAstAttr*, Error*> parse_attr(GrdCcParser* p, GrdcToken name, GrdArray<G
 		if (grd_len(args) != 0) {
 			return { NULL, grd_simple_parser_error(p, grd_current_loc(), name.reg, "Expected 0 arguments for position attribute, got %"_b, grd_len(args)) };
 		}
-		auto attr = grd_make_ast_attr<PositionAttr>(p, name, args, reg);
+		auto attr = grdc_make_ast_attr<GrdcPositionAttr>(p, name, args, reg);
 		return { attr, NULL };
 	} else if (name.str == "fragment") {
 		if (grd_len(args) != 0) {
 			return { NULL, grd_simple_parser_error(p, grd_current_loc(), name.reg, "Expected 0 arguments for fragment attribute, got %"_b, grd_len(args)) };
 		}
-		auto attr = grd_make_ast_attr<FragmentAttr>(p, name, args, reg);
+		auto attr = grdc_make_ast_attr<GrdcFragmentAttr>(p, name, args, reg);
 		return { attr, NULL };
 	} else if (name.str == "stage_in") {
 		if (grd_len(args) != 0) {
 			return { NULL, grd_simple_parser_error(p, grd_current_loc(), name.reg, "Expected 0 arguments for stage_in attribute, got %"_b, grd_len(args)) };
 		}
-		auto attr = grd_make_ast_attr<StageInAttr>(p, name, args, reg);
+		auto attr = grdc_make_ast_attr<GrdcStageInAttr>(p, name, args, reg);
 		return { attr, NULL };
 	} else if (name.str == "color") {
 		if (grd_len(args) != 1) {
 			return { NULL, grd_simple_parser_error(p, grd_current_loc(), name.reg, "Expected 1 argument for color attribute, got %"_b, grd_len(args)) };
 		}
-		auto [v, e] = eval_const_int(args[0], 0, s64_max);
+		auto [v, e] = grdc_eval_const_int(args[0], 0, s64_max);
 		if (e) {
 			return { NULL, e };
 		}
-		auto attr = grd_make_ast_attr<ColorAttr>(p, name, args, reg);
+		auto attr = grdc_make_ast_attr<GrdcColorAttr>(p, name, args, reg);
 		attr->idx = v;
 		return { attr, NULL };
 	} else {
@@ -2172,50 +2172,50 @@ Tuple<GrdAstAttr*, Error*> parse_attr(GrdCcParser* p, GrdcToken name, GrdArray<G
 	}
 }
 
-Tuple<GrdArray<GrdAstAttr*>, Error*> parse_attrs(GrdCcParser* p) {
-	GrdArray<GrdAstAttr*> attrs;
+GrdTuple<GrdArray<GrdcAstAttr*>, GrdError*> grdc_parse_attrs(GrdcParser* p) {
+	GrdArray<GrdcAstAttr*> attrs;
 	attrs.allocator = p->allocator;
 	while (true) {
-		auto start_tok = peek(p);
+		auto start_tok = grdc_peek(p);
 		if (start_tok.str != "[[") {
 			break;
 		}
-		next(p);
-		auto [name, e] = parse_ident(p);
+		grdc_next(p);
+		auto [name, e] = grdc_parse_ident(p);
 		if (e) {
 			return { {}, e };
 		}
-		auto tok = peek(p);
-		GrdArray<GrdAstExpr*> args = { .allocator = p->allocator };
+		auto tok = grdc_peek(p);
+		GrdArray<GrdcAstExpr*> args = { .allocator = p->allocator };
 		if (tok.str == "(") {
-			next(p);
+			grdc_next(p);
 			while (true) {
-				auto tok = peek(p);
+				auto tok = grdc_peek(p);
 				if (tok.str == ")") {
-					next(p);
+					grdc_next(p);
 					break;
 				}
 				if (grd_len(args) > 0) {
 					if (tok.str != ",") {
 						return { {}, grd_simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected ','"_b) };
 					}
-					next(p);
+					grdc_next(p);
 				}
-				auto op = find_binary_operator(p, U","_b);
-				auto [expr, e] = parse_expr(p, op->prec + 1);
+				auto op = grdc_find_binary_operator(p, U","_b);
+				auto [expr, e] = grdc_parse_expr(p, op->prec + 1);
 				if (e) {
 					return { {}, e };
 				}
 				grd_add(&args, expr);
 			}
 		}
-		auto end_tok = peek(p);
+		auto end_tok = grdc_peek(p);
 		if (end_tok.str != "]]") {
 			return { {}, grd_simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected ]]"_b) };
 		}
-		next(p);
-		ProgramTextRegion reg = { start_tok.reg.start, end_tok.reg.end };
-		auto [attr, e3] = parse_attr(p, name, args, reg);
+		grdc_next(p);
+		GrdcProgramTextRegion reg = { start_tok.reg.start, end_tok.reg.end };
+		auto [attr, e3] = grdc_parse_attr(p, name, args, reg);
 		if (e3) {
 			return { {}, e3 };
 		}
@@ -2224,43 +2224,43 @@ Tuple<GrdArray<GrdAstAttr*>, Error*> parse_attrs(GrdCcParser* p) {
 	return { attrs, NULL };
 }
 
-Tuple<AstIf*, Error*> parse_if(GrdCcParser* p, GrdcToken if_tok) {
-	if (peek(p).str != "("_b) {
-		return { NULL, grd_simple_parser_error(p, grd_current_loc(), peek(p).reg, U"Expected ("_b) };
+GrdTuple<GrdcAstIf*, GrdError*> parse_if(GrdcParser* p, GrdcToken if_tok) {
+	if (grdc_peek(p).str != "("_b) {
+		return { NULL, grd_simple_parser_error(p, grd_current_loc(), grdc_peek(p).reg, U"Expected ("_b) };
 	}
-	next(p);
-	auto [cond, e] = parse_expr(p, 0);
+	grdc_next(p);
+	auto [cond, e] = grdc_parse_expr(p, 0);
 	if (e) {
 		return { NULL, e };
 	}
-	if (cond->expr_type != find_type(p, U"bool"_b)) {
+	if (cond->expr_type != grdc_find_type(p, U"bool"_b)) {
 		auto error_reg = if_tok.reg;
 		if (cond->text_region.has_value) {
 			error_reg = cond->text_region.value;
 		}
 		return { NULL, grd_simple_parser_error(p, grd_current_loc(), error_reg, U"Condition must be bool, but it's '%'"_b, cond->expr_type->name) };
 	}
-	if (peek(p).str != ")"_b) {
-		return { NULL, grd_simple_parser_error(p, grd_current_loc(), peek(p).reg, U"Expected )"_b) };
+	if (grdc_peek(p).str != ")"_b) {
+		return { NULL, grd_simple_parser_error(p, grd_current_loc(), grdc_peek(p).reg, U"Expected )"_b) };
 	}
-	next(p);
-	auto [then, e2] = parse_block_or_one_stmt(p);
+	grdc_next(p);
+	auto [then, e2] = grdc_parse_block_or_one_stmt(p);
 	if (e2) {
 		return { NULL, e2 };
 	}
-	ProgramTextRegion reg = if_tok.reg;
+	GrdcProgramTextRegion reg = if_tok.reg;
 	if (then->text_region.has_value) {
 		reg.end = then->text_region.value.end;
 	}
-	auto node = grd_make_ast_node<AstIf>(p, reg);
+	auto node = grdc_make_ast_node<GrdcAstIf>(p, reg);
 	node->cond = cond;
 	node->then = then;
-	auto tok = peek(p);
+	auto tok = grdc_peek(p);
 	if (tok.str == U"else"_b) {
-		next(p);
-		tok = peek(p);
+		grdc_next(p);
+		tok = grdc_peek(p);
 		if (tok.str == U"if"_b) {
-			next(p);
+			grdc_next(p);
 			auto [else_if, e3] = parse_if(p, tok);
 			if (e3) {
 				return { NULL, e3 };
@@ -2268,7 +2268,7 @@ Tuple<AstIf*, Error*> parse_if(GrdCcParser* p, GrdcToken if_tok) {
 			node->else_if = else_if;
 			return { node, NULL };
 		}
-		auto [else_block, e3] = parse_block_or_one_stmt(p);
+		auto [else_block, e3] = grdc_parse_block_or_one_stmt(p);
 		if (e3) {
 			return { NULL, e3 };
 		}
@@ -2279,39 +2279,39 @@ Tuple<AstIf*, Error*> parse_if(GrdCcParser* p, GrdcToken if_tok) {
 	}
 }
 
-Tuple<AstBlock*, Error*> parse_block_or_one_stmt(GrdCcParser* p) {
-	auto tok = peek(p);
+GrdTuple<GrdcAstBlock*, GrdError*> grdc_parse_block_or_one_stmt(GrdcParser* p) {
+	auto tok = grdc_peek(p);
 	if (tok.str == "{"_b) {
-		auto [block, e] = parse_block(p);
+		auto [block, e] = grdc_parse_block(p);
 		if (e) {
 			return { NULL, e };
 		}
 		return { block, NULL };
 	} else {
-		auto [stmt, e, semicolon_opt] = parse_stmt(p);
+		auto [stmt, e, semicolon_opt] = grdc_parse_stmt(p);
 		if (e) {
 			return { NULL, e };
 		}
 		if (!semicolon_opt) {
-			if (peek(p).str != U";"_b) {
-				return { NULL, grd_simple_parser_error(p, grd_current_loc(), peek(p).reg, U"Expected ;"_b) };
+			if (grdc_peek(p).str != U";"_b) {
+				return { NULL, grd_simple_parser_error(p, grd_current_loc(), grdc_peek(p).reg, U"Expected ;"_b) };
 			}
-			next(p);
+			grdc_next(p);
 		}
-		auto block = grd_make_ast_node<AstBlock>(p, stmt->text_region);
+		auto block = grdc_make_ast_node<GrdcAstBlock>(p, stmt->text_region);
 		grd_add(&block->statements, stmt);
 		return { block, NULL };
 	}
 }
 
-struct AstFor: AstNode {
-	GrdAstExpr*  init_expr = NULL;
-	GrdAstExpr*  cond_expr = NULL;
-	GrdAstExpr*  incr_expr = NULL;
-	AstBlock* body = NULL;
+struct GrdcAstFor: GrdcAstNode {
+	GrdcAstExpr*  init_expr = NULL;
+	GrdcAstExpr*  cond_expr = NULL;
+	GrdcAstExpr*  incr_expr = NULL;
+	GrdcAstBlock* body = NULL;
 
-	GRD_REFLECT(AstFor) {
-		GRD_BASE_TYPE(AstNode);
+	GRD_REFLECT(GrdcAstFor) {
+		GRD_BASE_TYPE(GrdcAstNode);
 		GRD_MEMBER(init_expr);
 		GRD_MEMBER(cond_expr);
 		GRD_MEMBER(incr_expr);
@@ -2319,44 +2319,44 @@ struct AstFor: AstNode {
 	}
 };
 
-Tuple<AstNode*, Error*> parse_for(GrdCcParser* p, GrdcToken for_tok) {
-	if (peek(p).str != "("_b) {
-		return { NULL, grd_simple_parser_error(p, grd_current_loc(), peek(p).reg, U"Expected ("_b) };
+GrdTuple<GrdcAstNode*, GrdError*> grdc_parse_for(GrdcParser* p, GrdcToken for_tok) {
+	if (grdc_peek(p).str != "("_b) {
+		return { NULL, grd_simple_parser_error(p, grd_current_loc(), grdc_peek(p).reg, U"Expected ("_b) };
 	}
-	next(p);
-	auto [init_expr, e] = parse_expr(p, 0);
+	grdc_next(p);
+	auto [init_expr, e] = grdc_parse_expr(p, 0);
 	if (e) {
 		return { NULL, e };
 	}
-	if (peek(p).str != ";"_b) {
-		return { NULL, grd_simple_parser_error(p, grd_current_loc(), peek(p).reg, U"Expected ;"_b) };
+	if (grdc_peek(p).str != ";"_b) {
+		return { NULL, grd_simple_parser_error(p, grd_current_loc(), grdc_peek(p).reg, U"Expected ;"_b) };
 	}
-	next(p);
-	auto [cond_expr, e2] = parse_expr(p, 0);
+	grdc_next(p);
+	auto [cond_expr, e2] = grdc_parse_expr(p, 0);
 	if (e2) {
 		return { NULL, e2 };
 	}
-	if (peek(p).str != ";"_b) {
-		return { NULL, grd_simple_parser_error(p, grd_current_loc(), peek(p).reg, U"Expected ;"_b) };
+	if (grdc_peek(p).str != ";"_b) {
+		return { NULL, grd_simple_parser_error(p, grd_current_loc(), grdc_peek(p).reg, U"Expected ;"_b) };
 	}
-	next(p);
-	auto [incr_expr, e3] = parse_expr(p, 0);
+	grdc_next(p);
+	auto [incr_expr, e3] = grdc_parse_expr(p, 0);
 	if (e3) {
 		return { NULL, e3 };
 	}
-	if (peek(p).str != ")"_b) {
-		return { NULL, grd_simple_parser_error(p, grd_current_loc(), peek(p).reg, U"Expected )"_b) };
+	if (grdc_peek(p).str != ")"_b) {
+		return { NULL, grd_simple_parser_error(p, grd_current_loc(), grdc_peek(p).reg, U"Expected )"_b) };
 	}
-	next(p);
-	auto [body, e4] = parse_block_or_one_stmt(p);
+	grdc_next(p);
+	auto [body, e4] = grdc_parse_block_or_one_stmt(p);
 	if (e4) {
 		return { NULL, e4 };
 	}
-	ProgramTextRegion text_region = { for_tok.reg.start, peek(p).reg.end };
+	GrdcProgramTextRegion text_region = { for_tok.reg.start, grdc_peek(p).reg.end };
 	if (body->text_region.has_value) {
 		text_region.end = body->text_region.value.end;
 	}
-	auto node = grd_make_ast_node<AstFor>(p, text_region);
+	auto node = grdc_make_ast_node<GrdcAstFor>(p, text_region);
 	node->init_expr = init_expr;
 	node->cond_expr = cond_expr;
 	node->incr_expr = incr_expr;
@@ -2364,51 +2364,51 @@ Tuple<AstNode*, Error*> parse_for(GrdCcParser* p, GrdcToken for_tok) {
 	return { node, NULL };
 }
 
-GrdAstFunction* get_current_function(GrdCcParser* p) {
+GrdcAstFunction* grdc_get_current_function(GrdcParser* p) {
 	for (auto i: grd_reverse(grd_range(grd_len(p->scope)))) { 
 		auto scope = p->scope[i];
-		if (auto f = grd_reflect_cast<GrdAstFunction>(scope)) {
+		if (auto f = grd_reflect_cast<GrdcAstFunction>(scope)) {
 			return f;
 		}
 	}
 	return NULL;
 }
 
-struct AstReturn: AstNode {
-	GrdAstExpr* rhs = NULL;
+struct GrdcAstReturn: GrdcAstNode {
+	GrdcAstExpr* rhs = NULL;
 
-	GRD_REFLECT(AstReturn) {
-		GRD_BASE_TYPE(AstNode);
+	GRD_REFLECT(GrdcAstReturn) {
+		GRD_BASE_TYPE(GrdcAstNode);
 		GRD_MEMBER(rhs);
 	}
 };
 
-Tuple<AstNode*, Error*, bool> parse_stmt(GrdCcParser* p) {
-	auto type_tok = peek(p);
+GrdTuple<GrdcAstNode*, GrdError*, bool> grdc_parse_stmt(GrdcParser* p) {
+	auto type_tok = grdc_peek(p);
 	if (type_tok.str == "if"_b) {
-		next(p);
+		grdc_next(p);
 		auto [if_, e] = parse_if(p, type_tok);
 		if (e) {
 			return { NULL, e };
 		}
 		return { if_, NULL, true };
 	} else if (type_tok.str == "for"_b) {
-		next(p);
-		auto [for_, e] = parse_for(p, type_tok);
+		grdc_next(p);
+		auto [for_, e] = grdc_parse_for(p, type_tok);
 		if (e) {
 			return { NULL, e };
 		}
 		return { for_, NULL, true };
 	} else if (type_tok.str == "return"_b) {
-		auto f = get_current_function(p);
+		auto f = grdc_get_current_function(p);
 		if (!f) {
 			return { NULL, grd_simple_parser_error(p, grd_current_loc(), type_tok.reg, U"return must be inside a function"_b) };
 		}
-		next(p);
+		grdc_next(p);
 
-		GrdAstExpr* rhs = NULL;
+		GrdcAstExpr* rhs = NULL;
 		if (f->return_ts->tp != p->void_tp) {
-			auto [expr, e] = parse_expr(p, 0);
+			auto [expr, e] = grdc_parse_expr(p, 0);
 			if (e) {
 				return { NULL, e };
 			}
@@ -2417,42 +2417,42 @@ Tuple<AstNode*, Error*, bool> parse_stmt(GrdCcParser* p) {
 				return { NULL, grd_simple_parser_error(p, grd_current_loc(), rhs->text_region, U"Expected return type '%' but got '%'"_b, f->return_ts->tp->name, rhs->expr_type->name) };
 			}
 		}
-		ProgramTextRegion reg = type_tok.reg;
+		GrdcProgramTextRegion reg = type_tok.reg;
 		if (rhs->text_region.has_value) {
 			reg.end = rhs->text_region.value.end;
 		}
-		auto node = grd_make_ast_node<AstReturn>(p, reg);
+		auto node = grdc_make_ast_node<GrdcAstReturn>(p, reg);
 		node->rhs = rhs;
 		return { node, NULL };
 	}
 
-	auto lookup_tp = find_type(p, type_tok.str);
+	auto lookup_tp = grdc_find_type(p, type_tok.str);
 	if (lookup_tp) {
-		auto [pre_type, e1] = parse_pre_type(p);
+		auto [pre_type, e1] = grdc_parse_pre_type(p);
 		if (e1) {
 			return { NULL, e1 };
 		}
-		auto [ident, e2] = parse_ident(p);
+		auto [ident, e2] = grdc_parse_ident(p);
 		if (e2) {
 			return { NULL, e2 };
 		}
-		auto [decl, ee] = parse_var_decl(p, pre_type, ident, false);
+		auto [decl, ee] = grdc_parse_var_decl(p, pre_type, ident, false);
 		if (ee) {
 			return { NULL, ee };
 		}
 		return { decl, NULL, false };
 	}
-	auto [expr, e] = parse_expr(p, 0);
+	auto [expr, e] = grdc_parse_expr(p, 0);
 	return { expr, e, false };
 }
 
-Tuple<AstBlock*, Error*> parse_block(GrdCcParser* p) {
-	auto tok = peek(p);
+GrdTuple<GrdcAstBlock*, GrdError*> grdc_parse_block(GrdcParser* p) {
+	auto tok = grdc_peek(p);
 	if (tok.str != U"{"_b) {
 		return { NULL, grd_simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected {"_b) };
 	}
-	next(p);
-	auto block = grd_make_ast_node<AstBlock>(p, {});
+	grdc_next(p);
+	auto block = grdc_make_ast_node<GrdcAstBlock>(p, {});
 	block->statements.allocator = p->allocator;
 	grd_add(&p->scope, block);
 	grd_defer { grd_pop(&p->scope); };
@@ -2460,31 +2460,31 @@ Tuple<AstBlock*, Error*> parse_block(GrdCcParser* p) {
 	s64 region_end = -1;
 	
 	while (true) {
-		auto tok = peek(p);
+		auto tok = grdc_peek(p);
 		if (tok.str == U"}"_b) {
 			region_end = tok.reg.end;
-			next(p);
+			grdc_next(p);
 			break;
 		}
-		auto [stmt, e, semicolon_opt] = parse_stmt(p);
+		auto [stmt, e, semicolon_opt] = grdc_parse_stmt(p);
 		if (e) {
 			return { NULL, e };
 		}
 		if (!semicolon_opt) {
-			if (peek(p).str != U";"_b) {
-				return { NULL, grd_simple_parser_error(p, grd_current_loc(), peek(p).reg, U"Expected ;"_b) };
+			if (grdc_peek(p).str != U";"_b) {
+				return { NULL, grd_simple_parser_error(p, grd_current_loc(), grdc_peek(p).reg, U"Expected ;"_b) };
 			}
-			next(p);
+			grdc_next(p);
 		}
 		grd_add(&block->statements, stmt);
 	}
 	assert(region_end != -1);
-	ProgramTextRegion text_region = { tok.reg.start, region_end };
+	GrdcProgramTextRegion text_region = { tok.reg.start, region_end };
 	block->text_region = text_region;
 	return { block, NULL };
 }
 
-Error* grd_make_double_site_error(GrdCcParser* p, GrdCodeLoc loc, GrdOptional<ProgramTextRegion> reg, GrdOptional<ProgramTextRegion> reg2, auto... args) {
+GrdError* grdc_make_double_site_error(GrdcParser* p, GrdCodeLoc loc, GrdOptional<GrdcProgramTextRegion> reg, GrdOptional<GrdcProgramTextRegion> reg2, auto... args) {
 	auto error = grd_make_parser_error(p, loc, args...);
 	add_site(p, error,
 		CParserErrorToken{ .reg = reg, .color = CPARSER_ERROR_TOKEN_COLOR_REGULAR_GREEN },
@@ -2493,20 +2493,20 @@ Error* grd_make_double_site_error(GrdCcParser* p, GrdCodeLoc loc, GrdOptional<Pr
 	return error;
 }
 
-Tuple<GrdAstFunctionKind, Error*> resolve_function_kind(GrdCcParser* p, GrdAstFunction* f) {
-	GrdAstFunctionKind kind = GrdAstFunctionKind::Plain;
-	GrdAstAttr* kind_attr = NULL;
+GrdTuple<GrdcAstFunctionKind, GrdError*> grdc_resolve_function_kind(GrdcParser* p, GrdcAstFunction* f) {
+	GrdcAstFunctionKind kind = GrdcAstFunctionKind::Plain;
+	GrdcAstAttr* kind_attr = NULL;
 	for (auto attr: f->attrs) {
-		GrdAstFunctionKind new_kind = GrdAstFunctionKind::Plain;
-		if (auto m = grd_reflect_cast<FragmentAttr>(attr)) {
-			new_kind = GrdAstFunctionKind::Fragment;
+		GrdcAstFunctionKind new_kind = GrdcAstFunctionKind::Plain;
+		if (auto m = grd_reflect_cast<GrdcFragmentAttr>(attr)) {
+			new_kind = GrdcAstFunctionKind::Fragment;
 		}
-		if (auto m = grd_reflect_cast<VertexAttr>(attr)) {
-			new_kind = GrdAstFunctionKind::Vertex;
+		if (auto m = grd_reflect_cast<GrdcVertexAttr>(attr)) {
+			new_kind = GrdcAstFunctionKind::Vertex;
 		}
-		if (new_kind != GrdAstFunctionKind::Plain) {
-			if (kind != GrdAstFunctionKind::Plain) {
-				return { {}, grd_make_double_site_error(p, grd_current_loc(), kind_attr->text_region, attr->text_region, "Function kind already defined."_b) };
+		if (new_kind != GrdcAstFunctionKind::Plain) {
+			if (kind != GrdcAstFunctionKind::Plain) {
+				return { {}, grdc_make_double_site_error(p, grd_current_loc(), kind_attr->text_region, attr->text_region, "Function kind already defined."_b) };
 			}
 			kind = new_kind;
 		}
@@ -2514,7 +2514,7 @@ Tuple<GrdAstFunctionKind, Error*> resolve_function_kind(GrdCcParser* p, GrdAstFu
 	return { kind, NULL };
 }
 
-Error* handle_entry_point_arg(GrdCcParser* p, GrdAstFunction* f, s64 idx) {
+GrdError* grdc_handle_entry_point_arg(GrdcParser* p, GrdcAstFunction* f, s64 idx) {
 	auto arg = f->args[idx];
 
 	enum class EntryPointArgKind {
@@ -2525,20 +2525,20 @@ Error* handle_entry_point_arg(GrdCcParser* p, GrdAstFunction* f, s64 idx) {
 	EntryPointArgKind kind = EntryPointArgKind::Undefined;
 
 	for (auto attr: arg->attrs) {
-		if (auto m = grd_reflect_cast<StageInAttr>(attr)) {
+		if (auto m = grd_reflect_cast<GrdcStageInAttr>(attr)) {
 			m->is_used = true;
 			kind = EntryPointArgKind::StageIn;
 			break;
 		}
-		if (auto m = grd_reflect_cast<MtlBufferAttr>(attr)) {
+		if (auto m = grd_reflect_cast<GrdcMtlBufferAttr>(attr)) {
 			kind = EntryPointArgKind::Buffer;
 			break;
 		}
-		if (auto m = grd_reflect_cast<MtlConstantAttr>(attr)) {
+		if (auto m = grd_reflect_cast<GrdcMtlConstantAttr>(attr)) {
 			kind = EntryPointArgKind::Buffer;
 			break;
 		}
-		if (auto m = grd_reflect_cast<VkUniformAttr>(attr)) {
+		if (auto m = grd_reflect_cast<GrdcVkUniformAttr>(attr)) {
 			kind = EntryPointArgKind::Buffer;
 			break;
 		}
@@ -2547,25 +2547,25 @@ Error* handle_entry_point_arg(GrdCcParser* p, GrdAstFunction* f, s64 idx) {
 		return grd_simple_parser_error(p, grd_current_loc(), arg->text_region, "Unexpected entry point argument."_b);
 	}
 	if (kind == EntryPointArgKind::Buffer) {
-		if (!is_pointer(arg->var_ts->tp)) {
+		if (!grdc_is_pointer(arg->var_ts->tp)) {
 			return grd_simple_parser_error(p, grd_current_loc(), arg->text_region, "Expected pointer type for a buffer."_b);
 		}
-		VkUniformAttr* vk_attr = NULL;
-		MtlBufferIdxAttr* mtl_attr = NULL;
+		GrdcVkUniformAttr* vk_attr = NULL;
+		GrdcMtlBufferIdxAttr* mtl_attr = NULL;
 		for (auto attr: arg->attrs) {
-			if (auto m = grd_reflect_cast<VkUniformAttr>(attr)) {
+			if (auto m = grd_reflect_cast<GrdcVkUniformAttr>(attr)) {
 				if (vk_attr) {
-					return grd_make_double_site_error(p, grd_current_loc(), vk_attr->text_region, attr->text_region, "Vk uniform attribute is already specified."_b);
+					return grdc_make_double_site_error(p, grd_current_loc(), vk_attr->text_region, attr->text_region, "Vk uniform attribute is already specified."_b);
 				}
 				vk_attr = m;
-			} else if (auto m = grd_reflect_cast<MtlBufferAttr>(attr)) {
+			} else if (auto m = grd_reflect_cast<GrdcMtlBufferAttr>(attr)) {
 				if (mtl_attr) {
-					return grd_make_double_site_error(p, grd_current_loc(), mtl_attr->text_region, attr->text_region, "Metal buffer attribute is already specified."_b);
+					return grdc_make_double_site_error(p, grd_current_loc(), mtl_attr->text_region, attr->text_region, "Metal buffer attribute is already specified."_b);
 				}
 				mtl_attr = m;
-			} else if (auto m = grd_reflect_cast<MtlConstantAttr>(attr)) {
+			} else if (auto m = grd_reflect_cast<GrdcMtlConstantAttr>(attr)) {
 				if (mtl_attr) {
-					return grd_make_double_site_error(p, grd_current_loc(), mtl_attr->text_region, attr->text_region, "Metal constant attribute is already specified."_b);
+					return grdc_make_double_site_error(p, grd_current_loc(), mtl_attr->text_region, attr->text_region, "Metal constant attribute is already specified."_b);
 				}
 				mtl_attr = m;
 			} else {
@@ -2580,12 +2580,12 @@ Error* handle_entry_point_arg(GrdCcParser* p, GrdAstFunction* f, s64 idx) {
 		}
 		for (auto it: f->mtl_buffers) {
 			if (it->index == mtl_attr->index) {
-				return grd_make_double_site_error(p, grd_current_loc(), it->text_region, mtl_attr->text_region, "Metal buffer index (%) is already used."_b, mtl_attr->index);
+				return grdc_make_double_site_error(p, grd_current_loc(), it->text_region, mtl_attr->text_region, "Metal buffer index (%) is already used."_b, mtl_attr->index);
 			}
 		}
 		for (auto it: f->vk_set_bindings) {
 			if (it->set == vk_attr->set && it->binding == vk_attr->binding) {
-				return grd_make_double_site_error(p, grd_current_loc(), it->text_region, vk_attr->text_region, "Vulkan set/binding (%, %) is already used."_b, vk_attr->set, vk_attr->binding);
+				return grdc_make_double_site_error(p, grd_current_loc(), it->text_region, vk_attr->text_region, "Vulkan set/binding (%, %) is already used."_b, vk_attr->set, vk_attr->binding);
 			}
 		}
 		mtl_attr->is_used = true;
@@ -2594,26 +2594,26 @@ Error* handle_entry_point_arg(GrdCcParser* p, GrdAstFunction* f, s64 idx) {
 		grd_add(&f->vk_set_bindings, vk_attr);
 	}
 	if (kind == EntryPointArgKind::StageIn) {
-		if (!is_struct(arg->var_ts->tp)) {
+		if (!grdc_is_struct(arg->var_ts->tp)) {
 			return grd_simple_parser_error(p, grd_current_loc(), arg->text_region, "Expected struct type for a stage_in argument."_b);
 		}
 		if (f->stage_in_arg) {
-			return grd_make_double_site_error(p, grd_current_loc(), f->stage_in_arg->text_region, arg->text_region, "Stage_in argument is already specified."_b);
+			return grdc_make_double_site_error(p, grd_current_loc(), f->stage_in_arg->text_region, arg->text_region, "Stage_in argument is already specified."_b);
 		}
 		f->stage_in_arg = arg;
 	}
 	return NULL;
 }
 
-Error* handle_entry_point_args(GrdCcParser* p, GrdAstFunction* f) {
+GrdError* grdc_handle_entry_point_args(GrdcParser* p, GrdcAstFunction* f) {
 	for (auto i: grd_range(grd_len(f->args))) {
-		if (f->kind != GrdAstFunctionKind::Plain) {
-			auto e = handle_entry_point_arg(p, f, i);
+		if (f->kind != GrdcAstFunctionKind::Plain) {
+			auto e = grdc_handle_entry_point_arg(p, f, i);
 			if (e) {
 				return e;
 			}
 		}
-		auto e = check_if_attrs_used(p, f->args[i]->attrs);
+		auto e = grdc_check_if_attrs_used(p, f->args[i]->attrs);
 		if (e) {
 			return e;
 		}
@@ -2621,7 +2621,7 @@ Error* handle_entry_point_args(GrdCcParser* p, GrdAstFunction* f) {
 	return NULL;
 }
 
-Error* ensure_function_has_return(GrdCcParser* p, GrdAstFunction* f) {
+GrdError* grdc_ensure_function_has_return(GrdcParser* p, GrdcAstFunction* f) {
 	if (f->return_ts->tp == p->void_tp) {
 		return NULL;
 	}
@@ -2633,21 +2633,21 @@ Error* ensure_function_has_return(GrdCcParser* p, GrdAstFunction* f) {
 		return grd_simple_parser_error(p, grd_current_loc(), f->block->text_region, "Expected return statement");
 	}
 	auto last = f->block->statements[-1];
-	auto ret = grd_reflect_cast<AstReturn>(last);
+	auto ret = grd_reflect_cast<GrdcAstReturn>(last);
 	if (!ret) {
 		return grd_simple_parser_error(p, grd_current_loc(), f->block->text_region, "Expected return statement");
 	}
 	return NULL;
 }
 
-Error* validate_fragment_output_struct(GrdCcParser* p, GrdAstStructType* tp) {
+GrdError* grdc_validate_fragment_output_struct(GrdcParser* p, GrdcAstStructType* tp) {
 	s64 idx = 0;
 	for (auto it: tp->members) {
-		ColorAttr* c_attr = NULL;
+		GrdcColorAttr* c_attr = NULL;
 		for (auto attr: it->attrs) {
-			if (auto m = grd_reflect_cast<ColorAttr>(attr)) {
+			if (auto m = grd_reflect_cast<GrdcColorAttr>(attr)) {
 				if (c_attr) {
-					return grd_make_double_site_error(p, grd_current_loc(), c_attr->text_region, attr->text_region, "Color attribute is already specified."_b);
+					return grdc_make_double_site_error(p, grd_current_loc(), c_attr->text_region, attr->text_region, "Color attribute is already specified."_b);
 				}
 				c_attr = m;
 			}
@@ -2658,9 +2658,9 @@ Error* validate_fragment_output_struct(GrdCcParser* p, GrdAstStructType* tp) {
 		for (auto i: grd_range(idx)) {
 			auto prev_m = tp->members[i];
 			for (auto attr: prev_m->attrs) {
-				if (auto m = grd_reflect_cast<ColorAttr>(attr)) {
+				if (auto m = grd_reflect_cast<GrdcColorAttr>(attr)) {
 					if (m->idx == c_attr->idx) {
-						return grd_make_double_site_error(p, grd_current_loc(), m->text_region, c_attr->text_region, "Color index (%) is already used."_b, c_attr->idx);
+						return grdc_make_double_site_error(p, grd_current_loc(), m->text_region, c_attr->text_region, "Color index (%) is already used."_b, c_attr->idx);
 					}
 				}
 			}
@@ -2670,25 +2670,25 @@ Error* validate_fragment_output_struct(GrdCcParser* p, GrdAstStructType* tp) {
 	return NULL;
 }
 
-Error* typecheck_function_return_value(GrdCcParser* p, GrdAstFunction* f) {
-	if (f->kind == GrdAstFunctionKind::Fragment) {
+GrdError* grdc_typecheck_function_return_value(GrdcParser* p, GrdcAstFunction* f) {
+	if (f->kind == GrdcAstFunctionKind::Fragment) {
 		if (f->return_ts->tp == p->void_tp) {
 
 		} else if (f->return_ts->tp == p->float4_tp) {
 
-		} else if (is_struct(f->return_ts->tp)) {
-			auto stp = grd_reflect_cast<GrdAstStructType>(f->return_ts->tp);
+		} else if (grdc_is_struct(f->return_ts->tp)) {
+			auto stp = grd_reflect_cast<GrdcAstStructType>(f->return_ts->tp);
 			if (!stp) {
 				return grd_simple_parser_error(p, grd_current_loc(), f->text_region, "Internal error: expected struct type.");
 			}
-			auto e = validate_fragment_output_struct(p, stp);
+			auto e = grdc_validate_fragment_output_struct(p, stp);
 			if (e) {
 				return e;
 			}
 		} else {
 			return grd_simple_parser_error(p, grd_current_loc(), f->text_region, "Fragment function must return void, float4, or struct."_b);
 		}
-	} else if (f->kind == GrdAstFunctionKind::Vertex) {
+	} else if (f->kind == GrdcAstFunctionKind::Vertex) {
 		if (f->return_ts->tp != p->void_tp) {
 			return grd_simple_parser_error(p, grd_current_loc(), f->text_region, "Vertex function must return void."_b);
 		}
@@ -2696,28 +2696,28 @@ Error* typecheck_function_return_value(GrdCcParser* p, GrdAstFunction* f) {
 	return NULL;
 }
 
-Tuple<AstSymbol*, Error*> parse_function(GrdCcParser* p, PreType pre_type,  GrdArray<GrdAstAttr*> attrs, GrdcToken start_tok, GrdcToken ident) {
-	GrdArray<GrdAstFunctionArg*> args = { .allocator = p->allocator };
+GrdTuple<GrdcAstSymbol*, GrdError*> grdc_parse_function(GrdcParser* p, GrdcPreType pre_type,  GrdArray<GrdcAstAttr*> attrs, GrdcToken start_tok, GrdcToken ident) {
+	GrdArray<GrdcAstFunctionArg*> args = { .allocator = p->allocator };
 	grd_defer { args.free(); };
 
-	next(p);
+	grdc_next(p);
 
-	AstTypeSite* return_ts = NULL;
+	GrdcAstTypeSite* return_ts = NULL;
 
 	while (true) {
-		auto tok = peek(p);
+		auto tok = grdc_peek(p);
 		if (tok.str == U")"_b) {
-			next(p);
-			auto [attrs, e] = parse_attrs(p);
+			grdc_next(p);
+			auto [attrs, e] = grdc_parse_attrs(p);
 			if (e) {
 				return { NULL, e };
 			}
-			auto [ts, e2] = finalize_type(p, pre_type, attrs);
+			auto [ts, e2] = grdc_finalize_type(p, pre_type, attrs);
 			if (e2) {
 				return { NULL, e2 };
 			}
 			return_ts = ts;
-			auto e4 = check_if_attrs_used(p, attrs);
+			auto e4 = grdc_check_if_attrs_used(p, attrs);
 			if (e4) {
 				return { NULL, e4 };
 			}
@@ -2727,41 +2727,41 @@ Tuple<AstSymbol*, Error*> parse_function(GrdCcParser* p, PreType pre_type,  GrdA
 			if (tok.str != U","_b) {
 				return { NULL, grd_simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected ','"_b) };
 			}
-			next(p);
+			grdc_next(p);
 		}
-		auto start = peek(p).reg.start;
-		auto type_tok = peek(p);
-		auto [pre_type, e] = parse_pre_type(p);
+		auto start = grdc_peek(p).reg.start;
+		auto type_tok = grdc_peek(p);
+		auto [pre_type, e] = grdc_parse_pre_type(p);
 		if (e) {
 			return { NULL, e };
 		}
-		auto [arg_name, e2] = parse_ident(p);
+		auto [arg_name, e2] = grdc_parse_ident(p);
 		if (e2) {
 			return { NULL, e2 };
 		}
-		auto [attrs, e3] = parse_attrs(p);
+		auto [attrs, e3] = grdc_parse_attrs(p);
 		if (e3) {
 			return { NULL, e3 };
 		}
-		auto [ts, e4] = finalize_type(p, pre_type, attrs);
+		auto [ts, e4] = grdc_finalize_type(p, pre_type, attrs);
 		if (e4) {
 			return { NULL, e4 };
 		}
-		ProgramTextRegion text_region = { start, peek(p).reg.end };
+		GrdcProgramTextRegion text_region = { start, grdc_peek(p).reg.end };
 		if (grd_len(attrs) > 0) {
 			auto last = attrs[-1];
 			if (last->text_region.has_value) {
 				text_region.end = last->text_region.value.end;
 			}
 		}
-		auto arg_node = grd_make_ast_symbol<GrdAstFunctionArg>(p, arg_name.str, text_region);
+		auto arg_node = grdc_make_ast_symbol<GrdcAstFunctionArg>(p, arg_name.str, text_region);
 		arg_node->var_ts = ts;
 		arg_node->attrs = attrs;
 		grd_add(&args, arg_node);
 	}
 
-	ProgramTextRegion text_region = { start_tok.reg.start, peek(p).reg.end };
-	auto f = grd_make_ast_node<GrdAstFunction>(p, text_region);
+	GrdcProgramTextRegion text_region = { start_tok.reg.start, grdc_peek(p).reg.end };
+	auto f = grdc_make_ast_node<GrdcAstFunction>(p, text_region);
 	f->args.allocator = p->allocator;
 	f->return_ts = return_ts;
 	f->name = ident.str;
@@ -2771,29 +2771,29 @@ Tuple<AstSymbol*, Error*> parse_function(GrdCcParser* p, PreType pre_type,  GrdA
 	f->vk_set_bindings.allocator = p->allocator;
 
 	for (auto attr: attrs) {
-		if (grd_reflect_cast<FragmentAttr>(attr)) {
-			f->kind = GrdAstFunctionKind::Fragment;
+		if (grd_reflect_cast<GrdcFragmentAttr>(attr)) {
+			f->kind = GrdcAstFunctionKind::Fragment;
 			attr->is_used = true;
 			break;
 		}
 	}
 
-	auto e = typecheck_function_return_value(p, f);
+	auto e = grdc_typecheck_function_return_value(p, f);
 	if (e) {
 		return { NULL, e };
 	}
-	e = handle_entry_point_args(p, f);
+	e = grdc_handle_entry_point_args(p, f);
 	if (e) {
 		return { NULL, e };
 	}
-	e = check_if_attrs_used(p, attrs);
+	e = grdc_check_if_attrs_used(p, attrs);
 	if (e) {
 		return { NULL, e };
 	}
 
-	auto tok = peek(p);
+	auto tok = grdc_peek(p);
 	if (tok.str == ";") {
-		next(p);
+		grdc_next(p);
 		f->text_region.value.end = tok.reg.end;
 		return { f, NULL };
 	}
@@ -2801,15 +2801,15 @@ Tuple<AstSymbol*, Error*> parse_function(GrdCcParser* p, PreType pre_type,  GrdA
 		grd_add(&p->scope, f);
 		grd_defer { grd_pop(&p->scope); };
 
-		auto [block, e] = parse_block(p);
+		auto [block, e] = grdc_parse_block(p);
 		if (e) {
 			return { NULL, e };
 		}
-		f->block = (AstBlock*) block;
+		f->block = (GrdcAstBlock*) block;
 		if (f->block->text_region.has_value) {
 			f->text_region.value.end = f->block->text_region.value.end;
 		}
-		auto e2 = ensure_function_has_return(p, f);
+		auto e2 = grdc_ensure_function_has_return(p, f);
 		if (e2) {
 			return { NULL, e2 };
 		}
@@ -2819,65 +2819,65 @@ Tuple<AstSymbol*, Error*> parse_function(GrdCcParser* p, PreType pre_type,  GrdA
 	return { NULL, grd_simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected ; or { after function header"_b) };
 }
 
-Tuple<GrdAstStructType*, Error*> parse_struct(GrdCcParser* p, GrdcToken start_tok) {
-	auto [ident, e] = parse_ident(p);
+GrdTuple<GrdcAstStructType*, GrdError*> grdc_parse_struct(GrdcParser* p, GrdcToken start_tok) {
+	auto [ident, e] = grdc_parse_ident(p);
 	if (e) {
 		return { NULL, e };
 	}
-	auto tok = peek(p);
+	auto tok = grdc_peek(p);
 	if (tok.str != U"{"_b) {
 		return { NULL, grd_simple_parser_error(p, grd_current_loc(), tok.reg, U"Expected {"_b) };
 	}
-	next(p);
+	grdc_next(p);
 
-	GrdArray<AstStructMember*> members = { .allocator = p->allocator };
+	GrdArray<GrdcAstStructMember*> members = { .allocator = p->allocator };
 	grd_defer { members.free(); };
 
-	ProgramTextRegion st_reg;
+	GrdcProgramTextRegion st_reg;
 	st_reg.start = start_tok.reg.start;
 	st_reg.end = start_tok.reg.end;
 
-	AstStructMember* pos_member = NULL;
+	GrdcAstStructMember* pos_member = NULL;
 
 	while (true) {
-		auto tok = peek(p);
+		auto tok = grdc_peek(p);
 		if (tok.str == U"}"_b) {
 			st_reg.end = tok.reg.end;
-			next(p);
+			grdc_next(p);
 			break;
 		}
-		auto [pre_type, e] = parse_pre_type(p);
+		auto [pre_type, e] = grdc_parse_pre_type(p);
 		if (e) {
 			return { NULL, e };
 		}
-		auto [name, e2] = parse_ident(p);
+		auto [name, e2] = grdc_parse_ident(p);
 		if (e2) {
 			return { NULL, e2 };
 		}
-		tok = peek(p);
-		GrdAstExpr* init_expr = NULL;
+		tok = grdc_peek(p);
+		GrdcAstExpr* init_expr = NULL;
 		if (tok.str == "=") {
-			next(p);
-			auto [expr, e] = parse_expr(p, 0);
+			grdc_next(p);
+			auto [expr, e] = grdc_parse_expr(p, 0);
 			if (e) {
 				return { NULL, e };
 			}
 			init_expr = expr;
 		}
-		auto [attrs, e3] = parse_attrs(p);
+		auto [attrs, e3] = grdc_parse_attrs(p);
 		if (e3) {
 			return { NULL, e3 };
 		}
-		auto [ts, e4] = finalize_type(p, pre_type, attrs);
+		auto [ts, e4] = grdc_finalize_type(p, pre_type, attrs);
 		if (e4) {
 			return { NULL, e4 };
 		}
-		if (peek(p).str != ";") {
-			return { NULL, grd_simple_parser_error(p, grd_current_loc(), peek(p).reg, U"Expected ;"_b) };
+		if (grdc_peek(p).str != ";") {
+			return { NULL, grd_simple_parser_error(p, grd_current_loc(), grdc_peek(p).reg, U"Expected ;"_b) };
 		}
-		next(p);
+		grdc_next(p);
 
-		ProgramTextRegion reg;
+		GrdcProgramTextRegion reg;
 		reg.start = pre_type.reg.start;
 		reg.end = name.reg.end;
 		if (init_expr && init_expr->text_region.has_value) {
@@ -2889,14 +2889,14 @@ Tuple<GrdAstStructType*, Error*> parse_struct(GrdCcParser* p, GrdcToken start_to
 				reg.end = last->text_region.value.end;
 			}
 		}
-		auto member = grd_make_ast_node<AstStructMember>(p, reg);
+		auto member = grdc_make_ast_node<GrdcAstStructMember>(p, reg);
 		member->member_ts = ts;
 		member->name = name.str;
 		member->attrs = attrs;
 		grd_add(&members, member);
 
 		for (auto attr: attrs) {
-			if (auto x = grd_reflect_cast<PositionAttr>(attr)) {
+			if (auto x = grd_reflect_cast<GrdcPositionAttr>(attr)) {
 				if (pos_member) {
 					return { NULL, grd_simple_parser_error(p, grd_current_loc(), attr->text_region, "Position attribute can only be specified once."_b) };
 				}
@@ -2907,74 +2907,74 @@ Tuple<GrdAstStructType*, Error*> parse_struct(GrdCcParser* p, GrdcToken start_to
 				x->is_used = true;
 			}
 		}
-		auto e5 = check_if_attrs_used(p, attrs);
+		auto e5 = grdc_check_if_attrs_used(p, attrs);
 		if (e5) {
 			return { NULL, e5 };
 		}
 	}
 
-	auto st = grd_make_ast_node<GrdAstStructType>(p, st_reg);
+	auto st = grdc_make_ast_node<GrdcAstStructType>(p, st_reg);
 	st->members = members;
 	st->name = ident.str;
 	members = {};
 	return { st, NULL };
 }
 
-Error* parse_top_level(GrdCcParser* p) {
-	auto [attrs, e1] = parse_attrs(p);
+GrdError* grdc_parse_top_level(GrdcParser* p) {
+	auto [attrs, e1] = grdc_parse_attrs(p);
 	if (e1) {
 		return e1;
 	}
 
-	auto start_tok = peek(p);
+	auto start_tok = grdc_peek(p);
 
 	if (start_tok.str == "struct") {
-		next(p);
-		auto [type, e] = parse_struct(p, start_tok);
+		grdc_next(p);
+		auto [type, e] = grdc_parse_struct(p, start_tok);
 		if (e) {
 			return e;
 		}
-		e = add_global(p, type);
+		e = grdc_add_global(p, type);
 		if (e) {
 			return e;
 		}
 		return NULL;
 	}
 	
-	auto type_tok = peek(p);
-	auto [pre_type, e0] = parse_pre_type(p);
+	auto type_tok = grdc_peek(p);
+	auto [pre_type, e0] = grdc_parse_pre_type(p);
 	if (e0) {
 		return e0;
 	}
-	auto [ident, e] = parse_ident(p);
+	auto [ident, e] = grdc_parse_ident(p);
 	if (e) {
 		return e;
 	}
-	auto tok = peek(p);
+	auto tok = grdc_peek(p);
 	if (tok.str == U"("_b) {
-		auto [f, e] = parse_function(p, pre_type, attrs, start_tok, ident);
+		auto [f, e] = grdc_parse_function(p, pre_type, attrs, start_tok, ident);
 		if (e) {
 			return e;
 		}
-		e = add_global(p, f);
+		e = grdc_add_global(p, f);
 		if (e) {
 			return e;
 		}
-		auto e2 = check_if_attrs_used(p, attrs);
+		auto e2 = grdc_check_if_attrs_used(p, attrs);
 		if (e2) {
 			return e2;
 		}
 		return NULL;
 	} else if (tok.str == U","_b || tok.str == U";"_b || tok.str == U"="_b) {
-		auto [group, e] = parse_var_decl(p, pre_type, ident, true);
+		auto [group, e] = grdc_parse_var_decl(p, pre_type, ident, true);
 		if (e) {
 			return e;
 		}
-		e = add_global(p, group);
+		e = grdc_add_global(p, group);
 		if (e) {
 			return e;
 		}
-		auto e2 = check_if_attrs_used(p, attrs);
+		auto e2 = grdc_check_if_attrs_used(p, attrs);
 		if (e2) {
 			return e2;
 		}
@@ -2985,21 +2985,21 @@ Error* parse_top_level(GrdCcParser* p) {
 }
 
 template <typename T>
-GrdAstPrimitiveType* push_prim_type(GrdCcParser* p, GrdUnicodeString name, u64 size, u64 alignment, bool is_signed) {
-	auto tp = grd_make_ast_symbol<GrdAstPrimitiveType>(p, name, {});
+GrdcAstPrimitiveType* grdc_push_prim_type(GrdcParser* p, GrdUnicodeString name, u64 size, u64 alignment, bool is_signed) {
+	auto tp = grdc_make_ast_symbol<GrdcAstPrimitiveType>(p, name, {});
 	tp->size = size;
 	tp->alignment = alignment;
 	tp->is_signed = is_signed;
 	tp->c_tp = grd_reflect_type_of<T>()->template as<GrdPrimitiveType>();
 	assert(tp->c_tp);
-	auto e = add_global(p, tp);
+	auto e = grdc_add_global(p, tp);
 	if (e) {
 		panic(e);
 	}
 	return tp;
 }
 
-u64 calc_struct_size(GrdAstStructType* tp) {
+u64 grdc_calc_struct_size(GrdcAstStructType* tp) {
 	u64 end = 0;
 	u64 max_member_align = 1;
 	for (auto it: tp->members) {
@@ -3011,157 +3011,157 @@ u64 calc_struct_size(GrdAstStructType* tp) {
 			max_member_align = it->member_ts->tp->alignment;
 		}
 	}
-	u64 size = align(end, max_member_align);
+	u64 size = grd_align(end, max_member_align);
 	return size;
 }
 
-void push_member(GrdAstStructType* tp, GrdUnicodeString name, AstTypeSite* ts) {
-	auto m = grd_make_ast_node<AstStructMember>(tp->p, {});
+void grdc_push_member(GrdcAstStructType* tp, GrdUnicodeString name, GrdcAstTypeSite* ts) {
+	auto m = grdc_make_ast_node<GrdcAstStructMember>(tp->p, {});
 	m->struct_type = tp;
 	m->member_ts = ts;
 	m->name = name;
-	auto sz = calc_struct_size(tp);
-	m->offset = align(sz, ts->tp->alignment);
+	auto sz = grdc_calc_struct_size(tp);
+	m->offset = grd_align(sz, ts->tp->alignment);
 	grd_add(&tp->members, m);
 }
 
-AstTypeSite* grd_make_siteless_type_site(GrdCcParser* p, GrdAstType* tp) {
-	auto ts = grd_make_ast_node<AstTypeSite>(p, {});
+GrdcAstTypeSite* grdc_make_siteless_type_site(GrdcParser* p, GrdcAstType* tp) {
+	auto ts = grdc_make_ast_node<GrdcAstTypeSite>(p, {});
 	ts->tp = tp;
 	return ts;
 }
 
-void push_base_types(GrdCcParser* p) {
-	p->void_tp = push_prim_type<void>(p, U"void"_b, 0, 1, false);
-	p->bool_tp = push_prim_type<bool>(p, U"bool"_b, 1, 1, false);
-	p->s8_tp  = push_prim_type<s8>(p, U"s8"_b, 1, 1, true);
-	p->s16_tp = push_prim_type<s16>(p, U"s16"_b, 2, 2, true);
-	p->s32_tp = push_prim_type<s32>(p, U"s32"_b, 4, 4, true);
-	p->s64_tp = push_prim_type<s64>(p, U"s64"_b, 8, 8, true);
-	p->u8_tp  = push_prim_type<u8>(p, U"u8"_b, 1, 1, false);
-	p->u16_tp = push_prim_type<u16>(p, U"u16"_b, 2, 2, false);
-	p->u32_tp = push_prim_type<u32>(p, U"u32"_b, 4, 4, false);
-	p->u64_tp = push_prim_type<u64>(p, U"u64"_b, 8, 8, false);
-	p->f32_tp = push_prim_type<f32>(p, U"f32"_b, 4, 4, true);
-	p->f64_tp = push_prim_type<f64>(p, U"f64"_b, 8, 8, true);
+void grdc_push_base_types(GrdcParser* p) {
+	p->void_tp = grdc_push_prim_type<void>(p, U"void"_b, 0, 1, false);
+	p->bool_tp = grdc_push_prim_type<bool>(p, U"bool"_b, 1, 1, false);
+	p->s8_tp  = grdc_push_prim_type<s8>(p, U"s8"_b, 1, 1, true);
+	p->s16_tp = grdc_push_prim_type<s16>(p, U"s16"_b, 2, 2, true);
+	p->s32_tp = grdc_push_prim_type<s32>(p, U"s32"_b, 4, 4, true);
+	p->s64_tp = grdc_push_prim_type<s64>(p, U"s64"_b, 8, 8, true);
+	p->u8_tp  = grdc_push_prim_type<u8>(p, U"u8"_b, 1, 1, false);
+	p->u16_tp = grdc_push_prim_type<u16>(p, U"u16"_b, 2, 2, false);
+	p->u32_tp = grdc_push_prim_type<u32>(p, U"u32"_b, 4, 4, false);
+	p->u64_tp = grdc_push_prim_type<u64>(p, U"u64"_b, 8, 8, false);
+	p->f32_tp = grdc_push_prim_type<f32>(p, U"f32"_b, 4, 4, true);
+	p->f64_tp = grdc_push_prim_type<f64>(p, U"f64"_b, 8, 8, true);
 
-	auto f32_ts = grd_make_siteless_type_site(p, p->f32_tp);
+	auto f32_ts = grdc_make_siteless_type_site(p, p->f32_tp);
 
-	p->float2_tp = grd_make_ast_symbol<GrdAstStructType>(p, U"float2"_b, {});
-	push_member(p->float2_tp, U"x"_b, f32_ts);
-	push_member(p->float2_tp, U"y"_b, f32_ts);
+	p->float2_tp = grdc_make_ast_symbol<GrdcAstStructType>(p, U"float2"_b, {});
+	grdc_push_member(p->float2_tp, U"x"_b, f32_ts);
+	grdc_push_member(p->float2_tp, U"y"_b, f32_ts);
 	p->float2_tp->alignment = 8;
 	p->float2_tp->size = 8;
-	auto e = add_global(p, p->float2_tp);
+	auto e = grdc_add_global(p, p->float2_tp);
 	if (e) {
-		panic(e);
+		grd_panic(e);
 	}
 
-	p->float3_tp = grd_make_ast_symbol<GrdAstStructType>(p, U"float3"_b, {});
-	push_member(p->float3_tp, U"x"_b, f32_ts);
-	push_member(p->float3_tp, U"y"_b, f32_ts);
-	push_member(p->float3_tp, U"z"_b, f32_ts);
+	p->float3_tp = grdc_make_ast_symbol<GrdcAstStructType>(p, U"float3"_b, {});
+	grdc_push_member(p->float3_tp, U"x"_b, f32_ts);
+	grdc_push_member(p->float3_tp, U"y"_b, f32_ts);
+	grdc_push_member(p->float3_tp, U"z"_b, f32_ts);
 	p->float3_tp->alignment = 16;
 	p->float3_tp->size = 16;
-	e = add_global(p, p->float3_tp);
+	e = grdc_add_global(p, p->float3_tp);
 	if (e) {
-		panic(e);
+		grd_panic(e);
 	}
 
-	p->float4_tp = grd_make_ast_symbol<GrdAstStructType>(p, U"float4"_b, {});
-	push_member(p->float4_tp, U"x"_b, f32_ts);
-	push_member(p->float4_tp, U"y"_b, f32_ts);
-	push_member(p->float4_tp, U"z"_b, f32_ts);
-	push_member(p->float4_tp, U"w"_b, f32_ts);
+	p->float4_tp = grdc_make_ast_symbol<GrdcAstStructType>(p, U"float4"_b, {});
+	grdc_push_member(p->float4_tp, U"x"_b, f32_ts);
+	grdc_push_member(p->float4_tp, U"y"_b, f32_ts);
+	grdc_push_member(p->float4_tp, U"z"_b, f32_ts);
+	grdc_push_member(p->float4_tp, U"w"_b, f32_ts);
 	p->float4_tp->alignment = 16;
 	p->float4_tp->size = 16;
-	e = add_global(p, p->float4_tp);
+	e = grdc_add_global(p, p->float4_tp);
 	if (e) {
-		panic(e);
+		grd_panic(e);
 	}
 }
 
 
-struct ShaderIntrinFunc: GrdAstFunction {
+struct GrdcShaderIntrinFunc: GrdcAstFunction {
 
-	GRD_REFLECT(ShaderIntrinFunc) {
-		GRD_BASE_TYPE(GrdAstFunction);
+	GRD_REFLECT(GrdcShaderIntrinFunc) {
+		GRD_BASE_TYPE(GrdcAstFunction);
 	}
 };
 
-void add_shader_intrinsic_var(GrdCcParser* p, GrdUnicodeString name, AstTypeSite* ts) {
+void grdc_add_shader_intrinsic_var(GrdcParser* p, GrdUnicodeString name, GrdcAstTypeSite* ts) {
 	// @TODO: check for duplicates
 	if (!ts) {
-		panic("No type for shader intrinsic var");
+		grd_panic("No type for shader intrinsic var");
 	}
-	auto node = grd_make_ast_symbol<ShaderIntrinVar>(p, name, {});
+	auto node = grdc_make_ast_symbol<GrdcShaderIntrinVar>(p, name, {});
 	node->var_ts = ts;
-	auto e = add_global(p, node);
+	auto e = grdc_add_global(p, node);
 	if (e) {
-		panic(e);
+		grd_panic(e);
 	}
 }
 
-void add_shader_intrinsic_func(GrdCcParser* p, GrdUnicodeString name, AstTypeSite* ret_ts, std::initializer_list<AstTypeSite*> args) {
+void grdc_add_shader_intrinsic_func(GrdcParser* p, GrdUnicodeString name, GrdcAstTypeSite* ret_ts, std::initializer_list<GrdcAstTypeSite*> args) {
 	// @TODO: check for duplicates
-	auto node = grd_make_ast_symbol<ShaderIntrinFunc>(p, name, {});
+	auto node = grdc_make_ast_symbol<GrdcShaderIntrinFunc>(p, name, {});
 	node->args.allocator = p->allocator;
 	node->return_ts = ret_ts;
 	s64 i = 0;
 	for (auto arg: args) {
-		auto name = sprint_unicode(p->allocator, U"arg_%"_b, i);
-		auto arg_node = grd_make_ast_symbol<GrdAstFunctionArg>(p, name, {});
+		auto name = grd_sprint_unicode(p->allocator, U"arg_%"_b, i);
+		auto arg_node = grdc_make_ast_symbol<GrdcAstFunctionArg>(p, name, {});
 		arg_node->var_ts = arg;
 		grd_add(&node->args, arg_node);
 		i += 1;
 	}
-	auto e = add_global(p, node);
+	auto e = grdc_add_global(p, node);
 	if (e) {
-		panic(e);
+		grd_panic(e);
 	}
 }
 
-Tuple<CLikeProgram*, Error*> parse_c_like(GrdUnicodeString str) {
+GrdTuple<GrdcProgram*, GrdError*> grdc_parse(GrdUnicodeString str) {
 	auto allocator = grd_make_arena_allocator();
-	auto p = grd_make<GrdCcParser>(allocator);
+	auto p = grd_make<GrdcParser>(allocator);
 	p->allocator = allocator;
-	p->program = grd_make_ast_node<CLikeProgram>(p, {});
+	p->program = grdc_make_ast_node<GrdcProgram>(p, {});
 	p->program->globals.allocator = p->allocator;
 	p->str = str;
 	grd_add(&p->scope, p->program);
-	for (auto it: AST_BINARY_OPERATORS_UNSORTED) {
+	for (auto it: GRDC_AST_BINARY_OPERATORS_UNSORTED) {
 		grd_add(&p->op_tokens_sorted, it.op);
 	}
-	for (auto it: AST_PREFIX_UNARY_OPERATORS_UNSORTED) {
+	for (auto it: GRDC_AST_PREFIX_UNARY_OPERATORS_UNSORTED) {
 		grd_add(&p->op_tokens_sorted, it.op);
 	}
-	for (auto it: AST_POSTFIX_UNARY_OPERATORS_UNSORTED) {
+	for (auto it: GRDC_AST_POSTFIX_UNARY_OPERATORS_UNSORTED) {
 		grd_add(&p->op_tokens_sorted, it.op);
 	}
 	grd_add(&p->op_tokens_sorted, U"[["_b);
 	grd_add(&p->op_tokens_sorted, U"]]"_b);
-	sort(p->op_tokens_sorted, lambda(grd_len($0[$1]) > grd_len($0[$2]))); 
+	grd_sort(p->op_tokens_sorted, grd_lambda(grd_len($._0[$._1]) > grd_len($._0[$._2]))); 
 
-	push_base_types(p);
+	grdc_push_base_types(p);
 
-	auto f32_ts = grd_make_siteless_type_site(p, p->f32_tp);
-	auto float3_ts = grd_make_siteless_type_site(p, p->float3_tp);
+	auto f32_ts = grdc_make_siteless_type_site(p, p->f32_tp);
+	auto float3_ts = grdc_make_siteless_type_site(p, p->float3_tp);
 
-	add_shader_intrinsic_func(p, U"hsv"_b, float3_ts, { f32_ts, f32_ts, f32_ts });
-	add_shader_intrinsic_func(p, U"log"_b, f32_ts, { f32_ts });
-	add_shader_intrinsic_func(p, U"sin"_b, f32_ts, { f32_ts });
-	add_shader_intrinsic_func(p, U"cos"_b, f32_ts, { f32_ts });
-	add_shader_intrinsic_func(p, U"dot_vec3"_b, f32_ts, { float3_ts, float3_ts });
-	add_shader_intrinsic_func(p, U"atan"_b, f32_ts, { f32_ts });
-	add_shader_intrinsic_func(p, U"length"_b, f32_ts, { float3_ts });
-	add_shader_intrinsic_func(p, U"abs"_b, f32_ts, { f32_ts });
+	grdc_add_shader_intrinsic_func(p, U"hsv"_b, float3_ts, { f32_ts, f32_ts, f32_ts });
+	grdc_add_shader_intrinsic_func(p, U"log"_b, f32_ts, { f32_ts });
+	grdc_add_shader_intrinsic_func(p, U"sin"_b, f32_ts, { f32_ts });
+	grdc_add_shader_intrinsic_func(p, U"cos"_b, f32_ts, { f32_ts });
+	grdc_add_shader_intrinsic_func(p, U"dot_vec3"_b, f32_ts, { float3_ts, float3_ts });
+	grdc_add_shader_intrinsic_func(p, U"atan"_b, f32_ts, { f32_ts });
+	grdc_add_shader_intrinsic_func(p, U"length"_b, f32_ts, { float3_ts });
+	grdc_add_shader_intrinsic_func(p, U"abs"_b, f32_ts, { f32_ts });
 
-	while (peek(p).str != ""_b) {
-		if (peek(p).str == U";"_b) {
-			next(p);
+	while (grdc_peek(p).str != ""_b) {
+		if (grdc_peek(p).str == U";"_b) {
+			grdc_next(p);
 			continue;
 		}
-		auto e = parse_top_level(p);
+		auto e = grdc_parse_top_level(p);
 		if (e) {
 			return { NULL, e };
 		}

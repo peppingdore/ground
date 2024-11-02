@@ -14,7 +14,7 @@ struct GrdRange {
 	s64   operator*() { return start; }
 };
 
-GrdRange range_from_to(s64 start, s64 end_exclusive) {
+GrdRange grd_range_from_to(s64 start, s64 end_exclusive) {
 	return { start, grd_max(start, end_exclusive) };
 }
 

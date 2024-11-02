@@ -1015,7 +1015,7 @@ typedef enum SpvOp_ {
     SpvOpDecorateStringGOOGLE = 5632,
     SpvOpMemberDecorateStringGOOGLE = 5633,
     SpvOpMax = 0x7fffffff,
-} SpvOp;
+} GrdcSpvOp;
 
 #endif  // #ifndef spirv_H
 

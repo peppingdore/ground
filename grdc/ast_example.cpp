@@ -74,7 +74,7 @@ UR"GRD_TAG(
 
 
 int main() {
-	auto [program, e] = parse_c_like(PROGRAM);
+	auto [program, e] = grdc_parse(PROGRAM);
 	if (e) {
 		print_parser_error(e);
 		return -1;
@@ -82,12 +82,12 @@ int main() {
 	// grd_println(print_ast_node(program));
 
 	for (auto it: program->globals) {
-		if (auto f = grd_reflect_cast<GrdAstFunction>(it)) {
+		if (auto f = grd_reflect_cast<GrdcAstFunction>(it)) {
 			if (!f->block) {
 				continue;
 			}
 
-			auto [ssa, e] = emit_function_ssa(c_allocator, f);
+			auto [ssa, e] = grdc_emit_function_ssa(c_allocator, f);
 			if (e) {
 				print_parser_error(e);
 				return -1;
@@ -98,15 +98,15 @@ int main() {
 				print_parser_error(e);1);
 				return -1;
 			}
-			auto m = grd_make_spirv_emitter(f->p, c_allocator);			
-			e = emit_spirv_function(&m, ssa);
+			auto m = grdc_make_spirv_emitter(f->p, c_allocator);			
+			e = grdc_emit_spirv_function(&m, ssa);
 			if (e) {
 				print_parser_error(e);
 				return -1;
 			}
-			grd_print_ssa(ssa->entry);
+			grdc_print_ssa(ssa->entry);
 
-			e = finalize_spirv(&m);
+			e = grdc_finalize_spirv(&m);
 			if (e) {
 				print_parser_error(e);
 				return -1;

@@ -246,7 +246,7 @@ void format_parser(
 			if (grd_len(format_spec) == 0 && grd_starts_with(fmt[i + 1, {}], "("_b)) {
 				s64 open_counter = 1;
 				s64 closing_index = -1;
-				for (auto j: range_from_to(i + 2, grd_len(fmt))) {
+				for (auto j: grd_range_from_to(i + 2, grd_len(fmt))) {
 					if (fmt[j] == '(') {
 						open_counter += 1;
 					}

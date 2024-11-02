@@ -42,7 +42,7 @@ GrdCallStack grd_get_callstack(GrdAllocator allocator = c_allocator) {
 		// Skipping first entry to skip grd_get_callstack()'s frame.
 		st.count = cpp_st.size() - 1;
 		st.entries = Alloc<GrdCallStackEntry>(allocator, st.count);
-		for (auto i: range_from_to(1, st.count + 1)) {
+		for (auto i: grd_range_from_to(1, st.count + 1)) {
 			auto& x = cpp_st[i];
 			auto f_str = grd_callstack_copy_std_string(allocator, x.source_file());
 			st.entries[i - 1].loc = grd_make_code_loc(x.source_line(), f_str);
@@ -53,7 +53,7 @@ GrdCallStack grd_get_callstack(GrdAllocator allocator = c_allocator) {
 }
 
 void grd_print_callstack_verbose(GrdCallStack st, s64 start_entry_idx = 0) {
-	for (auto i: range_from_to(start_entry_idx, st.count)) {
+	for (auto i: grd_range_from_to(start_entry_idx, st.count)) {
 		auto entry = st.entries[i];
 		printf("%s: %d  %s\n", entry.loc.file, entry.loc.line, entry.desc);
 	}
@@ -61,13 +61,13 @@ void grd_print_callstack_verbose(GrdCallStack st, s64 start_entry_idx = 0) {
 
 void grd_print_callstack(GrdCallStack st, s64 start_entry_idx = 0) {
 	s64 end = st.count;
-	for (auto i: grd_reverse(range_from_to(start_entry_idx, st.count))) {
+	for (auto i: grd_reverse(grd_range_from_to(start_entry_idx, st.count))) {
 		if (st.entries[i].loc.file != NULL && strlen(st.entries[i].loc.file) > 0) {
 			break;
 		}
 		end = i;
 	}
-	for (auto i: range_from_to(start_entry_idx, end)) {
+	for (auto i: grd_range_from_to(start_entry_idx, end)) {
 		auto entry = st.entries[i];
 		printf("%s: %d\n", entry.loc.file, entry.loc.line);
 	}

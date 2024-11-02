@@ -144,7 +144,7 @@ GRD_TEST(unicode_data) {
 				return;
 			}
 
-			for (auto i: range_from_to(codepoint, last_codepoint + 1)) {
+			for (auto i: grd_range_from_to(codepoint, last_codepoint + 1)) {
 				auto synth = synth_codepoint_unicode_data(i);
 				original[0] = grd_codepoint_hex_padded(i);
 				if (synth != original) {

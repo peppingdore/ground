@@ -13,7 +13,7 @@ void grd_quick_sort(auto arr, s64 start, s64 end, auto less, auto swap) {
 	s64 pivot_index = (left) + (end - left) / 2;
 	swap(arr, right, pivot_index);
 	
-	for (auto i: range_from_to(start, end)) {
+	for (auto i: grd_range_from_to(start, end)) {
 		if (less(arr, i, right)) { 
 			swap(arr, i, left);
 			left += 1;

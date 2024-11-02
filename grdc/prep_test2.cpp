@@ -9,7 +9,7 @@
 #include "../grd_format.h"
 
 GRD_TEST(prep_splice) {
-	Prep* p = NULL;
+	GrdcPrep* p = NULL;
 // 	GrdUnicodeString str = UR"RAW(line 1\
 // line 2\
 // line 3\
@@ -37,16 +37,16 @@ GRD_TEST(prep_splice) {
 	#include "test.txt"
 	)RAW"_b;
 	p = grd_make_prep(c_allocator);
-	p->load_file_hook = [](Prep* p, GrdUnicodeString path) -> PrepFile* {
-		auto file = grd_make<PrepFile>(c_allocator);
+	p->load_file_hook = [](GrdcPrep* p, GrdUnicodeString path) -> GrdcPrepFile* {
+		auto file = grd_make<GrdcPrepFile>(c_allocator);
 		file->og_src = U"file content"_b;
 		file->fullpath = path;
 		return file;
 	};
-	auto file = grd_make_mem_prep_file(p, str2, U"/files/text.txt"_b);
+	auto file = grdc_make_mem_prep_file(p, str2, U"/files/text.txt"_b);
 	auto e = preprocess_file(p, file);
 	grd_println(prep_str(p));
 	if (e) {
-		print_prep_error(e);
+		grdc_print_prep_error(e);
 	}
 }

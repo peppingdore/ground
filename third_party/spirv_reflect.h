@@ -625,7 +625,7 @@ GRD_REFLECT(SpvCapability) {
     ENUM_VALUE(SpvCapabilityMax);
 };
 
-GRD_REFLECT(SpvOp) {
+GRD_REFLECT(GrdcSpvOp) {
     ENUM_VALUE(SpvOpNop);
     ENUM_VALUE(SpvOpUndef);
     ENUM_VALUE(SpvOpSourceContinued);
