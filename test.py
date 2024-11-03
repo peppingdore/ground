@@ -11,6 +11,7 @@ from multiprocessing.pool import ThreadPool
 import argparse
 import threading
 import time
+import re
 
 ARGS = None
 
@@ -31,6 +32,8 @@ class Tester:
 		return subprocess.run([Path(cmd).absolute(), *args], stdout=stdout, stderr=stderr, stdin=stdin, cwd=Path(cmd).parent)
 
 	def add(self, test):
+		if ARGS.whitelist and not re.match(ARGS.whitelist, test.path):
+			return
 		self.tests.append(test)
 	
 	def print(self, str):
@@ -78,6 +81,7 @@ class Tester:
 				continue
 			if it.name.lower().endswith("_test_hook.py"):
 				self.load_hook(it.path)
+		
 
 	def scan(self, dir):
 		if any(map(lambda x: x(dir), self.path_filters)): return
@@ -209,7 +213,7 @@ class CppTest(Test):
 		self.needs_build = True
 
 	def parse_results(self, output):
-		lines = output.decode('utf-8').splitlines()
+		lines = output.decode('utf-8', errors='ignore').splitlines()
 		self.tester.verbose(f"Lines {self.path}:\n {chr(10).join(lines)}")
 		def read_line():
 			nonlocal lines
@@ -285,6 +289,7 @@ def main():
 	parser = argparse.ArgumentParser()
 	parser.add_argument('--path', default=os.getcwd())
 	parser.add_argument('--verbose', action='store_true')
+	parser.add_argument('--whitelist', help='Regex pattern', default=None)
 	ARGS = parser.parse_args()
 	builder.VERBOSE = ARGS.verbose
 	os.chdir(ARGS.path)
