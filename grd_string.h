@@ -91,9 +91,9 @@ void grd_append(GrdArray<char>* arr, const char* str, s64 index = -1, GrdCodeLoc
 
 template <GrdStringChar T>
 T* grd_copy_c_str(GrdSpan<T> str, GrdAllocator allocator = c_allocator) {
-	auto cp = Alloc<T>(allocator, len(str) + 1);
-	memcpy(cp, str.data, len(str) * sizeof(T));
-	cp[len(str)] = '\0';
+	auto cp = GrdAlloc<T>(allocator, grd_len(str) + 1);
+	memcpy(cp, str.data, grd_len(str) * sizeof(T));
+	cp[grd_len(str)] = '\0';
 	return cp;
 }
 
