@@ -196,12 +196,17 @@ void format_parser(
 	for (s64 i = 0; i < grd_len(fmt); i++) {
 		auto c = fmt[i];
 		if (c == '\\') {
+			bool insert_escapable = false;
 			for (auto e: grd_range(grd_static_array_count(escapable))) {
 				if (grd_len(fmt) > i + 1 && fmt[i + 1] == escapable[e]) {
 					insert_char(escapable[e]);
 					i += 1;
-					continue;
+					insert_escapable = true;
+					break;
 				}
+			}
+			if (!insert_escapable) {
+				insert_char(c);
 			}
 		} else if (c == '%') {
 			decltype(fmt) format_spec;
