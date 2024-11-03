@@ -182,6 +182,5 @@ inline void grd_test_##name()
 
 #define GRD_FAIL(message) grd_test_expect(false, "", message)
 #define GRD_EXPECT(cond, ...) grd_test_expect(cond, #cond, ## __VA_ARGS__);
-// Requires "grd_format.h"
-// #define EXPECT_OP(a, op, b, ...) EXPECT(a op b, grd_sprint("Expected % " #op " %", a, b), ## __VA_ARGS__);
-// #define EXPECT_EQ(a, b, ...) EXPECT_OP(a, ==, b, ## __VA_ARGS__)
+#define GRD_EXPECT_OP(a, op, b, ...) GRD_EXPECT(a op b, grd_sprint("Expected % " #op " %\0", a, b).data, ## __VA_ARGS__);
+#define GRD_EXPECT_EQ(a, b, ...) GRD_EXPECT_OP(a, ==, b, ## __VA_ARGS__)
