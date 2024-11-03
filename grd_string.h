@@ -304,6 +304,12 @@ GrdSpan<T> grd_remove_suffix(GrdSpan<T> str, GrdSpan<U> suffix) {
 	return str;
 }
 
+template <GrdStringChar T>
+bool grd_contains(GrdSpan<T> str, const T* substr) {
+	auto rhs = grd_make_string(substr);
+	return grd_contains(str, rhs);
+}
+
 
 s32 grd_utf8_char_size(char32_t c) {
 	if (c <= 0x007F) return 1;
