@@ -1080,6 +1080,10 @@ void grd_type_format(GrdFormatter* formatter, GrdCodeLoc* loc, GrdString spec) {
 	grd_format(formatter, "%: %", grd_make_string(loc->file), loc->line);
 }
 
+void grd_type_format(GrdFormatter* formatter, GrdSmallString* str, GrdString spec) {
+	grd_format(formatter, grd_as_str(str));
+}
+
 GRD_REFLECT(GrdCodeLoc) {
 	GRD_MEMBER(file);
 	GRD_MEMBER(line);
