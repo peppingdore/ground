@@ -566,6 +566,7 @@ void grdc_do_detailed_print(GrdcDetailedPrinter* dp, bool expand_site) {
 		// }
 	}
 
+	// Fill gaps.
 	for (s64 i = 0; i < grd_len(regs); i++) {
 		s64 left_end = i - 1 >= 0 ? regs[i - 1]._1 : 0;
 		if (left_end < regs[i]._0) {
@@ -597,6 +598,18 @@ void grdc_do_detailed_print(GrdcDetailedPrinter* dp, bool expand_site) {
 	// 	grd_println("  Path: %", first_file->file->fullpath);
 	// }
 
+	s64 first_line = 1;
+	for (auto i: grd_range(grd_len(regs))) {
+		for (auto tok: dp->tokens[{0, regs[i]._0}]) {
+			if (tok->kind == GRDC_PREP_TOKEN_KIND_LINE_BREAK) {
+				first_line += 1;
+			}
+		}
+	}
+
+	s64 line = first_line;
+	bool did_print_line_number = false;
+
 	GrdAllocatedUnicodeString line_double;
 	grd_defer { line_double.free(); };
 	for (auto [start, end, need_exp, zone]: regs) {
@@ -616,6 +629,12 @@ void grdc_do_detailed_print(GrdcDetailedPrinter* dp, bool expand_site) {
 				}
 			}
 			auto it = dp->tokens[idx];
+			if (!did_print_line_number && !expand_site) {
+				GrdSmallString str = grd_to_string(line);
+				grd_print("% ", str);
+				for (auto i: grd_range(grd_len(str) + 1)) grd_add(&line_double, ' ');
+				did_print_line_number = true;
+			}
 			if (it->kind == GRDC_PREP_TOKEN_KIND_LINE_BREAK) {
 				grd_println();
 				if (expand_site) {
@@ -623,6 +642,8 @@ void grdc_do_detailed_print(GrdcDetailedPrinter* dp, bool expand_site) {
 					grd_clear(&line_double);
 					grd_println();
 				}
+				line += 1;
+				did_print_line_number = false;
 				continue;
 			}
 			if (need_exp) {
@@ -702,9 +723,9 @@ struct GrdcPrepDetailedError: GrdError {
 	GrdArray<GrdcPrepDpErrorNode> nodes;
 };
 
-GrdcPrepDetailedError* grdc_make_prep_dp_error(GrdcPrep* p, auto... args) {
+GrdcPrepDetailedError* grdc_make_prep_dp_error(GrdcPrep* p, GrdCodeLoc loc, auto... args) {
 	auto msg = grd_sprint(args...);
-	auto e = grd_make_error<GrdcPrepDetailedError>(msg);
+	auto e = grd_make_error<GrdcPrepDetailedError>(msg, loc);
 	return e;
 }
 
@@ -1272,7 +1293,9 @@ struct GrdcTokenSlice {
 	s64                 end = 0;
 
 	GrdcToken*& operator[](s64 idx) {
-		return tokens[idx + start];
+		s64 target_idx = idx < 0 ? end + idx : start + idx;
+		grd_assert(target_idx >= start && target_idx < end);
+		return tokens[target_idx];
 	}
 
 	GrdcTokenSlice operator[](GrdTuple<s64, s64> x) {
@@ -1413,7 +1436,7 @@ GrdcMaybeExpandedMacro grdc_maybe_expand_macro(GrdcPrep* p, GrdcTokenSlice token
 				}
 				auto [end, kind] = grdc_get_str_token_at(tok->custom_str, 0);
 				if (end != grd_len(tok->custom_str)) {
-					auto e = grdc_make_prep_dp_error(p, "Concatenated string '%' doesn't form a valid token", grdc_tok_str(tok));
+					auto e = grdc_make_prep_dp_error(p, grd_current_loc(), "Concatenated string '%' doesn't form a valid token", grdc_tok_str(tok));
 					auto dp = grdc_make_detailed_printer(exp->body);
 					grd_add(&dp->spans, { i, i + 1, 1 });
 					grdc_add_dp(e, dp);
@@ -1610,12 +1633,12 @@ GrdError* grdc_handle_prep_directive(GrdcPrep* p, GrdcTokenSlice tokens, s64* cu
 		macro->name = ident_tok;
 		grd_add(&p->macros, macro);
 
-		s64 first_macro_body_tok = *cursor + 1;
-		if (first_macro_body_tok < grd_len(tokens) &&
-			grdc_tok_str(tokens[first_macro_body_tok]) == "(" &&
-			tokens[first_macro_body_tok]->file_start == ident_tok->file_end)
+		*cursor += 1;
+
+		if (*cursor < grd_len(tokens) &&
+			grdc_tok_str(tokens[*cursor]) == "(" &&
+			tokens[*cursor]->file_start == ident_tok->file_end)
 		{
-			*cursor += 1;
 			macro->is_object = false;
 			while (true) {
 				auto arg_tok = grdc_get_next_token(tokens.span(), cursor);
@@ -1642,8 +1665,15 @@ GrdError* grdc_handle_prep_directive(GrdcPrep* p, GrdcTokenSlice tokens, s64* cu
 				}
 				grd_add(&macro->arg_defs, arg_tok);
 			}
-			first_macro_body_tok = *cursor;
 		}
+		while (*cursor < grd_len(tokens)) {
+			auto macro_tok = tokens[*cursor];
+			if (macro_tok->kind != GRDC_PREP_TOKEN_KIND_SPACE) {
+				break;
+			}
+			*cursor += 1;
+		}
+		s64 first_macro_body_tok = *cursor;
 		while (*cursor < grd_len(tokens)) {
 			auto macro_tok = tokens[*cursor];
 			if (macro_tok->kind == GRDC_PREP_TOKEN_KIND_EOF || macro_tok->kind == GRDC_PREP_TOKEN_KIND_LINE_BREAK) {
@@ -1666,7 +1696,7 @@ GrdError* grdc_handle_prep_directive(GrdcPrep* p, GrdcTokenSlice tokens, s64* cu
 				it->kind = GRDC_PREP_TOKEN_KIND_MACRO_PRESCAN_IDENT;
 			}
 		}
-		GrdLogTrace("Expanding macro {%}, tokens:", grdc_tok_str(macro->name));
+		GrdLogTrace("Parsing macro {%}, tokens:", grdc_tok_str(macro->name));
 		for (auto it: macro->tokens) {
 			GrdLogTrace("  %, %: %, %", grdc_tok_str(it), it->file_start, it->file_end, it->kind);
 		}
