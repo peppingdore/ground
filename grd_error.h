@@ -8,10 +8,10 @@
 
 struct GrdError {
 	GrdAllocatedString text;
-	GrdType*        type;
-	GrdCodeLoc      loc;
-	void          (*on_free)(GrdError*) = NULL;
-	GrdError*       prev = NULL;
+	GrdType*           type;
+	GrdCodeLoc         loc;
+	void             (*on_free)(GrdError*) = NULL;
+	GrdError*          prev = NULL;
 
 	void free() {
 		if (prev) {
@@ -54,6 +54,7 @@ inline void grd_type_format(GrdFormatter* formatter, GrdError* e, GrdString spec
 GRD_REFLECT(GrdError) {
 	GRD_MEMBER(text);
 	GRD_MEMBER(type);
+		GRD_TAG(GrdRealTypeMember{});
 	GRD_MEMBER(loc);
 	GRD_MEMBER(prev);
 }
