@@ -28,8 +28,9 @@ class Tester:
 		self.file_filters = []
 		self.path_filters = []
 
-	def run_exec(self, cmd, args, *, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL):
-		return subprocess.run([Path(cmd).absolute(), *args], stdout=stdout, stderr=stderr, stdin=stdin, cwd=Path(cmd).parent)
+	def run_exec(self, cmd, args, *, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, **kwargs):
+		self.verbose(f"run_exec({cmd}, {args})")
+		return subprocess.run([Path(cmd).absolute(), *args], stdout=stdout, stderr=stderr, cwd=Path(cmd).parent, **kwargs)
 
 	def add(self, test):
 		if ARGS.whitelist and not re.match(ARGS.whitelist, test.path):
@@ -137,12 +138,12 @@ class Tester:
 					self.print(f"Test {test.path}: {RED}failed to build{RESETC}")
 				else:
 					if test.is_ok():
-						self.print(f"Test {test.path}: {GREEN}success{RESETC}")
+						self.print(f"Test {test.path}: {GREEN}success{RESETC} [{len(test.successful_cases())}/{len(test.cases)}]")
 					else:
-						self.print(f"Test {test.path}: {RED}failed{RESETC}")
+						self.print(f"Test {test.path}: {RED}failed{RESETC} [{len(test.successful_cases())}/{len(test.cases)}]")
 						for case in test.cases.values():
 							if not case.is_ok():
-								self.print(f"  Case {case.name}: failed")
+								self.print(f"  Case {case.name}: failed [{case.status}]")
 								for expect in case.expects:
 									if not expect.ok:
 										self.print(f"    {expect.message}")
@@ -185,10 +186,16 @@ class Test:
 		self.status = 'test_not_built'
 		self.needs_build = False
 
+	def successful_cases(self):
+		return [x for x in self.cases.values() if x.is_ok()]
+
+	def failed_cases(self):
+		return [x for x in self.cases.values() if not x.is_ok()]
+
 	def is_ok(self):
 		return self.status == 'test_finished' and all(map(lambda it: it.is_ok(), self.cases.values()))
 
-	def get_case(self, name):
+	def get_case(self, name):	
 		if name in self.cases: return self.cases[name]
 		case = TestCase(self, name)
 		self.cases[name] = case
@@ -214,7 +221,7 @@ class CppTest(Test):
 
 	def parse_results(self, output):
 		lines = output.decode('utf-8', errors='ignore').splitlines()
-		self.tester.verbose(f"Lines {self.path}:\n {chr(10).join(lines)}")
+		self.tester.verbose(f"Cpp test output {self.path}:\n {chr(10).join(lines)}")
 		def read_line():
 			nonlocal lines
 			if len(lines) == 0:
@@ -264,13 +271,33 @@ class CppTest(Test):
 				raise ParseResultsException(f"Unknown verb {verb}")
 
 	def run(self):
-		process = self.tester.run_exec(self.exec_path, ['--write_test_results_to_stderr'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-		try:
-			self.parse_results(process.stderr)
-		except ParseResultsException as e:
-			self.tester.test_run_failed(self, e)
-			return
-		self.status = 'test_finished'
+		prev_cases_to_skip_len = -1
+		self.run_count = 0
+		while True:
+			cases_to_skip = []
+			for name, case in self.cases.items():
+				if case.status != 'case_did_not_run':
+					if not name in cases_to_skip:
+						cases_to_skip.append(name)
+			if len(cases_to_skip) <= prev_cases_to_skip_len:
+				self.status = 'test_finished'
+				break
+			prev_cases_to_skip_len = len(cases_to_skip)
+			input = '\n'.join([str(len(cases_to_skip)), *cases_to_skip]) + '\n'
+			self.tester.verbose(f"Running test {self.path} with skipped cases {cases_to_skip}")
+			process = self.tester.run_exec(self.exec_path
+			, ['--write_test_results_to_stderr', '--skip_cases'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, input=input.encode('utf-8'))
+			self.run_count += 1
+			self.tester.verbose(f"Test {self.path} stdout: \n{process.stdout.decode('utf-8', errors='ignore')}")
+			try:
+				self.parse_results(process.stderr)
+			except ParseResultsException as e:
+				# self.tester.test_run_failed(self, e)
+				# return
+				pass
+			for name, case in self.cases.items():
+				if case.status == 'case_started':
+					case.status = 'case_crashed'
 
 	def build(self):
 		self.tester.print(f'Building: {self.path}')
