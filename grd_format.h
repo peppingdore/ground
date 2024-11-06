@@ -897,6 +897,7 @@ void grd_format_function(GrdFormatter* formatter, GrdFunctionType* type, void* t
 }
 
 void grd_format_item(GrdFormatter* formatter, GrdType* type, void* thing, GrdString spec) {
+	type = grd_get_real_type(type, thing);
 
 	if (GRD_TYPE_FORMAT_PROCS) {
 		if (auto* fmt_proc = grd_get(GRD_TYPE_FORMAT_PROCS, type)) {
