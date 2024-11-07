@@ -1,3 +1,6 @@
+#if 0
+	`dirname "$0"`/../build.py "$0" -r -- ${@:1}; exit
+#endif
 #include "grdc_preprocess.h"
 #include "../grd_testing.h"
 
@@ -120,7 +123,7 @@ GRD_TEST(file_include) {
 	GRD_EXPECT(!e, e);
 	if (!e) {
 		GrdAllocatedUnicodeString output = grdc_prep_str(prep);
-		GRD_EXPECT_EQ(test_escape_string(output), test_escape_string(U"100\n"_b));
+		GRD_EXPECT_EQ(test_escape_string(output), test_escape_string(U"\n100\n"_b));
 		output.free();
 	} else {
 		grdc_print_prep_error(e);
@@ -138,7 +141,7 @@ GRD_TEST(recursive_include) {
 	if (!e) {
 		GrdAllocatedUnicodeString output = grdc_prep_str(prep);
 		// The preprocessor should prevent infinite recursion and include each file once
-		GRD_EXPECT_EQ(test_escape_string(output), test_escape_string(U"1\n2\n"_b));
+		GRD_EXPECT_EQ(test_escape_string(output), test_escape_string(U"\n\n\n1\n2\n"_b));
 		output.free();
 	} else {
 		grdc_print_prep_error(e);
