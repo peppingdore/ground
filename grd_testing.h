@@ -21,18 +21,20 @@ struct GrdTestScopeNode {
 	GrdCodeLoc   loc;
 };
 
-struct GrdIgnoreTest {
-	GrdIgnoreTest* next = NULL;
-	char*          name = NULL;
+struct GrdTestStringNode {
+	GrdTestStringNode* next = NULL;
+	char*              str = NULL;
 };
 
 struct GrdTester {
-	GrdTest*          first_test;
-	GrdTestScopeNode* scope;
-	GrdTest*          current_test = NULL;
-	GrdIgnoreTest*    first_ignore_text = NULL;
-	bool              write_test_results = false;
-	bool              skip_cases = false;
+	GrdTest*           first_test;
+	GrdTestScopeNode*  scope;
+	GrdTest*           current_test = NULL;
+	GrdTestStringNode* first_ignore_test = NULL;
+	GrdTestStringNode* first_whitelist_test = NULL;
+	bool               write_test_results = false;
+	bool               skip_cases = false;
+	bool               whitelist_mode = false;
 };
 inline GrdTester tester;
 
@@ -71,14 +73,26 @@ void grd_tester_write_result_loc(GrdCodeLoc loc) {
 }
 
 void grd_run_test(GrdTest* test) {
-	auto node = tester.first_ignore_text;
-	printf("grd_run_test(%s)\n", test->name);
+	auto node = tester.first_ignore_test;
 	while (node) {
-		printf("test skip: %s\n", node->name);
-		if (strcmp(node->name, test->name) == 0) {
+		if (strcmp(node->str, test->name) == 0) {
 			return;
 		}
 		node = node->next;
+	}
+	if (tester.whitelist_mode) {
+		node = tester.first_whitelist_test;
+		bool found = false;
+		while (node) {
+			if (strcmp(node->str, test->name) == 0) {
+				found = true;
+				break;
+			}
+			node = node->next;
+		}
+		if (!found) {
+			return;
+		}
 	}
 	fflush(stdout);
 	grd_tester_write_result_line("TESTER_TEST_START");
@@ -119,8 +133,24 @@ int main(int argc, char* argv[]) {
 		if (strcmp(argv[i], "--skip_cases") == 0) {
 			tester.skip_cases = true;
 		}
-		printf("arg %s\n", argv[i]);
-		fflush(stdout);
+		if (strcmp(argv[i], "--whitelist") == 0) {
+			tester.whitelist_mode = true;
+			for (int j = i + 1; j < argc; j++) {
+				if (strstr(argv[j], "--") == argv[j]) {
+					break;
+				}
+				auto node = new GrdTestStringNode();
+				node->str = (char*) malloc(strlen(argv[j]) + 1);
+				strcpy(node->str, argv[j]);
+				node->next = NULL;
+				auto dst = &tester.first_whitelist_test;
+				while (*dst) {
+					dst = &(*dst)->next;
+				}
+				*dst = node;
+				i = j;
+			}
+		}
 	}
 
 	if (tester.skip_cases) {
@@ -130,11 +160,11 @@ int main(int argc, char* argv[]) {
 		char buf[1024 * 4];
 		for (int i = 0; i < count; i++) {
 			scanf("%s\n", buf);
-			auto node = new GrdIgnoreTest();
-			node->name = (char*) malloc(strlen(buf) + 1);
-			strcpy(node->name, buf);
+			auto node = new GrdTestStringNode();
+			node->str = (char*) malloc(strlen(buf) + 1);
+			strcpy(node->str, buf);
 			node->next = NULL;
-			auto dst = &tester.first_ignore_text;
+			auto dst = &tester.first_ignore_test;
 			while (*dst) {
 				dst = &(*dst)->next;
 			}
