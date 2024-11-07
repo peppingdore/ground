@@ -25,6 +25,7 @@ enum GrdcPrepTokenKind {
 	GRDC_PREP_TOKEN_KIND_GRD_CONCATTED,
 	GRDC_PREP_TOKEN_KIND_STRINGIZE,
 	GRDC_PREP_TOKEN_KIND_MACRO_PRESCAN_IDENT,
+	GRDC_PREP_TOKEN_KIND_DOT_DOT_DOT,
 };
 GRD_REFLECT(GrdcPrepTokenKind) {
 	GRD_ENUM_VALUE(GRDC_PREP_TOKEN_KIND_NONE);
@@ -40,6 +41,7 @@ GRD_REFLECT(GrdcPrepTokenKind) {
 	GRD_ENUM_VALUE(GRDC_PREP_TOKEN_KIND_GRD_CONCATTED);
 	GRD_ENUM_VALUE(GRDC_PREP_TOKEN_KIND_STRINGIZE);
 	GRD_ENUM_VALUE(GRDC_PREP_TOKEN_KIND_MACRO_PRESCAN_IDENT);
+	GRD_ENUM_VALUE(GRDC_PREP_TOKEN_KIND_DOT_DOT_DOT);
 }
 
 struct PrepFileMapping {
@@ -65,6 +67,7 @@ enum GrdcPrepTokenSourceKind {
 	GRDC_PREP_TOKEN_SOURCE_GRD_CONCAT_RESIDUE = 5,
 	GRDC_PREP_TOKEN_SOURCE_PRESCAN_EXP = 6,
 	GRDC_PREP_TOKEN_SOURCE_INCLUDED_FILE = 7,
+	GRDC_PREP_TOKEN_SOURCE_DOT_DOT_DOT = 8,
 };
 GRD_REFLECT(GrdcPrepTokenSourceKind) {
 	GRD_ENUM_VALUE(GRDC_PREP_TOKEN_SOURCE_NONE);
@@ -75,6 +78,7 @@ GRD_REFLECT(GrdcPrepTokenSourceKind) {
 	GRD_ENUM_VALUE(GRDC_PREP_TOKEN_SOURCE_GRD_CONCAT_RESIDUE);
 	GRD_ENUM_VALUE(GRDC_PREP_TOKEN_SOURCE_PRESCAN_EXP);
 	GRD_ENUM_VALUE(GRDC_PREP_TOKEN_SOURCE_INCLUDED_FILE);
+	GRD_ENUM_VALUE(GRDC_PREP_TOKEN_SOURCE_DOT_DOT_DOT);
 }
 
 struct GrdcIncludedFile;
@@ -103,6 +107,9 @@ struct GrdcToken {
 	GrdcToken*                 prescan_exp_og = NULL;
 	GrdcMacroExp*              prescan_exp = NULL;
 	GrdcToken*                 included_file_og_tok = NULL;
+	GrdcToken*                 dot_dot_dot_1 = NULL;
+	GrdcToken*                 dot_dot_dot_2 = NULL;
+	GrdcToken*                 dot_dot_dot_3 = NULL;
 };
 
 struct GrdcIncludedFile {
@@ -891,7 +898,7 @@ void grdc_prep_remove_comments(GrdcPrep* p, GrdcPrepFileSource* file) {
 		}
 
 		if (grd_starts_with(file->src[{i, {}}], "/*")) {
-			s64 level = 0;
+			s64 level = 1;
 			s64 comment_end = -1;
 			for (s64 j: grd_range_from_to(i + 2, grd_len(file->src))) {
 				if (grd_starts_with(file->src[{j, {}}], "*/")) {
@@ -1083,8 +1090,11 @@ GrdTuple<GrdcToken*, GrdError*> grdc_prep_file_next_token(GrdcPrep* p, GrdcPrepF
 }
 
 GrdUnicodeString grdc_tok_str(GrdcToken* tok) {
-	if (tok->flags & GRDC_PREP_TOKEN_KIND_LINE_BREAK) {
+	if (tok->kind == GRDC_PREP_TOKEN_KIND_LINE_BREAK) {
 		return U"\n"_b;
+	}
+	if (tok->kind == GRDC_PREP_TOKEN_KIND_DOT_DOT_DOT) {
+		return U"..."_b;
 	}
 	if (tok->flags & GRDC_PREP_TOKEN_FLAG_CUSTOM_STR) {
 		return tok->custom_str;
@@ -1346,8 +1356,14 @@ struct GrdcTokenSlice {
 		return tokens[target_idx];
 	}
 
-	GrdcTokenSlice operator[](GrdTuple<s64, s64> x) {
-		return { .tokens = tokens, .start = x._0 + start, .end = x._1 + start };
+	GrdcTokenSlice operator[](GrdTuple<GrdOptional<s64>, GrdOptional<s64>> x) {
+		s64 a = x._0.has_value ? x._0.value : 0;
+		s64 b = x._1.has_value ? x._1.value : end;
+		if (a < 0) a += end;
+		if (b < 0) b += end;
+		GrdcTokenSlice ret = { .tokens = tokens, .start = a, .end = b };
+		grd_assert(ret.start <= ret.end);
+		return ret;
 	}
 
 	GrdSpan<GrdcToken*> span() {
@@ -1694,13 +1710,25 @@ GrdError* grdc_handle_prep_directive(GrdcPrep* p, GrdcTokenSlice tokens, s64* cu
 					*cursor += 1;
 					break;
 				}
+				// Parse ...
+				if (grdc_tok_str(arg_tok) == ".") {
+					if (*cursor + 1 < grd_len(tokens.span()) && grdc_tok_str(tokens[*cursor + 1]) == ".") {
+						if (*cursor + 2 < grd_len(tokens.span()) && grdc_tok_str(tokens[*cursor + 2]) == ".") {
+							arg_tok = grdc_make_token(p, GRDC_PREP_TOKEN_KIND_DOT_DOT_DOT, GRDC_PREP_TOKEN_SOURCE_DOT_DOT_DOT);
+							arg_tok->dot_dot_dot_1 = tokens[*cursor];
+							arg_tok->dot_dot_dot_2 = tokens[*cursor + 1];
+							arg_tok->dot_dot_dot_3 = tokens[*cursor + 2];
+							*cursor += 2;
+						}
+					}
+				}
 				if (grd_len(macro->arg_defs) >= 1) {
 					if (grdc_tok_str(arg_tok) != ",") {
 						return grdc_make_prep_file_error(p, arg_tok, "Expected ',' after macro argument");
 					}
 					arg_tok = grdc_get_next_token(tokens.span(), cursor);
 				}
-				if (arg_tok->kind != GRDC_PREP_TOKEN_KIND_IDENT) {
+				if (arg_tok->kind != GRDC_PREP_TOKEN_KIND_DOT_DOT_DOT && arg_tok->kind != GRDC_PREP_TOKEN_KIND_IDENT) {
 					return grdc_make_prep_file_error(p, arg_tok, "Expected an identifier as a macro argument");
 				}
 				for (auto it: macro->arg_defs) {
