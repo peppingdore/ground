@@ -143,7 +143,7 @@ def resolve_compiler_flag(flag, compiler):
 
 def run(cmd, *, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, shell=True, cwd=None):
 	start = time.perf_counter()
-	process = subprocess.run(str(cmd), stdout=stdout, stderr=stderr, stdin=stdin, shell=shell, cwd=cwd)
+	process = subprocess.run(cmd, stdout=stdout, stderr=stderr, stdin=stdin, shell=shell, cwd=cwd)
 	elapsed = time.perf_counter() - start
 	return (process, elapsed)
 
@@ -527,7 +527,8 @@ def build_main():
 	argparser.add_argument('--compiler')
 	argparser.add_argument('--opt_level', type=int, default=0, help="Optimization level")
 	argparser.add_argument('--arch')
-	args, _ = argparser.parse_known_args()
+	argparser.add_argument('extra', nargs='*')
+	args, extra = argparser.parse_known_args()
 
 	target = builder.native_target()
 
@@ -550,7 +551,8 @@ def build_main():
 	if not builder.did_link_successfully(link_result):
 		return 1
 	if args.run:
-		builder.run(Path(link_result.output_path).resolve(), stdout=sys.stdout, stdin=sys.stdin, cwd=Path(link_result.output_path).parent)
+		if len(extra) > 0: extra = extra[1:] # Skip double dash (--)
+		builder.run([str(Path(link_result.output_path).resolve()), *extra], stdout=sys.stdout, stdin=sys.stdin, cwd=Path(link_result.output_path).parent, shell=False)
 	return builder.RunnableExecutable(link_result.output_path)
 """
 
