@@ -14,7 +14,7 @@ struct GrdArray: GrdSpan<T> {
 
 	GrdArray copy(GrdAllocator cp_allocator = c_allocator, GrdCodeLoc loc = grd_caller_loc()) {
 		GrdArray result = { .allocator = cp_allocator };
-		grd_add(&result, *this, loc);
+		grd_add(&result, *this, -1, loc);
 		return result;
 	}
 
