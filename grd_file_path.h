@@ -14,7 +14,7 @@ bool grd_is_path_sep(char32_t c) {
 
 GrdUnicodeString grd_path_basename(GrdUnicodeString path) {
 	GrdUnicodeString last;
-	for (auto it: grd_split(path, grd_lambda(grd_is_path_sep($._0)))) {
+	for (auto it: grd_split(path, grd_lambda(x, grd_is_path_sep(x)))) {
 		last = it;
 	}
 	return last;
@@ -24,7 +24,7 @@ GrdUnicodeString grd_path_stem(GrdUnicodeString path) {
 	auto base = grd_path_basename(path);
 	GrdUnicodeString prev;
 	GrdUnicodeString last;
-	for (auto it: grd_split(base, grd_lambda($._0 == '.'))) {
+	for (auto it: grd_split(base, grd_lambda(x, x == '.'))) {
 		prev = last;
 		last = it;
 	}
@@ -35,7 +35,7 @@ GrdUnicodeString path_ext(GrdUnicodeString path) {
 	auto base = grd_path_basename(path);
 	s64    index;
 	GrdUnicodeString last;
-	for (auto it: grd_split(base, grd_lambda($._0 == '.'))) {
+	for (auto it: grd_split(base, grd_lambda(x, x == '.'))) {
 		last = it;
 		index += 1;
 	}

@@ -189,7 +189,7 @@ void format_parser(
 	
 	constexpr char escapable[] = { '%', '[', '(' };
 
-	grd_sort(format_flags, grd_lambda(grd_len(format_flags[$._1].text) < grd_len(format_flags[$._2].text))); 
+	grd_sort(format_flags, grd_lambda(_, x, y, grd_len(format_flags[x].text) < grd_len(format_flags[y].text))); 
 	grd_reverse(format_flags);
 
 	u32 arg_index = 0;
@@ -220,7 +220,7 @@ void format_parser(
 			}
 
 			if (grd_starts_with(fmt[i + 1, grd_len(fmt)], "["_b)) {
-				auto [idx_str, found] = grd_take_until(fmt[i + 2, grd_len(fmt)], grd_lambda($._0 == ']'));
+				auto [idx_str, found] = grd_take_until(fmt[i + 2, grd_len(fmt)], grd_lambda(x, x == ']'));
 				if (found) {
 					s64 new_idx;
 					if (grd_parse_integer(idx_str, &new_idx)) {

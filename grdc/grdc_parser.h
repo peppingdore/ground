@@ -3140,7 +3140,7 @@ GrdTuple<GrdcProgram*, GrdError*> grdc_parse(GrdUnicodeString str) {
 	}
 	grd_add(&p->op_tokens_sorted, U"[["_b);
 	grd_add(&p->op_tokens_sorted, U"]]"_b);
-	grd_sort(p->op_tokens_sorted, grd_lambda(grd_len($._0[$._1]) > grd_len($._0[$._2]))); 
+	grd_sort(p->op_tokens_sorted, grd_lambda(arr, a, b, grd_len(arr[x]) > grd_len(arr[y]))); 
 
 	grdc_push_base_types(p);
 

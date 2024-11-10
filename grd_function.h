@@ -245,7 +245,20 @@ struct __grd_cast2noheapfunction {
 #define grd_function_cast  __grd_cast2function() << 
 #define grd_no_heap_function_cast  __grd_cast2noheapfunction() << 
 
-#define grd_lambda(expr) [&] (auto... lambda_args) { auto $ = grd_make_tuple(lambda_args...); return expr; }
+#define grd_lambda_1(expr) [&] () { return expr; }
+#define grd_lambda_2(a, expr) [&] (auto a) { return expr; }
+#define grd_lambda_3(a, b, expr) [&] (auto a, auto b) { return expr; }
+#define grd_lambda_4(a, b, c, expr) [&] (auto a, auto b, auto c) { return expr; }
+#define grd_lambda_5(a, b, c, d, expr) [&] (auto a, auto b, auto c, auto d) { return expr; }
+#define grd_lambda_6(a, b, c, d, e, expr) [&] (auto a, auto b, auto c, auto d, auto e) { return expr; }
+#define grd_lambda_7(a, b, c, d, e, f, expr) [&] (auto a, auto b, auto c, auto d, auto e, auto f) { return expr; }
+#define grd_lambda_8(a, b, c, d, e, f, g, expr) [&] (auto a, auto b, auto c, auto d, auto e, auto f, auto g) { return expr; }
+#define grd_lambda_9(a, b, c, d, e, f, g, h, expr) [&] (auto a, auto b, auto c, auto d, auto e, auto f, auto g, auto h) { return expr; }
+#define grd_lambda_10(a, b, c, d, e, f, g, h, i, expr) [&] (auto a, auto b, auto c, auto d, auto e, auto f, auto g, auto h, auto i) { return expr; }
+
+#define grd_lambda(...) GRD_CONCAT(grd_lambda_, GRD_NARGS(__VA_ARGS__))(__VA_ARGS__)
+
+// #define grd_lambda(expr) [&] (auto... lambda_args) { auto $ = grd_make_tuple(lambda_args...); return expr; }
 // #define $0 tuple_get<0>(lambda_args_tuple)
 // #define $1 tuple_get<1>(lambda_args_tuple)
 // #define $2 tuple_get<2>(lambda_args_tuple)
@@ -253,6 +266,34 @@ struct __grd_cast2noheapfunction {
 // #define $4 tuple_get<4>(lambda_args_tuple)
 // #define $5 tuple_get<5>(lambda_args_tuple)
 // #define $6 tuple_get<6>(lambda_args_tuple)
+
+// #define GRD_GET_VA_ARGS_ELEM_0(_0, ...) _0
+// #define GRD_GET_VA_ARGS_ELEM_1(_0, _1, ...) _1
+// #define GRD_GET_VA_ARGS_ELEM_2(_0, _1, _2, ...) _2
+// #define GRD_GET_VA_ARGS_ELEM_3(_0, _1, _2, _3, ...) _3
+// #define GRD_GET_VA_ARGS_ELEM_4(_0, _1, _2, _3, _4, ...) _4
+// #define GRD_GET_VA_ARGS_ELEM_5(_0, _1, _2, _3, _4, _5, ...) _5
+// #define GRD_GET_VA_ARGS_ELEM_6(_0, _1, _2, _3, _4, _5, _6, ...) _6
+// #define GRD_GET_VA_ARGS_ELEM_7(_0, _1, _2, _3, _4, _5, _6, _7, ...) _7
+// #define GRD_GET_VA_ARGS_ELEM_8(_0, _1, _2, _3, _4, _5, _6, _7, _8, ...) _8
+// #define GRD_GET_VA_ARGS_ELEM_9(_0, _1, _2, _3, _4, _5, _6, _7, _8, _9, ...) _9
+// #define GRD_GET_VA_ARGS_ELEM_10(_0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, ...) _10
+// #define GRD_GET_ALL_BUT_LAST_ARG_0(_0, ...) 
+// #define GRD_GET_ALL_BUT_LAST_ARG_1(_0, _1, ...) _0
+// #define GRD_GET_ALL_BUT_LAST_ARG_2(_0, _1, _2, ...) _0, _1
+// #define GRD_GET_ALL_BUT_LAST_ARG_3(_0, _1, _2, _3, ...) _0, _1, _2
+// #define GRD_GET_ALL_BUT_LAST_ARG_4(_0, _1, _2, _3, _4, ...) _0, _1, _2, _3
+// #define GRD_GET_ALL_BUT_LAST_ARG_5(_0, _1, _2, _3, _4, _5, ...) _0, _1, _2, _3, _4
+// #define GRD_GET_ALL_BUT_LAST_ARG_6(_0, _1, _2, _3, _4, _5, _6, ...) _0, _1, _2, _3, _4, _5
+// #define GRD_GET_ALL_BUT_LAST_ARG_7(_0, _1, _2, _3, _4, _5, _6, _7, ...) _0, _1, _2, _3, _4, _5, _6
+// #define GRD_GET_ALL_BUT_LAST_ARG_8(_0, _1, _2, _3, _4, _5, _6, _7, _8, ...) _0, _1, _2, _3, _4, _5, _6, _7
+// #define GRD_GET_ALL_BUT_LAST_ARG_9(_0, _1, _2, _3, _4, _5, _6, _7, _8, _9, ...) _0, _1, _2, _3, _4, _5, _6, _7, _8
+// #define GRD_GET_ALL_BUT_LAST_ARG_10(_0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, ...) _0, _1, _2, _3, _4, _5, _6, _7, _8, _9
+
+// #define GRD_GET_VA_ARGS_ELEM(N, ...) GRD_CONCAT(GRD_GET_VA_ARGS_ELEM_, N)(__VA_ARGS__)
+// #define GRD_GET_LAST_ARG(...) GRD_GET_VA_ARGS_ELEM(GRD_NARGS(__VA_ARGS__), _, __VA_ARGS__ ,,,,,,,,,,,)
+// #define grd_lambda(...) [&] (auto... lambda_args) { auto $ = grd_make_tuple(lambda_args...); return GRD_GET_LAST_ARG(__VA_ARGS__); }
+
 
 template <typename Candidate, typename FunctionType, typename D = GrdDecomposedFunctionType<FunctionType>>
 concept GrdCallable = requires(Candidate f, FunctionType signature_type) {
