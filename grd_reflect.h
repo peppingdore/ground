@@ -760,3 +760,15 @@ GRD_REFLECT(GrdAny) {
 	GRD_MEMBER(type);
 	GRD_MEMBER(ptr);
 }
+
+struct GrdGeneratorType: GrdType {
+	constexpr static auto KIND = grd_make_type_kind("genr"); 
+
+	GrdType* gen_type = NULL;
+};
+
+template <typename T>
+GrdGeneratorType* grd_reflect_type(GrdGenerator<T>* x, GrdGeneratorType* type) {
+	type->gen_type = grd_reflect_type_of<T>();
+	return type;
+}
