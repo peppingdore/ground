@@ -58,6 +58,9 @@
 
 #define GRD_OFFSETOF(Type, member) (s64(&((Type*) 0x1000)->member) - s64((Type*) 0x1000))
 
+#define GRD_NARGS(...) GRD_NARGS_(__VA_ARGS__, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+#define GRD_NARGS_(_10, _9, _8, _7, _6, _5, _4, _3, _2, _1, N, ...) N
+
 #ifndef s8
     #define s8 int8_t
 #endif
