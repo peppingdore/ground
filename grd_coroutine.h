@@ -126,3 +126,9 @@ auto begin(HasGrdGeneratorIterator auto t) {
 int end(HasGrdGeneratorIterator auto t) {
 	return 0;
 }
+
+auto grd_map(auto iter, auto func) -> GrdGenerator<decltype(func(*iter.begin()))> {
+	for (auto it: iter) {
+		co_yield func(it);
+	}
+}
