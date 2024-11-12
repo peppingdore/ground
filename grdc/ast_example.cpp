@@ -95,7 +95,7 @@ int main() {
 
 			auto [file, e1] = open_file(U"xxx.spv"_b, FILE_WRITE | FILE_CREATE_NEW);
 			if (e1) {
-				print_parser_error(e);1);
+				print_parser_error(e);;
 				return -1;
 			}
 			auto m = grdc_make_spirv_emitter(f->p, c_allocator);			

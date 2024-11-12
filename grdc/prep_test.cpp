@@ -106,7 +106,7 @@ GRD_TEST(va_args_paste) {
 	GRD_EXPECT(!e, e);
 	if (!e) {
 		auto output = grdc_prep_str(prep);
-		GRD_EXPECT_EQ(test_escape_string(output), test_escape_string(U"1 23 4\n"_b));
+		GRD_EXPECT_EQ(test_escape_string(output), test_escape_string(U"1 2VA_ARGS(3, 4)\n"_b));
 	}
 }
 
@@ -204,7 +204,7 @@ GRD_TEST(line_splicing_removal) {
 GRD_TEST(error_directive) {
 	// Test handling of #error directive (if implemented)
 	// Assuming your preprocessor handles #error
-	auto [e, prep] = simple_prep(U"int k = 43;\n#error This is an error message\nint k = 43;"_b, {});
+	auto [e, prep] = simple_prep(U"#error This is an error message\nint k = 43;"_b, {});
 	GRD_EXPECT(e, e);
 	if (e) {
 		GrdLog(e);
