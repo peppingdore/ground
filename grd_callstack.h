@@ -41,7 +41,7 @@ GrdCallStack grd_get_callstack(GrdAllocator allocator = c_allocator) {
 		auto cpp_st = std::stacktrace::current();
 		// Skipping first entry to skip grd_get_callstack()'s frame.
 		st.count = cpp_st.size() - 1;
-		st.entries = Alloc<GrdCallStackEntry>(allocator, st.count);
+		st.entries = GrdAlloc<GrdCallStackEntry>(allocator, st.count);
 		for (auto i: grd_range_from_to(1, st.count + 1)) {
 			auto& x = cpp_st[i];
 			auto f_str = grd_callstack_copy_std_string(allocator, x.source_file());

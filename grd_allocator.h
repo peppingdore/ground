@@ -102,6 +102,8 @@ constexpr GrdAllocator grd_crt_allocator = {
 
 // Aliasing like this allows us to replace c_allocator
 //   with other allocator in runtime.
+// @TODO: rename c_allocator
+// @TODO: rename null_allocator
 GrdAllocator c_allocator = grd_crt_allocator;
 
 constexpr GrdAllocator null_allocator = { 

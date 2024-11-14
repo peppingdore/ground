@@ -87,11 +87,11 @@ T* grd_format_error(GrdCodeLoc loc, auto... args) {
 
 #if GRD_OS_WINDOWS
 
-struct GrdWindowsError: Error {
+struct GrdWindowsError: GrdError {
 	DWORD code;
 };
 GRD_REFLECT(GrdWindowsError) {
-	GRD_BASE_TYPE(Error);
+	GRD_BASE_TYPE(GrdError);
 	GRD_MEMBER(code);
 }
 

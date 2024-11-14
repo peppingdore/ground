@@ -31,7 +31,7 @@ GrdFile grd_file_from_native_handle(GrdNativeFileHandle handle) {
 }
 
 #if GRD_OS_WINDOWS
-GrdTuple<File, Error*> grd_open_file(GrdUnicodeString path, GrdOpenFileFlag flags = GRD_FILE_READ, u32 unix_perm=0777/*ignored*/) {
+GrdTuple<GrdFile, GrdError*> grd_open_file(GrdUnicodeString path, GrdOpenFileFlag flags = GRD_FILE_READ, u32 unix_perm=0777/*ignored*/) {
 	int windows_flags = 0;
 	if (flags & GRD_FILE_READ) {
 		windows_flags |= GENERIC_READ;
@@ -207,3 +207,6 @@ GrdError* write_string_to_file(GrdString str, GrdUnicodeString path) {
 	}
 	return NULL;
 }
+
+// @TODO: add file closing
+// @TODO: add file flushing
