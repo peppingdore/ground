@@ -83,6 +83,14 @@ GrdTuple<s64, GrdError*> grd_os_read_file(GrdFile* file, void* buf, s64 size) {
 	return { read, NULL };
 }
 
+void grd_close_file(GrdFile* file) {
+	CloseHandle(file->handle);
+}
+
+void grd_fsync(GrdFile* file) {
+	FlushFileBuffers(file->handle);
+}
+
 #elif GRD_IS_POSIX
 
 GrdTuple<GrdFile, GrdError*> grd_open_file(GrdUnicodeString path, GrdOpenFileFlag flags = GRD_FILE_READ, u32 unix_perm = 0777) {
@@ -131,6 +139,13 @@ GrdTuple<s64, GrdError*> grd_os_read_file(GrdFile* file, void* buf, s64 size) {
 	return { result, NULL };
 }
 
+void grd_close_file(GrdFile* file) {
+	close(file->handle);
+}
+
+void grd_fsync(GrdFile* file) {
+	fsync(file->handle);
+}
 #endif
 
 GrdError* grd_write_file(GrdFile* file, void* data, s64 size) {
@@ -207,6 +222,3 @@ GrdError* write_string_to_file(GrdString str, GrdUnicodeString path) {
 	}
 	return NULL;
 }
-
-// @TODO: add file closing
-// @TODO: add file flushing
