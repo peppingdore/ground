@@ -1188,7 +1188,7 @@ GrdError* grdc_tokenize(GrdcPrep* p, GrdcPrepFileSource* file) {
 	grdc_push_source_file_token(file, eof);
 	for (auto it: file->tokens) {
 		// print tokens.
-		GrdLogTrace("Token: %, %, %, %", grdc_tok_str(it), it->file_start, it->file_end, it->kind);
+		// GrdLogTrace("Token: %, %, %, %", grdc_tok_str(it), it->file_start, it->file_end, it->kind);
 	}
 	return NULL;
 }
@@ -1302,9 +1302,16 @@ void grdc_grdc_prep_stringize_tok(GrdcToken* dst, GrdcToken* arg) {
 GrdTuple<GrdError*, GrdArray<GrdcPrepMacroArg>> grdc_parse_macro_args(GrdcPrep* p, GrdcPrepMacro* macro, GrdSpan<GrdcToken*> tokens, s64* cursor, GrdcToken* paren_tok) {
 	GrdArray<GrdcPrepMacroArg> args = { .capacity = grd_len(macro->arg_defs), .allocator = p->allocator };
 	s64 paren_level = 0;
-	s64 arg_start = *cursor;
+	s64 arg_start = -1;
 	while (true) {
 		auto arg_tok = grdc_get_next_token(tokens, cursor);
+		GrdLogTrace("arg_tok: %, %", arg_tok->kind, grdc_tok_str(arg_tok));
+		if (arg_tok->kind == GRDC_PREP_TOKEN_KIND_EOF) {
+			return { grdc_make_prep_file_error(p, arg_tok, "Unexpected EOF while parsing macro arguments") };
+		}
+		if (arg_start == -1) {
+			arg_start = *cursor;
+		}
 		if (grdc_tok_str(arg_tok) == ")") {
 			if (paren_level > 0) {
 				paren_level -= 1;
@@ -1453,12 +1460,14 @@ GrdcMaybeExpandedMacro grdc_maybe_expand_macro(GrdcPrep* p, GrdcTokenSlice token
 		return { };
 	}
 	GrdcToken* paren_tok = NULL;
+	GrdLogTrace("Expanding macro: %", grdc_tok_str(name_tok));
+	GrdLogTrace("is_object: %", macro->is_object);
 	if (!macro->is_object) {
 		paren_tok = grdc_get_next_token(tokens.span(), cursor);
 		if (grdc_tok_str(paren_tok) != "(" || paren_tok->file_start != name_tok->file_end) {
 			return { };
 		}
-		*cursor += 1; // skip (
+		// *cursor += 1; // skip (
 	}
 
 	if (grdc_does_macro_stack_contain_macro(p, macro)) {
@@ -1487,10 +1496,10 @@ GrdcMaybeExpandedMacro grdc_maybe_expand_macro(GrdcPrep* p, GrdcTokenSlice token
 		// print args.
 		s64 idx = 0;
 		for (auto it: args) {
-			GrdLogTrace("Arg: %", idx);
-			for (auto i: grd_range_from_to(it.start, it.end)) {
-				GrdLogTrace("  %", grdc_tok_str(tokens[i]));
-			}
+			// GrdLogTrace("Arg: %", idx);
+			// for (auto i: grd_range_from_to(it.start, it.end)) {
+			// 	GrdLogTrace("  %", grdc_tok_str(tokens[i]));
+			// }
 			idx += 1;
 		}
 		exp->args = args;
