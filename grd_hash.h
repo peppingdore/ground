@@ -2,7 +2,7 @@
 
 #include "third_party/spooky_hash.h"
 #include "grd_type_utils.h"
-#include <math.h>
+#include "math/grd_basic_functions.h"
 
 using GrdHash64 = u64;
 
@@ -130,12 +130,12 @@ void grd_hash_fp_naive(GrdHasher* h, T num) {
 		grd_update(&h, &num, sizeof(num));
 	};
 
-	switch (fpclassify(num)) {
-		case FP_INFINITE:  hash_bytes(INFINITY);
-		case FP_NAN:       hash_bytes(NAN);
-		case FP_ZERO:      hash_bytes(0);
-		case FP_SUBNORMAL: // Is this proper??
-		case FP_NORMAL:
+	switch (grd_fp_classify(num)) {
+		case GRD_FP_INFINITE:  hash_bytes(GRD_INFINITY);
+		case GRD_FP_NAN:       hash_bytes(GRD_NAN);
+		case GRD_FP_ZERO:      hash_bytes(0);
+		case GRD_FP_SUBNORMAL: // Is this proper??
+		case GRD_FP_NORMAL:
 		default:
 			hash_bytes(num);
 	}

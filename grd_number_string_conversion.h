@@ -107,23 +107,23 @@ inline GrdSmallString grd_to_string(T num, int max_decimal_digits = 99999999) {
 	GrdSmallString res;
 
 	if (num == 0) {
-		if (signbit(num)) {
+		if (grd_signbit(num)) {
 			grd_append(&res, "-0.0");
 		} else {
 			grd_append(&res, "0.0");
 		}
 		return res;
-	} else if (isnan(num)) {
-		if (signbit(num)) {
+	} else if (grd_is_nan(num)) {
+		if (grd_signbit(num)) {
 			grd_append(&res, "-NaN");
 		} else {
 			grd_append(&res, "NaN");
 		}
 		return res;
-	} else if (num == INFINITY) {
+	} else if (num == GRD_INFINITY) {
 		grd_append(&res, "Inf");
 		return res;
-	} else if (num == -INFINITY) {
+	} else if (num == -GRD_INFINITY) {
 		grd_append(&res, "-Inf");
 		return res;
 	}
@@ -534,16 +534,16 @@ inline bool grd_parse_float(GrdSpan<Char> str, f64* result, Float_Parsing_Params
 	}
 
 	if (grd_compare_ignore_case_ascii(str, "-nan"_b)) {
-		*result = -NAN;
+		*result = -GRD_NAN;
 		return true;
 	} else if (grd_compare_ignore_case_ascii(str, "nan"_b)) {
-		*result =  NAN;
+		*result =  GRD_NAN;
 		return true;
 	} else if (grd_compare_ignore_case_ascii(str, "-inf"_b)) {
-		*result = -INFINITY;
+		*result = -GRD_INFINITY;
 		return true;
 	} else if (grd_compare_ignore_case_ascii(str, "inf"_b)) {
-		*result =  INFINITY;
+		*result =  GRD_INFINITY;
 		return true;
 	}
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../grd_base.h"
+#include "../grd_data_ops.h"
 #include <type_traits>
 
 template <typename T>
@@ -58,4 +59,40 @@ T grd_align(T number, u64 alignment) {
 		return number;
 	}
 	return number + (alignment - (number % alignment));
+}
+
+enum GrdFpClass {
+	GRD_FP_NAN = 0,
+	GRD_FP_INFINITE = 1,
+	GRD_FP_ZERO = 2,
+	GRD_FP_SUBNORMAL = 3,
+	GRD_FP_NORMAL = 4,
+};
+
+GrdFpClass grd_fp_classify(f64 x) {
+	union{ f64 d; u64 u;}u = {x};
+	u32 exp = (u32) ( (u.u & 0x7fffffffffffffffULL) >> 52 );
+	if (exp == 0) {
+		if (u.u & 0x000fffffffffffffULL)
+			return GRD_FP_SUBNORMAL;
+		return GRD_FP_ZERO;
+	}
+	if (0x7ff == exp ) {	
+		if (u.u & 0x000fffffffffffffULL) {
+			return GRD_FP_NAN;
+		}
+		return GRD_FP_INFINITE;
+	}
+	return GRD_FP_NORMAL;
+}
+
+#define GRD_INFINITY (1.0f / 0.0f)
+#define GRD_NAN (0.0f / 0.0f)
+
+bool grd_signbit(f64 x) {
+	return grd_bitcast<u64>(x) & (1ULL << 63);
+}
+
+bool grd_is_nan(f64 x) {
+	return grd_fp_classify(x) == GRD_FP_NAN;
 }
