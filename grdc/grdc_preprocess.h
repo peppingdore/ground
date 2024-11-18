@@ -16,34 +16,32 @@ enum GrdcPrepTokenKind {
 	GRDC_PREP_TOKEN_KIND_EOF,
 	GRDC_PREP_TOKEN_KIND_LINE_BREAK,
 	GRDC_PREP_TOKEN_KIND_NUMBER,
-	GRDC_PREP_TOKEN_KIND_DIRECTIVE,
 	GRDC_PREP_TOKEN_KIND_STRING,
 	GRDC_PREP_TOKEN_KIND_IDENT,
 	GRDC_PREP_TOKEN_KIND_SPACE,
 	GRDC_PREP_TOKEN_KIND_PUNCT,
 	GRDC_PREP_TOKEN_KIND_GRD_CONCAT,
 	GRDC_PREP_TOKEN_KIND_GRD_CONCATTED,
-	GRDC_PREP_TOKEN_KIND_STRINGIZE,
 	GRDC_PREP_TOKEN_KIND_MACRO_PRESCAN_IDENT,
 	GRDC_PREP_TOKEN_KIND_DOT_DOT_DOT,
 	GRDC_PREP_TOKEN_KIND_OTHER,
+	GRDC_PREP_TOKEN_KIND_HASH,
 };
 GRD_REFLECT(GrdcPrepTokenKind) {
 	GRD_ENUM_VALUE(GRDC_PREP_TOKEN_KIND_NONE);
 	GRD_ENUM_VALUE(GRDC_PREP_TOKEN_KIND_EOF);
 	GRD_ENUM_VALUE(GRDC_PREP_TOKEN_KIND_LINE_BREAK);
 	GRD_ENUM_VALUE(GRDC_PREP_TOKEN_KIND_NUMBER);
-	GRD_ENUM_VALUE(GRDC_PREP_TOKEN_KIND_DIRECTIVE);
 	GRD_ENUM_VALUE(GRDC_PREP_TOKEN_KIND_STRING);
 	GRD_ENUM_VALUE(GRDC_PREP_TOKEN_KIND_IDENT);
 	GRD_ENUM_VALUE(GRDC_PREP_TOKEN_KIND_SPACE);
 	GRD_ENUM_VALUE(GRDC_PREP_TOKEN_KIND_PUNCT);
 	GRD_ENUM_VALUE(GRDC_PREP_TOKEN_KIND_GRD_CONCAT);
 	GRD_ENUM_VALUE(GRDC_PREP_TOKEN_KIND_GRD_CONCATTED);
-	GRD_ENUM_VALUE(GRDC_PREP_TOKEN_KIND_STRINGIZE);
 	GRD_ENUM_VALUE(GRDC_PREP_TOKEN_KIND_MACRO_PRESCAN_IDENT);
 	GRD_ENUM_VALUE(GRDC_PREP_TOKEN_KIND_DOT_DOT_DOT);
 	GRD_ENUM_VALUE(GRDC_PREP_TOKEN_KIND_OTHER);
+	GRD_ENUM_VALUE(GRDC_PREP_TOKEN_KIND_HASH);
 }
 
 struct PrepFileMapping {
@@ -1092,20 +1090,7 @@ GrdTuple<s64, GrdcPrepTokenKind> grdc_get_token_end_at(GrdUnicodeString src, s64
 		if (grd_starts_with(src[{cursor, {}}], "##")) {
 			return { cursor + 2, GRDC_PREP_TOKEN_KIND_GRD_CONCAT };
 		}
-		s64 dir_end = grd_len(src);
-		for (s64 i: grd_range_from_to(cursor + 1, grd_len(src))) {
-			if (grd_is_whitespace(src[i]) || grd_is_line_break(src[i])) {
-				dir_end = i;
-				break;
-			}
-		}
-		if (dir_end > cursor) {
-			auto str = src[{cursor, dir_end}];
-			if (str == "#include" || str == "#define" || str == "#error" || str == "#pragma" || str == "#if" || str == "#elif" || str == "#else" || str == "#endif") {
-				return { dir_end, GRDC_PREP_TOKEN_KIND_DIRECTIVE };
-			}
-			return { dir_end, GRDC_PREP_TOKEN_KIND_STRINGIZE };
-		}
+		return { cursor + 1, GRDC_PREP_TOKEN_KIND_HASH };
 	}
 	auto [lang_end, lang_kind] = grdc_get_lang_token_end_at(src, cursor);
 	if (lang_end > 0) {
@@ -1649,6 +1634,13 @@ GrdcMaybeExpandedMacro grdc_maybe_expand_macro(GrdcPrep* p, GrdcTokenSlice token
 
 GrdError* grdc_handle_prep_directive(GrdcPrep* p, GrdcTokenSlice tokens, s64* cursor) {
 	auto first_directive_tok = tokens[*cursor];
+
+	for (s64 i: grd_range_from_to(*cursor, grd_len(tokens))) {
+		if (tokens[i]->kind == GRDC_PREP_TOKEN_KIND_IDENT) {
+			
+		}
+	}
+
 	if (grdc_tok_str(first_directive_tok) == "#include") {
 		*cursor += 1;
 		s64 start = *cursor;
@@ -1903,7 +1895,7 @@ GrdError* grdc_preprocess_file(GrdcPrep* p, GrdcPrepFileSource* source_file) {
 	s64 cursor = -1;
 	while (++cursor < grd_len(included->tokens)) {
 		auto tok = included->tokens[cursor];
-		if (tok->kind == GRDC_PREP_TOKEN_KIND_DIRECTIVE) {
+		if (tok->kind == GRDC_PREP_TOKEN_KIND_HASH) {
 			auto e = grdc_handle_prep_directive(p, grdc_make_tok_slice(included->tokens), &cursor);
 			if (e) {
 				return e;
