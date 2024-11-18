@@ -245,24 +245,12 @@ GRD_REFLECTION_REFLECT_PRIMITIVE(char,     char);
 GRD_REFLECTION_REFLECT_PRIMITIVE(wchar_t,  wchar);
 GRD_REFLECTION_REFLECT_PRIMITIVE(char16_t, char16);
 GRD_REFLECTION_REFLECT_PRIMITIVE(char32_t, char32);
-#if IS_POSIX
+#if GRD_IS_POSIX
 	GRD_REFLECTION_REFLECT_PRIMITIVE(unsigned long, u64);
 	GRD_REFLECTION_REFLECT_PRIMITIVE(long, s64);
 #endif
 #undef GRD_REFLECTION_REFLECT_PRIMITIVE
 // @NewPrimitive
-
-
-GrdPrimitiveType* grd_reflect_type(bool* x, GrdPrimitiveType* type);
-
-template <typename T, s64 N>
-GrdFixedArrayType* grd_reflect_type(T (*arr)[N], GrdFixedArrayType* type);
-
-template <typename T> requires(!std::is_function_v<T>)
-GrdPointerType* grd_reflect_type(T** thing, GrdPointerType* type);
-
-template <typename T> requires(std::is_function_v<T>)
-GrdFunctionType* grd_reflect_type(T* thing, GrdFunctionType* type);
 
 using GrdReflectionHookCounter = GrdCompileTimeCounter<>;
 
@@ -353,16 +341,7 @@ TypeT* grd_reflect_add_type_named(const char* name) {
 }
 
 template <typename T>
-concept GrdMemberReflect = requires(T a) { 
-	{ T::grd_reflect_create_type(&a) };
-	{ T::grd_reflect_type(&a, NULL) };
-};
-
-template <typename T>
-concept GrdGlobalReflect = requires(T a) { 
-	{ grd_reflect_create_type(&a) };
-	{ grd_reflect_type(&a, NULL) };
-};
+GrdType* grd_reflect_type_of();
 
 template <typename T>
 GrdUnregisteredType* grd_reflect_create_type(T* x) {
@@ -377,34 +356,50 @@ GrdPrimitiveType* grd_reflect_create_type(bool* x) {
 	return grd_reflect_add_type_named<bool, GrdPrimitiveType>("");
 }
 
-GrdPrimitiveType* grd_reflect_type(bool* x, GrdPrimitiveType* type) {
+void grd_reflect_type(bool* x, GrdPrimitiveType* type) {
 	type->name = "bool";
 	type->primitive_kind = GrdPrimitiveKind::P_bool;
-	return type;
 }
 
-struct GrdReflector {
-	template <typename T>
-	static GrdType* grd_reflect_type_internal(T*, short) {
-		auto type = T::grd_reflect_create_type((T*) NULL);
-		T::grd_reflect_type((T*) NULL, type);
-		return type;
-	}
+template <typename T>
+GrdPointerType* grd_reflect_create_type(T** thing) {
+	return grd_reflect_add_type_named<T*, GrdPointerType>("");
+}
 
-	template <typename T>
-	static GrdType* grd_reflect_type_internal(T*, int) {
-		auto type = grd_reflect_create_type((T*) NULL);
-		grd_reflect_type((T*) NULL, type);
-		return type;
-	}
+template <typename T>
+void grd_reflect_type(T** thing, GrdPointerType* type) {
+	type->inner = grd_reflect_type_of<T>();
+	auto inner_name_length = strlen(type->inner->name);
+	auto name = (char*) malloc(inner_name_length + 2);
+	memcpy(name, type->inner->name, inner_name_length);
+	strcpy(name + inner_name_length, "*");
+	type->name = name;
+}
 
-	// Every type pointer auto casts to void*, that's why
-	//  we can't have global grd_reflect_type(void*, ) to reflect type 'void'.
-	static GrdType* grd_reflect_type_internal(void*, u64) {
-		auto* type = grd_reflect_add_type_named<void, GrdPrimitiveType>("");
-		type->name = "void";
-		type->primitive_kind = GrdPrimitiveKind::P_void;
-		return type;
+template <typename T, s64 N>
+GrdFixedArrayType* grd_reflect_create_type(T (*arr)[N]) {
+	return grd_reflect_add_type_named<T (*)[N], GrdFixedArrayType>("");
+}
+
+template <typename T, s64 N>
+void grd_reflect_type(T (*arr)[N], GrdFixedArrayType* type) {
+	type->inner = grd_reflect_type_of<T>();
+	type->array_size = N;
+	type->subkind = "fixed_array";
+	type->name = grd_heap_sprintf("%s[%lld]", type->inner->name, N);
+	type->get_count = +[](void* arr) {
+		return N;
+	};
+	type->get_item = +[](void* arr, s64 index) -> void* {
+		return grd_ptr_add(arr, sizeof(T) * index);
+	};
+}
+
+template <typename R, typename... Args>
+GrdFunctionType* grd_reflect_create_type(R (**function)(Args...)) {
+	return grd_reflect_add_type_named<R (*)(Args...), GrdFunctionType>("");
+}
+
 template <typename R, typename... Args>
 void grd_reflect_type(R (**function)(Args...), GrdFunctionType* type) {
 	type->return_type = grd_reflect_type_of<R>();
@@ -523,44 +518,6 @@ const char* grd_resolve_type_name_alias(const char* name) {
 	if (strcmp(name, "double") == 0) return "f64";
 	if (strcmp(name, "unsigned long long") == 0) return "u64";
 	return name;
-}
-
-template <typename T> requires(!std::is_function_v<T>)
-GrdPointerType* grd_reflect_type(T** thing, GrdPointerType* type) {
-	type->inner = grd_reflect_type_of<T>();
-	auto inner_name_length = strlen(type->inner->name);
-	auto name = (char*) malloc(inner_name_length + 2);
-	memcpy(name, type->inner->name, inner_name_length);
-	strcpy(name + inner_name_length, "*");
-	type->name = name;
-	return type;
-}
-
-template <typename T, s64 N>
-GrdFixedArrayType* grd_reflect_type(T (*arr)[N], GrdFixedArrayType* type) {
-	type->inner = grd_reflect_type_of<T>();
-	type->array_size = N;
-	type->subkind = "fixed_array";
-	type->name = grd_heap_sprintf("%s[%lld]", type->inner->name, N);
-	type->get_count = +[](void* arr) {
-		return N;
-	};
-	type->get_item = +[](void* arr, s64 index) -> void* {
-		return grd_ptr_add(arr, sizeof(T) * index);
-	};
-	return type;
-}
-
-template <typename R, typename... Args>
-GrdFunctionType* grd_reflect_type(R (**function)(Args...), GrdFunctionType* type) {
-	// @TODO: set name.
-	type->return_type = grd_reflect_type_of<R>();
-	GrdType* arg_types[] = { grd_reflect_type_of<Args>()... };
-	s64 capacity = 0;
-	for (GrdType* arg_type: arg_types) {
-		type->arg_types.add(arg_type);
-	}
-	return type;
 }
 
 GrdType* grd_reflect_get_pointer_inner_type_with_indirection_level(GrdPointerType* pointer_type, s32* result_indirection_level) {
@@ -720,8 +677,16 @@ struct grd_is_virtual_base_of<Base, Derived, typename std::enable_if<
 template <typename T>
 using GrdReflectMacroPickType = std::conditional_t<std::is_class_v<T>, GrdStructType, GrdEnumType>;
 
+// #define GRD_REFLECT_NAME(__X, _name)\
+// template <typename __T = __X> requires (std::is_same_v<__X, __T>)\
+// static GrdReflectMacroPickType<__T>* grd_reflect_create_type(__T* x) { return grd_reflect_add_type_named<__T, GrdReflectMacroPickType<__T>>(_name); }\
+// template <typename __T = __X> requires (std::is_same_v<__X, __T>)\
+// static void grd_reflect_type(__T* x, GrdReflectMacroPickType<__T>* type)
+
 #define GRD_REFLECT_NAME(__T, _name)\
+template <int _N = 0> requires (_N == 0)\
 static GrdReflectMacroPickType<__T>* grd_reflect_create_type(__T* x) { return grd_reflect_add_type_named<__T, GrdReflectMacroPickType<__T>>(_name); }\
+template <int _N = 0> requires (_N == 0)\
 static void grd_reflect_type(__T* x, GrdReflectMacroPickType<__T>* type)
 
 
@@ -753,7 +718,9 @@ grd_reflect_struct_type_add_member(type, GrdStructMember{\
 	((s32) ((u8*) ((base*) ((decltype(x)) 0x10000000)) - (u8*) ((decltype(x)) 0x10000000))),\
 });
 
-struct GrdRealTypeMember {};
+struct GrdRealTypeMember {
+	GRD_REFLECT(GrdRealTypeMember) {}
+};
 
 GrdType* grd_get_real_type(GrdType* type, void* ptr) {
 	if (ptr != NULL) {

@@ -44,6 +44,10 @@ GRD_REFLECTION_REFLECT_HOOK(T) {
 // Use this as a tag on a member to specify how that member must be formatted.
 struct GrdCustomMemberFormat {
 	void (*format_proc)(GrdFormatter*, GrdAny member);
+
+	GRD_REFLECT(GrdCustomMemberFormat) {
+		GRD_MEMBER(format_proc);
+	}
 };
 
 GrdCustomMemberFormat grd_make_custom_member_format(auto proc) {
@@ -69,6 +73,11 @@ struct GrdFormatter {
 	GrdArray<void*>        cyclic_pointer_tracker;
 	s64                    depth = -1;
 	bool                   quote_inner_string = false;
+
+	GRD_REFLECT(GrdFormatter) {
+		
+	}
+
 
 	bool is_compact() {
 		return !(flags & FORMAT_EXTENDED);

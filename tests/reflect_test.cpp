@@ -6,7 +6,7 @@
 #include "../grd_testing.h"
 #include "../grd_format.h"
 
-GRD_TEST(reflect_type_names) {
+GRD_TEST(primitive_names) {
 	GRD_EXPECT(strcmp(grd_reflect_type_of<int>()->name, "s32") == 0, grd_make_string(grd_reflect_type_of<int>()->name));
 	GRD_EXPECT(strcmp(grd_reflect_type_of<char>()->name, "char") == 0, grd_make_string(grd_reflect_type_of<char>()->name));
 	GRD_EXPECT(strcmp(grd_reflect_type_of<short>()->name, "s16") == 0, grd_make_string(grd_reflect_type_of<short>()->name));
@@ -14,6 +14,16 @@ GRD_TEST(reflect_type_names) {
 	GRD_EXPECT(strcmp(grd_reflect_type_of<double>()->name, "f64") == 0, grd_make_string(grd_reflect_type_of<double>()->name));
 	GRD_EXPECT(strcmp(grd_reflect_type_of<bool>()->name, "bool") == 0, grd_make_string(grd_reflect_type_of<bool>()->name));
 	GRD_EXPECT(strcmp(grd_reflect_type_of<void>()->name, "void") == 0, grd_make_string(grd_reflect_type_of<void>()->name));
+	GRD_EXPECT(strcmp(grd_reflect_type_of<void*>()->name, "void*") == 0, grd_make_string(grd_reflect_type_of<void*>()->name));
+	GRD_EXPECT(strcmp(grd_reflect_type_of<void**>()->name, "void**") == 0, grd_make_string(grd_reflect_type_of<void**>()->name));
+}
+
+GRD_TEST(reflect_function) {
+	auto proc = +[](bool a, s32 b) -> void* { return NULL; };
+	auto tp = grd_reflect_type_of<decltype(proc)>();
+	GRD_EXPECT(strcmp(tp->name, "void*(bool, s32)") == 0, tp->name);
+	GRD_EXPECT(tp->size, sizeof(void*));
+	GRD_EXPECT_EQ(tp->kind, GrdFunctionType::KIND, grd_type_kind_as_c_str(&tp->kind));
 }
 
 struct A {
@@ -44,6 +54,7 @@ struct C: A, B {
 };
 
 GRD_TEST(reflect_struct_offset) {
+
 	auto type = grd_reflect_type_of<C>();
 	GRD_EXPECT(type->kind == GrdStructType::KIND, grd_type_kind_as_c_str(&type->kind));
 	auto casted = (GrdStructType*) type;
@@ -62,7 +73,6 @@ GRD_TEST(reflect_struct_offset) {
 	GRD_EXPECT(casted->members[4]->offset == sizeof(int) * 4);
 }
 
-
 struct Base {
 	GrdType* type;
 
@@ -79,6 +89,7 @@ struct Derived: Base {
 };
 
 GRD_TEST(reflect_real_type_test) {
+
 	Derived d;
 	d.type = grd_reflect_type_of<decltype(d)>();
 
