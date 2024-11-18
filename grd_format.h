@@ -288,10 +288,8 @@ GrdTuple<GrdString, bool> formatter_resolve_spec(GrdFormatter* formatter, GrdStr
 	return { spec, false };
 }
 
-template <GrdStringChar T, typename... Args>
-void grd_format(GrdFormatter* formatter, GrdSpan<T> format_str, Args... args) {
-
-	GrdAny things[] = { grd_make_any(&args)... };
+template <GrdStringChar T>
+void grd_format_impl(GrdFormatter* formatter, GrdSpan<T> format_str, std::initializer_list<GrdAny> things) {
 
 	GrdString short_specs[] = { "p"_b, "P"_b, "h"_b, "H"_b, "b"_b, "B"_b };
 
@@ -324,9 +322,9 @@ void grd_format(GrdFormatter* formatter, GrdSpan<T> format_str, Args... args) {
 	};
 
 	auto insert_arg = [&] (s64 idx, auto spec) {
-		if (idx >= 0 && idx < grd_static_array_count(things)) {
+		if (idx >= 0 && idx < things.size()) {
 			auto [resolved_spec, have_to_free] = formatter_resolve_spec(formatter, spec);
-			grd_format_item(formatter, things[idx], resolved_spec);
+			grd_format_item(formatter, things.begin()[idx], resolved_spec);
 			if (have_to_free) {
 				GrdFree(resolved_spec.data);
 			}
@@ -345,7 +343,7 @@ void grd_format(GrdFormatter* formatter, GrdSpan<T> format_str, Args... args) {
 
 template <GrdStringChar T, typename... Args>
 void grd_format(GrdFormatter* formatter, const T* c_str, Args... args) {
-	grd_format(formatter, grd_make_string(c_str), args...);
+	grd_format_impl(formatter, grd_make_string(c_str), { grd_make_any(&args)... });
 }
 
 template <typename... Args>
@@ -361,7 +359,7 @@ void grd_format(GrdFormatter* formatter, Args... args) {
 		cursor += strlen(str);
 	}
 	buf[cursor] = '\0';
-	grd_format(formatter, grd_make_string(buf, cursor), args...);
+	grd_format_impl(formatter, grd_make_string(buf, cursor), { grd_make_any(&args)... });
 }
 
 struct Struct_Printer {
