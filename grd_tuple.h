@@ -247,7 +247,12 @@ void grd_tuple_reflect_dummy(std::initializer_list<int> x) {
 }
 
 template <typename... Args>
-GrdStructType* grd_reflect_type(GrdTuple<Args...>* tuple, GrdStructType* type) {
+GrdStructType* grd_reflect_create_type(GrdTuple<Args...>* x) {
+	return grd_reflect_add_type_named<GrdTuple<Args...>, GrdStructType>("");
+}
+
+template <typename... Args>
+void grd_reflect_type(GrdTuple<Args...>* tuple, GrdStructType* type) {
 	auto impl = [&]
 		<s64... Indices>
 		(std::integer_sequence<s64, Indices...>) {
@@ -265,5 +270,4 @@ GrdStructType* grd_reflect_type(GrdTuple<Args...>* tuple, GrdStructType* type) {
 	impl(std::make_integer_sequence<s64, GrdTuple<Args...>::size>{});
 
 	type->subkind = "tuple";
-	return type;
 }

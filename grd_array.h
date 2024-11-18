@@ -136,7 +136,12 @@ struct GrdArrayType: GrdSpanType {
 };
 
 template <typename T>
-GrdArrayType* grd_reflect_type(GrdArray<T>* x, GrdArrayType* type) {
+GrdArrayType* grd_reflect_create_type(GrdArray<T>* x) {
+	return grd_reflect_add_type_named<GrdArray<T>, GrdArrayType>("");
+}
+
+template <typename T>
+void grd_reflect_type(GrdArray<T>* x, GrdArrayType* type) {
 	type->inner = grd_reflect_type_of<T>();
 	type->name = grd_heap_sprintf("GrdArray<%s>", type->inner->name);
 	type->subkind = "array";
@@ -153,5 +158,4 @@ GrdArrayType* grd_reflect_type(GrdArray<T>* x, GrdArrayType* type) {
 		void* item = grd_ptr_add(casted->data, sizeof(T) * index);
 		return item;
 	};
-	return type;
 }

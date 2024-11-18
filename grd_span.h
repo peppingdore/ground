@@ -178,7 +178,12 @@ void grd_type_hash(GrdHasher* hasher, GrdSpan<T> array) {
 }
 
 template <typename T>
-GrdSpanType* grd_reflect_type(GrdSpan<T>* x, GrdSpanType* type) {
+GrdSpanType* grd_reflect_create_type(GrdSpan<T>* x) {
+	return grd_reflect_add_type_named<GrdSpan<T>, GrdSpanType>("");
+}
+
+template <typename T>
+void grd_reflect_type(GrdSpan<T>* x, GrdSpanType* type) {
 	type->inner = grd_reflect_type_of<T>();
 	type->name = grd_heap_sprintf("GrdSpan<%s>", type->inner->name);
 	type->subkind = "span";
@@ -191,7 +196,6 @@ GrdSpanType* grd_reflect_type(GrdSpan<T>* x, GrdSpanType* type) {
 		void* item = grd_ptr_add(casted->data, sizeof(T) * index);
 		return item;
 	};
-	return type;
 }
 
 template <typename T>

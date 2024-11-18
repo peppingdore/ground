@@ -1,8 +1,20 @@
-#pragma once
+#if 0
+	`dirname "$0"`/../build.sh $0 $@; exit
+#endif
 
-#include "grd_testing.h"
-#include "grd_reflect.h"
-#include "grd_format.h"
+#include "../grd_reflect.h"
+#include "../grd_testing.h"
+#include "../grd_format.h"
+
+GRD_TEST(reflect_type_names) {
+	GRD_EXPECT(strcmp(grd_reflect_type_of<int>()->name, "s32") == 0, grd_make_string(grd_reflect_type_of<int>()->name));
+	GRD_EXPECT(strcmp(grd_reflect_type_of<char>()->name, "char") == 0, grd_make_string(grd_reflect_type_of<char>()->name));
+	GRD_EXPECT(strcmp(grd_reflect_type_of<short>()->name, "s16") == 0, grd_make_string(grd_reflect_type_of<short>()->name));
+	GRD_EXPECT(strcmp(grd_reflect_type_of<float>()->name, "f32") == 0, grd_make_string(grd_reflect_type_of<float>()->name));
+	GRD_EXPECT(strcmp(grd_reflect_type_of<double>()->name, "f64") == 0, grd_make_string(grd_reflect_type_of<double>()->name));
+	GRD_EXPECT(strcmp(grd_reflect_type_of<bool>()->name, "bool") == 0, grd_make_string(grd_reflect_type_of<bool>()->name));
+	GRD_EXPECT(strcmp(grd_reflect_type_of<void>()->name, "void") == 0, grd_make_string(grd_reflect_type_of<void>()->name));
+}
 
 struct A {
 	int a;
@@ -33,7 +45,7 @@ struct C: A, B {
 
 GRD_TEST(reflect_struct_offset) {
 	auto type = grd_reflect_type_of<C>();
-	GRD_EXPECT(type->kind == GrdStructType::KIND);
+	GRD_EXPECT(type->kind == GrdStructType::KIND, grd_type_kind_as_c_str(&type->kind));
 	auto casted = (GrdStructType*) type;
 	GRD_EXPECT(casted->unflattened_members.count == 3);
 	GRD_EXPECT(casted->unflattened_members[0]->offset == 0);

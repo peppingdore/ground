@@ -276,7 +276,12 @@ struct GrdHashMapType: GrdMapType {
 };
 
 template <typename K, typename V>
-GrdHashMapType* grd_reflect_type(GrdHashMap<K, V>* x, GrdHashMapType* type) {
+GrdHashMapType* grd_reflect_create_type(GrdHashMap<K, V>* x) {
+	return grd_reflect_add_type_named<GrdHashMap<K, V>, GrdHashMapType>("");
+}
+
+template <typename K, typename V>
+void grd_reflect_type(GrdHashMap<K, V>* x, GrdHashMapType* type) {
 	type->key   = grd_reflect_type_of<K>();
 	type->value = grd_reflect_type_of<V>();
 	type->name  = grd_heap_sprintf("GrdHashMap<%s, %s>", type->key->name, type->value->name);
@@ -315,5 +320,4 @@ GrdHashMapType* grd_reflect_type(GrdHashMap<K, V>* x, GrdHashMapType* type) {
 			}
 		}
 	};
-	return type;
 }

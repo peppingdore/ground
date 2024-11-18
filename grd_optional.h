@@ -58,8 +58,12 @@ struct GrdOptionalType: GrdType {
 };
 
 template <typename T>
-GrdOptionalType* grd_reflect_type(GrdOptional<T>* x, GrdOptionalType* type) {
+GrdOptionalType* grd_reflect_create_type(GrdOptional<T>* x) {
+	return grd_reflect_add_type_named<GrdOptional<T>, GrdOptionalType>("");
+}
+
+template <typename T>
+void grd_reflect_type(GrdOptional<T>* x, GrdOptionalType* type) {
 	type->inner = grd_reflect_type_of<T>();
 	type->name = grd_heap_sprintf("GrdOptional<%s>", type->inner->name);
-	return type;
 }
