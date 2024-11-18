@@ -39,7 +39,8 @@ FILENAME_CASE_MISMATCH_WARNING=CompilerFlag(clang='-Wnonportable-include-path', 
 ALLOW_DEPRECATED=CompilerFlag(clang='-Wno-deprecated', msvc='')
 ALLOW_MICROSOFT_INCLUDE=CompilerFlag(clang='-Wno-microsoft-include', msvc='')
 ENABLE_WIDE_CMPXCHG=CompilerFlag(clang="-mcx16", msvc="")
-COMPILE_TIME_TRACE=CompilerFlag(clang="-ftime-trace", msvc="")
+COMPILE_TIME_TRACE=CompilerFlag(clang=("-ftime-trace"), msvc="")
+COMPILE_TIME_TRACE_HIGH_GRANULARITY=CompilerFlag(clang=("-ftime-trace-granularity=0"), msvc="")
 
 DEFAULT_COMPILER_FLAGS = [
 	DISABLE_LINKER, LATEST_CPP_VERSION, MISSING_RETURN_IS_ERROR,
@@ -530,6 +531,7 @@ def build_main():
 	argparser.add_argument('--arch')
 	argparser.add_argument('extra', nargs='*')
 	argparser.add_argument('--time_trace', action='store_true', help="Enables compile time tracing")
+	argparser.add_argument('--time_trace_high_granularity', action='store_true', help="Enables compile time tracing with high granularity")
 	args, extra = argparser.parse_known_args()
 
 	target = builder.native_target()
@@ -538,8 +540,10 @@ def build_main():
 		params.set_compiler(args.compiler)
 	if args.arch:
 		target = builder.Target(target.os, args.arch)
-	if args.time_trace:
+	if args.time_trace or args.time_trace_high_granularity:
 		params.compile_params.compiler_flags.append(builder.COMPILE_TIME_TRACE)
+	if args.time_trace_high_granularity:
+		params.compile_params.compiler_flags.append(builder.COMPILE_TIME_TRACE_HIGH_GRANULARITY)
 	
 	params.set_target(target)
 	params.set_optimization_level(args.opt_level)
