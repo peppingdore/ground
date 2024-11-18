@@ -1,5 +1,5 @@
 #if 0
-	`dirname "$0"`/../build.py "$0" -r -- ${@:1}; exit
+	`dirname "$0"`/../build.sh $0 $@; exit
 #endif
 #include "grdc_preprocess.h"
 #include "../grd_testing.h"
