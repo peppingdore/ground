@@ -405,8 +405,32 @@ struct GrdReflector {
 		type->name = "void";
 		type->primitive_kind = GrdPrimitiveKind::P_void;
 		return type;
+template <typename R, typename... Args>
+void grd_reflect_type(R (**function)(Args...), GrdFunctionType* type) {
+	type->return_type = grd_reflect_type_of<R>();
+	GrdType* arg_types[] = { grd_reflect_type_of<Args>()... };
+	s64 capacity = 0;
+	for (GrdType* arg_type: arg_types) {
+		type->arg_types.add(arg_type);
 	}
-};
+	s64 str_len = 16;
+	str_len += strlen(type->name);
+	for (GrdType* arg_type: type->arg_types) {
+		str_len += strlen(arg_type->name);
+	}
+	char* str = (char*) malloc(str_len);
+	str[0] = '\0';
+	strcat(str, type->return_type->name);
+	strcat(str, "(");
+	for (s64 i = 0; i < type->arg_types.count; i++) {
+		if (i > 0) {
+			strcat(str, ", ");
+		}
+		strcat(str, type->arg_types.data[i]->name);
+	}
+	strcat(str, ")");
+	type->name = str;
+}
 
 void grd_reflect_maybe_flatten_struct_type(GrdType* type);
 
