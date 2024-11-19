@@ -1494,21 +1494,28 @@ GrdcMaybeExpandedMacro grdc_maybe_expand_macro(GrdcPrep* p, GrdcTokenSlice token
 	if (!macro->is_object) {
 		// Stringize.
 		for (s64 i = 0; i < grd_len(exp->body); i++) {
-			if (exp->body[i]->kind == GRDC_PREP_TOKEN_KIND_STRINGIZE) {
+			if (exp->body[i]->kind == GRDC_PREP_TOKEN_KIND_HASH) {
+				if (i + 1 >= grd_len(exp->body) || 
+					(exp->body[i + 1]->kind != GRDC_PREP_TOKEN_KIND_IDENT &&
+					 exp->body[i + 1]->kind != GRDC_PREP_TOKEN_KIND_MACRO_PRESCAN_IDENT
+				)) {
+					return { grdc_make_prep_file_error(p, exp->body[i + 1], "Expected macro argument after # in a macro") };
+				}
 				auto str_tok = grdc_make_token(p, GRDC_PREP_TOKEN_KIND_STRING, GRDC_PREP_TOKEN_SOURCE_STRINGIZE);
 				str_tok->stringize_exp = exp;
-				str_tok->stringize_tok = exp->body[i];
+				str_tok->stringize_tok = exp->body[i + 1];
 				grdc_prep_use_custom_str(p, str_tok);
 				grd_append(&str_tok->custom_str, U"\"");
-				auto [arg_tokens, found] = grdc_get_arg_tokens(macro, tokens.span(), exp->args, grdc_tok_str(exp->body[i])[{1, {}}]);
+				auto [arg_tokens, found] = grdc_get_arg_tokens(macro, tokens.span(), exp->args, grdc_tok_str(exp->body[i + 1]));
 				if (!found) {
-					return { grdc_make_prep_file_error(p, exp->body[i], "Macro argument is not found for stringizing") };
+					return { grdc_make_prep_file_error(p, exp->body[i + 1], "Macro argument is not found for stringizing") };
 				}
 				for (auto tok: arg_tokens.span()) {
 					grdc_grdc_prep_stringize_tok(str_tok, tok);
 				}
 				grd_append(&str_tok->custom_str, U"\"");
-				exp->body[i] = str_tok;
+				exp->body[i + 1] = str_tok;
+				grd_remove(&exp->body, i);
 			}
 		}
 		exp->after_stringize = exp->body.copy(p->allocator);
@@ -1633,15 +1640,24 @@ GrdcMaybeExpandedMacro grdc_maybe_expand_macro(GrdcPrep* p, GrdcTokenSlice token
 }
 
 GrdError* grdc_handle_prep_directive(GrdcPrep* p, GrdcTokenSlice tokens, s64* cursor) {
-	auto first_directive_tok = tokens[*cursor];
-
-	for (s64 i: grd_range_from_to(*cursor, grd_len(tokens))) {
-		if (tokens[i]->kind == GRDC_PREP_TOKEN_KIND_IDENT) {
-			
+	bool did_find_ident = false;
+	s64 start_cursor = *cursor;
+	while (++(*cursor) < grd_len(tokens)) {
+		if (tokens[*cursor]->kind == GRDC_PREP_TOKEN_KIND_IDENT) {
+			did_find_ident = true;
+			break;
+		} else if (tokens[*cursor]->kind == GRDC_PREP_TOKEN_KIND_SPACE) {
+			continue;
+		} else {
+			return grdc_make_prep_file_error(p, tokens[*cursor], "Unexpected token after #");
 		}
 	}
+	if (!did_find_ident) {
+		return grdc_make_prep_file_error(p, tokens[start_cursor], "Expected an identifier after #");
+	}
+	auto directive_tok = tokens[*cursor];
 
-	if (grdc_tok_str(first_directive_tok) == "#include") {
+	if (grdc_tok_str(directive_tok) == "include") {
 		*cursor += 1;
 		s64 start = *cursor;
 		s64 end = grd_len(tokens);
@@ -1694,7 +1710,7 @@ GrdError* grdc_handle_prep_directive(GrdcPrep* p, GrdcTokenSlice tokens, s64* cu
 			grd_remove(&path_toks, i);
 		}
 		if (grd_len(path_toks) == 0) {
-			return grdc_make_prep_file_error(p, first_directive_tok, "Empty #include path");
+			return grdc_make_prep_file_error(p, directive_tok, "Empty #include path");
 		}
 		GrdUnicodeString path;
 		bool          is_global = false;
@@ -1727,9 +1743,9 @@ GrdError* grdc_handle_prep_directive(GrdcPrep* p, GrdcTokenSlice tokens, s64* cu
 		auto fullpath = p->resolve_fullpath_hook(p, path, is_global);
 		if (fullpath == "") {
 			if (!is_global) {
-				return grdc_make_prep_file_error(p, first_directive_tok, "Failed to resolve fullpath for #include \"%\"", path);
+				return grdc_make_prep_file_error(p, directive_tok, "Failed to resolve fullpath for #include \"%\"", path);
 			} else {
-				return grdc_make_prep_file_error(p, first_directive_tok, "Failed to resolve fullpath for #include <%>", path);
+				return grdc_make_prep_file_error(p, directive_tok, "Failed to resolve fullpath for #include <%>", path);
 			}
 		}
 		GrdcPrepFileSource* source = NULL;
@@ -1742,7 +1758,7 @@ GrdError* grdc_handle_prep_directive(GrdcPrep* p, GrdcTokenSlice tokens, s64* cu
 		if (!source) {
 			source = p->load_file_hook(p, fullpath);
 			if (!source) {
-				return grdc_make_prep_file_error(p, first_directive_tok, "Failed to find #include file with fullpath '%'", fullpath);
+				return grdc_make_prep_file_error(p, directive_tok, "Failed to find #include file with fullpath '%'", fullpath);
 			}
 			grd_add(&p->files, source);
 		}
@@ -1757,7 +1773,7 @@ GrdError* grdc_handle_prep_directive(GrdcPrep* p, GrdcTokenSlice tokens, s64* cu
 		*cursor = end - 1;
 		// Eat line break if present, but don't eat EOF.
 		// *cursor = include_trailing_newline_idx == -1 ? end - 1 : end;
-	} else if (grdc_tok_str(first_directive_tok) == "#define") {
+	} else if (grdc_tok_str(directive_tok) == "define") {
 		s64 start_tok_idx = *cursor;
 		auto ident_tok = grdc_get_next_token(tokens.span(), cursor);
 		if (ident_tok->kind != GRDC_PREP_TOKEN_KIND_IDENT) {
@@ -1826,13 +1842,15 @@ GrdError* grdc_handle_prep_directive(GrdcPrep* p, GrdcTokenSlice tokens, s64* cu
 			auto macro_tok = tokens[*cursor];
 			if (macro_tok->kind == GRDC_PREP_TOKEN_KIND_EOF || macro_tok->kind == GRDC_PREP_TOKEN_KIND_LINE_BREAK) {
 				break;
-			} else if (macro_tok->kind == GRDC_PREP_TOKEN_KIND_STRINGIZE) {
-				auto def_tok_idx = grdc_find_macro_arg_def_tok_idx(macro, grdc_tok_str(macro_tok)[{1, {}}]);
+			} else if (macro_tok->kind == GRDC_PREP_TOKEN_KIND_HASH) {
+				*cursor += 1;
+				if (*cursor >= grd_len(tokens) || tokens[*cursor]->kind != GRDC_PREP_TOKEN_KIND_IDENT) {
+					return grdc_make_prep_file_error(p, macro_tok, "Expected macro argument after # in a macro");
+				}
+				auto def_tok_idx = grdc_find_macro_arg_def_tok_idx(macro, grdc_tok_str(tokens[*cursor]));
 				if (def_tok_idx == -1) {
 					return grdc_make_prep_file_error(p, macro_tok, "Macro argument is not found for stringizing");
 				}
-			} else if (macro_tok->kind == GRDC_PREP_TOKEN_KIND_DIRECTIVE) {
-				return grdc_make_prep_file_error(p, macro_tok, "Unexpected preprocessor directive in a macro");
 			}
 			assert(macro_tok->kind != GRDC_PREP_TOKEN_KIND_NONE);
 			*cursor += 1;
@@ -1848,7 +1866,7 @@ GrdError* grdc_handle_prep_directive(GrdcPrep* p, GrdcTokenSlice tokens, s64* cu
 		// for (auto it: macro->tokens) {
 		// 	GrdLogTrace("  %, %: %, %", grdc_tok_str(it), it->file_start, it->file_end, it->kind);
 		// }
-	} else if (grdc_tok_str(first_directive_tok) == "#error") {
+	} else if (grdc_tok_str(directive_tok) == "error") {
 		*cursor += 1;
 		s64 start = *cursor;
 		while (*cursor < grd_len(tokens)) {
@@ -1865,10 +1883,10 @@ GrdError* grdc_handle_prep_directive(GrdcPrep* p, GrdcTokenSlice tokens, s64* cu
 		grd_add(&dp->spans, { start, *cursor, 1 });
 		grdc_add_dp(e, dp);
 		return e;
-	} else if (grdc_tok_str(first_directive_tok) == "#if") {
+	} else if (grdc_tok_str(directive_tok) == "if") {
 		
 	} else {
-		return grdc_make_prep_file_error(p, first_directive_tok, "Unknown preprocessor directive '%'", grdc_tok_str(first_directive_tok));
+		return grdc_make_prep_file_error(p, directive_tok, "Unknown preprocessor directive '%'", grdc_tok_str(directive_tok));
 	}
 	return NULL;
 }
