@@ -6,7 +6,7 @@
 #include "../grd_testing.h"
 #include "../grd_format.h"
 
-GRD_TEST(primitive_names) {
+GRD_TEST_CASE(primitive_names) {
 	GRD_EXPECT(strcmp(grd_reflect_type_of<int>()->name, "s32") == 0, grd_make_string(grd_reflect_type_of<int>()->name));
 	GRD_EXPECT(strcmp(grd_reflect_type_of<char>()->name, "char") == 0, grd_make_string(grd_reflect_type_of<char>()->name));
 	GRD_EXPECT(strcmp(grd_reflect_type_of<short>()->name, "s16") == 0, grd_make_string(grd_reflect_type_of<short>()->name));
@@ -18,7 +18,7 @@ GRD_TEST(primitive_names) {
 	GRD_EXPECT(strcmp(grd_reflect_type_of<void**>()->name, "void**") == 0, grd_make_string(grd_reflect_type_of<void**>()->name));
 }
 
-GRD_TEST(reflect_function) {
+GRD_TEST_CASE(reflect_function) {
 	auto proc = +[](bool a, s32 b) -> void* { return NULL; };
 	auto tp = grd_reflect_type_of<decltype(proc)>();
 	GRD_EXPECT(strcmp(tp->name, "void*(bool, s32)") == 0, tp->name);
@@ -53,7 +53,7 @@ struct C: A, B {
 	}
 };
 
-GRD_TEST(reflect_struct_offset) {
+GRD_TEST_CASE(reflect_struct_offset) {
 
 	auto type = grd_reflect_type_of<C>();
 	GRD_EXPECT(type->kind == GrdStructType::KIND, grd_type_kind_as_c_str(&type->kind));
@@ -88,7 +88,7 @@ struct Derived: Base {
 	}
 };
 
-GRD_TEST(reflect_real_type_test) {
+GRD_TEST_CASE(reflect_real_type_test) {
 
 	Derived d;
 	d.type = grd_reflect_type_of<decltype(d)>();

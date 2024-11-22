@@ -7,13 +7,21 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-struct GrdTest {
-	GrdTest*            next = NULL;
-	void              (*proc)();
-	const char*         name = NULL;
-	s64                 expect_succeeded = 0;
-	s64                 expect_failed = 0;
-	s64                 idx = 0;
+struct GrdTestFailedExpect {
+	GrdTestFailedExpect* next = NULL;
+	const char*          cond_str = NULL;
+	const char*          message = NULL;
+	GrdCodeLoc           loc;
+};
+
+struct GrdTestCase {
+	GrdTestCase*         next = NULL;
+	void               (*proc)();
+	const char*          name = NULL;
+	s64                  expect_succeeded = 0;
+	s64                  expect_failed = 0;
+	s64                  idx = 0;
+	GrdTestFailedExpect* first_failed_expect = NULL;
 };
 
 struct GrdTestScopeNode {
@@ -27,9 +35,9 @@ struct GrdTestStringNode {
 };
 
 struct GrdTester {
-	GrdTest*           first_test;
+	GrdTestCase*       first_case;
 	GrdTestScopeNode*  scope;
-	GrdTest*           current_test = NULL;
+	GrdTestCase*       current_test = NULL;
 	GrdTestStringNode* first_ignore_test = NULL;
 	GrdTestStringNode* first_whitelist_test = NULL;
 	bool               write_test_results = false;
@@ -72,7 +80,7 @@ void grd_tester_write_result_loc(GrdCodeLoc loc) {
 	grd_tester_write_result_int(loc.line);
 }
 
-void grd_run_test(GrdTest* test) {
+void grd_run_test(GrdTestCase* test) {
 	auto node = tester.first_ignore_test;
 	while (node) {
 		if (strcmp(node->str, test->name) == 0) {
@@ -105,15 +113,15 @@ void grd_run_test(GrdTest* test) {
 	printf("%s - %s\n", test->name, test->expect_failed > 0 ? "failed" : "success");
 }
 
-void grd_register_test(void(*proc)(), const char* name, s64 idx) {
-	GrdTest* test = new GrdTest();
+void grd_register_test_case(void(*proc)(), const char* name, s64 idx) {
+	GrdTestCase* test = new GrdTestCase();
 	test->proc = proc;
 	test->name = name;
 	test->idx = idx;
-	if (!tester.first_test) {
-		tester.first_test = test;
+	if (!tester.first_case) {
+		tester.first_case = test;
 	} else {
-		auto** dst = &tester.first_test;
+		auto** dst = &tester.first_case;
 		while (*dst) {
 			if (idx <= (*dst)->idx) {
 				break;
@@ -123,6 +131,38 @@ void grd_register_test(void(*proc)(), const char* name, s64 idx) {
 		test->next = *dst;
 		*dst = test;
 	}
+}
+
+void grd_tester_print_summary() {
+	// print failed tests. use ascii colors
+	printf("\n\n");
+	auto test = tester.first_case;
+	s64 successful_tests = 0;
+	s64 failed_tests = 0;
+	while (test) {
+		if (test->expect_failed > 0) {
+			failed_tests += 1;
+			printf("Test: %s: \x1b[31mfailed\x1b[0m\n", test->name);
+			auto expect = test->first_failed_expect;
+			while (expect) {
+				printf("  %s\n", expect->cond_str);
+				printf("  %s\n", expect->message);
+				printf("  %s:%d\n", expect->loc.file, expect->loc.line);
+				expect = expect->next;
+			}
+		}
+		test = test->next;
+	}
+	test = tester.first_case;
+	while (test) {
+		if (test->expect_failed == 0) {
+			successful_tests += 1;
+			printf("Test: %s: \x1b[32mpassed\x1b[0m\n", test->name);
+		}
+		test = test->next;
+	}
+	f64 percentage = (f64) successful_tests / (f64) (successful_tests + failed_tests);
+	printf("%lld/%lld passed tests - %.2f %s\n", successful_tests, failed_tests + successful_tests, percentage * 100.0, "%"); 
 }
 
 int main(int argc, char* argv[]) {
@@ -177,12 +217,13 @@ int main(int argc, char* argv[]) {
 	grd_tester_write_result_line("TESTER_OUTPUT_START");
 	grd_tester_write_result_int(1); // Version.
 
-	auto ptr = tester.first_test;
+	auto ptr = tester.first_case;
 	while (ptr) {
 		grd_run_test(ptr);
 		ptr = ptr->next;
 	}
 	grd_tester_write_result_line("TESTER_EXECUTABLE_DONE");
+	grd_tester_print_summary();
 	return 0;
 }
 
@@ -197,6 +238,14 @@ void grd_test_expect(bool cond, const char* cond_str, const char* message, GrdCo
 			printf("  %s - failed\n", cond_str);
 		}
 		printf("  %s\n", message);
+		auto dst = &tester.current_test->first_failed_expect;
+		while (*dst) {
+			dst = &(*dst)->next;
+		}
+		*dst = new GrdTestFailedExpect();
+		(*dst)->loc = loc;
+		(*dst)->cond_str = cond_str;
+		(*dst)->message = message;
 		grd_tester_write_result_int(0);
 	}
 
@@ -246,10 +295,10 @@ void grd_tester_scope_pop() {
 	}
 }
 
-#define GRD_TEST(name)\
+#define GRD_TEST_CASE(name)\
 GRD_BUILD_RUN("if 'test' in globals(): test.get_case(\"" #name "\")");\
 void grd_test_##name ();\
-int grd_register_test_##name = []() { grd_register_test(&grd_test_##name, #name, __COUNTER__); return 0; }();\
+int grd_register_test_##name = []() { grd_register_test_case(&grd_test_##name, #name, __COUNTER__); return 0; }();\
 inline void grd_test_##name()
 
 #define GRD_EXPECT_BASIC(cond, ...) grd_test_expect(cond, #cond, ## __VA_ARGS__);

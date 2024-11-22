@@ -46,7 +46,7 @@ GrdArray<TestRegion> build_test_regions() {
 	return regions;
 }
 
-GRD_TEST(one_dim) {
+GRD_TEST_CASE(one_dim) {
 	auto regions = build_test_regions();
 	
 	auto get_region = [&](s64 i) {

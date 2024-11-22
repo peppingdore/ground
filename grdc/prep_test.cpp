@@ -52,7 +52,7 @@ GrdTuple<GrdError*, GrdcPrep*> simple_prep(GrdUnicodeString str, GrdSpan<GrdTupl
 	return { grdc_preprocess_file(prep, root), prep };
 }
 
-GRD_TEST(simple_expansion) {
+GRD_TEST_CASE(simple_expansion) {
 	auto [e, prep] = simple_prep(U"#define MACRO 42\nMACRO"_b, {});
 	GRD_EXPECT(!e, e);
 	if (!e) {
@@ -62,7 +62,7 @@ GRD_TEST(simple_expansion) {
 	}
 }
 
-GRD_TEST(function_like_macro) {
+GRD_TEST_CASE(function_like_macro) {
 	auto [e, prep] = simple_prep(U"#define ADD(a, b) (a + b)\nADD(1, 2)"_b, {});
 	GRD_EXPECT(!e, e);
 	if (!e) {
@@ -72,7 +72,7 @@ GRD_TEST(function_like_macro) {
 	}
 }
 
-GRD_TEST(stringizing) {
+GRD_TEST_CASE(stringizing) {
 	auto [e, prep] = simple_prep(U"#define STR(a) #a\nSTR(hello)"_b, {});
 	GRD_EXPECT(!e, e);
 	if (!e) {
@@ -82,7 +82,7 @@ GRD_TEST(stringizing) {
 	}
 }
 
-GRD_TEST(token_pasting) {
+GRD_TEST_CASE(token_pasting) {
 	auto [e, prep] = simple_prep(U"#define PASTE(a,b) a##b\nPASTE(hel,lo)"_b, {});
 	GRD_EXPECT(!e, e);
 	if (!e) {
@@ -92,7 +92,7 @@ GRD_TEST(token_pasting) {
 	}
 }
 
-GRD_TEST(multi_token_paste) {
+GRD_TEST_CASE(multi_token_paste) {
 	auto [e, prep] = simple_prep(U"#define PASTE(a, b) a##b\nPASTE(1 2, 3 4)"_b, {});
 	GRD_EXPECT(!e, e);
 	if (!e) {
@@ -101,7 +101,7 @@ GRD_TEST(multi_token_paste) {
 	}
 }
 
-GRD_TEST(va_args_paste) {
+GRD_TEST_CASE(va_args_paste) {
 	auto [e, prep] = simple_prep(U"#define PASTE(a, b) a##b\n#define VA_ARGS(...) __VA_ARGS__\nPASTE(1 2, VA_ARGS(3, 4))"_b, {});
 	GRD_EXPECT(!e, e);
 	if (!e) {
@@ -110,7 +110,7 @@ GRD_TEST(va_args_paste) {
 	}
 }
 
-GRD_TEST(variadic_macro) {
+GRD_TEST_CASE(variadic_macro) {
 	auto [e, prep] = simple_prep(U"#define VARIADIC(...) __VA_ARGS__\nVARIADIC(1, 2, 3)"_b, {});
 	GRD_EXPECT(!e, e);
 	if (!e) {
@@ -120,7 +120,7 @@ GRD_TEST(variadic_macro) {
 	}
 }
 
-GRD_TEST(pasting) {
+GRD_TEST_CASE(pasting) {
 	expect_str(simple_prep(U"#define PASTE(a, ...) a##__VA_ARGS__\nPASTE(1, 2, 3)"_b, {}), U"12, 3\n"_b);
 	expect_str(simple_prep(U"#define PASTE(a, ...) a##__VA_ARGS__\nPASTE(1)"_b, {}), U"1\n"_b);
 	expect_str(simple_prep(U"#define PASTE(a, ...) a##__VA_ARGS__\nPASTE()"_b, {}), U"\n"_b);
@@ -129,7 +129,7 @@ GRD_TEST(pasting) {
 	expect_error(simple_prep(U"#define PASTE(a) a##__VA_ARGS__\nPASTE(1 2, 3 4)"_b, {}), U"Expected 1 argument(s) at most for a macro"_b);
 }
 
-GRD_TEST(undefined_macro) {
+GRD_TEST_CASE(undefined_macro) {
 	auto [e, prep] = simple_prep(U"UNDEFINED_MACRO"_b, {});
 	GRD_EXPECT(!e, e);
 	if (!e) {
@@ -140,7 +140,7 @@ GRD_TEST(undefined_macro) {
 	}
 }
 
-GRD_TEST(invalid_token_concat) {
+GRD_TEST_CASE(invalid_token_concat) {
 	auto [e, prep] = simple_prep(U"#define MACRO(a, b) a##b\nMACRO(1, \"2\")"_b, {});
 	GRD_EXPECT(e);
 	if (e) {
@@ -149,7 +149,7 @@ GRD_TEST(invalid_token_concat) {
 	}
 }
 
-GRD_TEST(file_include) {
+GRD_TEST_CASE(file_include) {
 	GrdArray<GrdTuple<GrdUnicodeString, GrdUnicodeString>> files;
 	grd_add(&files, { U"header.h"_b, U"#define HEADER_DEF 100\n"_b });
 	auto [e, prep] = simple_prep(U"#include \"header.h\"\nHEADER_DEF"_b, files);
@@ -162,7 +162,7 @@ GRD_TEST(file_include) {
 	files.free();
 }
 
-GRD_TEST(recursive_include) {
+GRD_TEST_CASE(recursive_include) {
 	// Test recursive inclusion (should handle gracefully)
 	GrdArray<GrdTuple<GrdUnicodeString, GrdUnicodeString>> files;
 	grd_add(&files, { U"file1.h"_b, U"#include \"file2.h\"\n#define DEF1 1\n"_b });
@@ -178,7 +178,7 @@ GRD_TEST(recursive_include) {
 	files.free();
 }
 
-GRD_TEST(comment_removal) {
+GRD_TEST_CASE(comment_removal) {
 	// Test comment removal
 	auto [e, prep] = simple_prep(U"int a; // This is a comment\nint b; /* Multi-line\nComment */\nint c;"_b, {});
 	GRD_EXPECT(!e, e);
@@ -190,7 +190,7 @@ GRD_TEST(comment_removal) {
 	}
 }
 
-GRD_TEST(line_splicing_removal) {
+GRD_TEST_CASE(line_splicing_removal) {
 	// Test line splicing removal
 	auto [e, prep] = simple_prep(U"#define TEST \\\n42\nTEST"_b, {});
 	GRD_EXPECT(!e, e);
@@ -201,10 +201,10 @@ GRD_TEST(line_splicing_removal) {
 	}
 }
 
-GRD_TEST(error_directive) {
+GRD_TEST_CASE(error_directive) {
 	// Test handling of #error directive (if implemented)
 	// Assuming your preprocessor handles #error
-	auto [e, prep] = simple_prep(U"#error This is an error message\nint k = 43;"_b, {});
+	auto [e, prep] = simple_prep(U"#  error This is an error message\nint k = 43;"_b, {});
 	GRD_EXPECT(e, e);
 	if (e) {
 		GrdLog(e);

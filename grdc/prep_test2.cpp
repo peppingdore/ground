@@ -8,7 +8,7 @@
 #include "../grd_testing.h"
 #include "../grd_format.h"
 
-GRD_TEST(prep_splice) {
+GRD_TEST_CASE(prep_splice) {
 	GrdcPrep* p = NULL;
 // 	GrdUnicodeString str = UR"RAW(line 1\
 // line 2\

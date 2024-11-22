@@ -5,7 +5,7 @@
 #include "grd_sort.h"
 #include "grd_format.h"
 
-GRD_TEST(sort) {
+GRD_TEST_CASE(sort) {
 	GrdArray<s64> arr;
 	grd_add(&arr, {
 		4,

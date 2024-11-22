@@ -2,6 +2,6 @@
 
 #include "grd_testing.h"
 
-GRD_TEST(success) {
+GRD_TEST_CASE(success) {
 
 }

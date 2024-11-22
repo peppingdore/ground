@@ -97,7 +97,7 @@ GrdArray<GrdString> synth_codepoint_unicode_data(u32 codepoint) {
 	return synth;
 }
 
-GRD_TEST(unicode_data) {
+GRD_TEST_CASE(unicode_data) {
 	GRD_EXPECT(grd_ends_with(U"<CJK Ideograph Extension A, First>"_b, "First>"_b));
 
 	auto [text, e] = grd_read_text_at_path(U"../UnicodeData.txt"_b);
