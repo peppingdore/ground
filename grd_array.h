@@ -159,3 +159,20 @@ void grd_reflect_type(GrdArray<T>* x, GrdArrayType* type) {
 		return item;
 	};
 }
+
+template <typename T, typename X>
+GrdArray<T> grd_join(GrdAllocator allocator, GrdSpan<T> a, GrdSpan<X> b) {
+	GrdArray<T> result = { .allocator = allocator };
+	for (auto i: grd_range(grd_len(a))) {
+		grd_add(&result, a[i]);
+		if (i < grd_len(a) - 1) {
+			grd_add(&result, b);
+		}
+	}
+	return result;
+}
+
+template <typename T, typename X>
+GrdArray<T> grd_join(GrdSpan<T> a, GrdSpan<X> b) {
+	return grd_join(c_allocator, a, b);
+}
