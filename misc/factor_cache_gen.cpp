@@ -40,8 +40,7 @@ int main(int argc, char** argv) {
 	}
 	for (auto i: grd_range(1, 10000000)) {
 		trial_division3(&factor, i);
-		GrdFormatter fmt = grd_make_formatter(&line, c_allocator);
-		grd_format(&fmt, "%", i);
+		grd_format(&line, "%", i);
 		while (grd_len(factor) > 0) {
 			auto num = factor[0];
 			s64 count = 0;
@@ -52,9 +51,9 @@ int main(int argc, char** argv) {
 					count += 1;
 				}
 			}
-			grd_format(&fmt, " %-%", num, count);
+			grd_format(&line, " %-%", num, count);
 		}
-		grd_format(&fmt, "\n"_b);
+		grd_format(&line, "\n"_b);
 		grd_write_file(&f, line.data, grd_len(line) * sizeof(line[0]));
 		grd_clear(&factor);
 		grd_clear(&line);
@@ -62,4 +61,5 @@ int main(int argc, char** argv) {
 			grd_println("Factoring %", i);
 		}
 	}
+	grd_close_file(&f);
 }
