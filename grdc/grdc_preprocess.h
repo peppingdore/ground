@@ -185,17 +185,23 @@ struct GrdcMacroExp {
 	GrdArray<GrdcToken*> body;
 };
 
+struct GrdcPrepIf {
+	s64 current_block = 0;
+	s64 taken_block = -1;
+};
+
 struct GrdcPrep {
-	GrdAllocator               allocator;
-	GrdAllocator               arena;
-	GrdArray<GrdcToken*>       tokens;
+	GrdAllocator                   allocator;
+	GrdAllocator                   arena;
+	GrdArray<GrdcToken*>           tokens;
 	GrdArray<GrdcPrepFileSource*>  files;
 	GrdArray<GrdcPrepMacro*>       macros;
-	GrdcMacroExp*              macro_exp = NULL;
+	GrdcMacroExp*                  macro_exp = NULL;
 	GrdcIncludedFile*              include_site = NULL;
-	void*                      aux_data = NULL;
-	GrdUnicodeString         (*resolve_fullpath_hook) (GrdcPrep* p, GrdUnicodeString path, bool global) = NULL;
+	void*                          aux_data = NULL;
+	GrdUnicodeString             (*resolve_fullpath_hook) (GrdcPrep* p, GrdUnicodeString path, bool global) = NULL;
 	GrdcPrepFileSource*          (*load_file_hook)        (GrdcPrep* p, GrdUnicodeString fullpath) = NULL;
+	GrdArray<GrdcPrepIf>           if_stack;
 };
 
 struct GrdcPrepFileError;
@@ -1160,7 +1166,6 @@ GrdError* grdc_tokenize(GrdcPrep* p, GrdcPrepFileSource* file) {
 			break;
 		}
 		auto tok = grdc_make_file_token(p, tok_kind, file, cursor, tok_end);
-		grd_println("tok: %", grdc_tok_str(tok));
 		grdc_push_source_file_token(file, tok);
 		cursor = tok_end;
 	}
@@ -1224,12 +1229,15 @@ GrdAllocatedUnicodeString grdc_prep_str(GrdcPrep* p) {
 	return str;
 }
 
-s64 grdc_get_next_token_idx(GrdSpan<GrdcToken*> tokens, s64 cursor) {
+s64 grdc_get_next_token_idx(GrdSpan<GrdcToken*> tokens, s64 cursor, bool stop_at_line_break = false) {
 	while (++cursor < grd_len(tokens)) {
 		auto tok = tokens[cursor];
 		if (tok->kind != GRDC_PREP_TOKEN_KIND_SPACE &&
 			tok->kind != GRDC_PREP_TOKEN_KIND_LINE_BREAK
 		) {
+			return cursor;
+		}
+		if (stop_at_line_break && tok->kind == GRDC_PREP_TOKEN_KIND_LINE_BREAK) {
 			return cursor;
 		}
 	}
@@ -1639,7 +1647,71 @@ GrdcMaybeExpandedMacro grdc_maybe_expand_macro(GrdcPrep* p, GrdcTokenSlice token
 	return res;
 }
 
+GrdTuple<GrdError*, s64> grdc_prep_eval_leaf(GrdcPrep* p, GrdcTokenSlice tokens, s64* cursor) {
+	*cursor = grdc_get_next_token_idx(tokens.span(), *cursor, true);
+	if (*cursor >= grd_len(tokens)) {
+		return { grdc_make_prep_file_error(p, tokens[-1], "Expected preprocessor expression") };
+	}
+	if (tokens[*cursor]->kind == GRDC_PREP_TOKEN_KIND_NUMBER) {
+		auto str = grdc_tok_str(tokens[*cursor]);
+		s64 num;
+		if (!grd_parse_integer(str, &num)) {
+			return { grdc_make_prep_file_error(p, tokens[*cursor], "Failed to parse integer for preprocessor expression") };
+		}
+		return { NULL, num };
+	}
+	return { grdc_make_prep_file_error(p, tokens[*cursor], "Expected preprocessor expression") };
+}
+
+GrdTuple<GrdError*, s64> grdc_prep_eval(GrdcPrep* p, GrdcTokenSlice tokens, s64* cursor) {
+	auto [e, v] = grdc_prep_eval_leaf(p, tokens, cursor);
+	if (e) {
+		return { e };
+	}
+	while (true) {
+		*cursor = grdc_get_next_token_idx(tokens.span(), *cursor, true);
+		if (*cursor >= grd_len(tokens)) {
+			break;
+		}
+		if (tokens[*cursor]->kind == GRDC_PREP_TOKEN_KIND_EOF ||
+			tokens[*cursor]->kind == GRDC_PREP_TOKEN_KIND_LINE_BREAK)
+		{
+			break;
+		}
+		auto tok_str = grdc_tok_str(tokens[*cursor]);
+		if (tok_str == "+"_b) {
+			auto [e, v2] = grdc_prep_eval_leaf(p, tokens, cursor);
+			if (e) {
+				return { e };
+			}
+			v += v2;
+		}
+	}
+	// @TOOD: make sure nothing is left on the line after expr.
+	return { NULL, v };
+}
+
+bool grdc_prep_is_conditioned_out(GrdcPrep* p) {
+	for (auto it: p->if_stack) {
+		if (it.current_block != it.taken_block) {
+			return true;
+		}
+	}
+	return false;
+}
+
 GrdError* grdc_handle_prep_directive(GrdcPrep* p, GrdcTokenSlice tokens, s64* cursor) {
+	// Make sure only spaces preceed '#'.
+	for (auto i: grd_reverse(grd_range_from_to(0, *cursor))) {
+		if (tokens[i]->kind == GRDC_PREP_TOKEN_KIND_SPACE) {
+			continue;
+		}
+		if (tokens[i]->kind == GRDC_PREP_TOKEN_KIND_LINE_BREAK) {
+			break;
+		}
+		return grdc_make_prep_file_error(p, tokens[i], "Only spaces are allowed on the same line before preprocessor directive");
+	}
+
 	bool did_find_ident = false;
 	s64 start_cursor = *cursor;
 	while (++(*cursor) < grd_len(tokens)) {
@@ -1653,12 +1725,56 @@ GrdError* grdc_handle_prep_directive(GrdcPrep* p, GrdcTokenSlice tokens, s64* cu
 		}
 	}
 	if (!did_find_ident) {
+		if (grdc_prep_is_conditioned_out(p)) {
+			return NULL;
+		}
 		return grdc_make_prep_file_error(p, tokens[start_cursor], "Expected an identifier after #");
 	}
 	auto directive_tok = tokens[*cursor];
+	*cursor += 1;
 
+	if (grdc_tok_str(directive_tok) == "if") {
+		auto [e, v] = grdc_prep_eval(p, tokens, cursor);
+		if (e) {
+			return e;
+		}
+		grd_add(&p->if_stack, { .current_block = 0, .taken_block = v > 0 ? 0 : -1 });
+		return NULL;
+	} else if (grdc_tok_str(directive_tok) == "else") {
+		if (grd_len(p->if_stack) == 0) {
+			return grdc_make_prep_file_error(p, directive_tok, "#else without #if");
+		}
+		p->if_stack[-1].current_block += 1;
+		if (p->if_stack[-1].taken_block == -1) {
+			p->if_stack[-1].taken_block = p->if_stack[-1].current_block;
+		}
+		return NULL;
+	} else if (grdc_tok_str(directive_tok) == "elif") {
+		if (grd_len(p->if_stack) == 0) {
+			return grdc_make_prep_file_error(p, directive_tok, "#elif without #if");
+		}
+		p->if_stack[-1].current_block += 1;
+		if (p->if_stack[-1].taken_block == -1) {
+			auto [e, v] = grdc_prep_eval(p, tokens, cursor);
+			if (e) {
+				return e;
+			}
+			if (v > 0) {
+				p->if_stack[-1].taken_block = p->if_stack[-1].current_block;
+			}
+		}
+		return NULL;
+	} else if (grdc_tok_str(directive_tok) == "endif") {
+		if (grd_len(p->if_stack) == 0) {
+			return grdc_make_prep_file_error(p, directive_tok, "#endif without #if");
+		}
+		grd_pop(&p->if_stack);
+		return NULL;
+	} 
+	if (grdc_prep_is_conditioned_out(p)) {
+		return NULL;
+	}
 	if (grdc_tok_str(directive_tok) == "include") {
-		*cursor += 1;
 		s64 start = *cursor;
 		s64 end = grd_len(tokens);
 		s64 include_trailing_newline_idx = -1;
@@ -1773,8 +1889,9 @@ GrdError* grdc_handle_prep_directive(GrdcPrep* p, GrdcTokenSlice tokens, s64* cu
 		*cursor = end - 1;
 		// Eat line break if present, but don't eat EOF.
 		// *cursor = include_trailing_newline_idx == -1 ? end - 1 : end;
+		return NULL;
 	} else if (grdc_tok_str(directive_tok) == "define") {
-		s64 start_tok_idx = *cursor;
+		s64 start_tok_idx = *cursor - 1;
 		auto ident_tok = grdc_get_next_token(tokens.span(), cursor);
 		if (ident_tok->kind != GRDC_PREP_TOKEN_KIND_IDENT) {
 			return grdc_make_prep_file_error(p, ident_tok, "Expected an identifier after #define");
@@ -1866,8 +1983,8 @@ GrdError* grdc_handle_prep_directive(GrdcPrep* p, GrdcTokenSlice tokens, s64* cu
 		// for (auto it: macro->tokens) {
 		// 	GrdLogTrace("  %, %: %, %", grdc_tok_str(it), it->file_start, it->file_end, it->kind);
 		// }
+		return NULL;
 	} else if (grdc_tok_str(directive_tok) == "error") {
-		*cursor += 1;
 		s64 start = *cursor;
 		while (*cursor < grd_len(tokens)) {
 			if (tokens[*cursor]->kind == GRDC_PREP_TOKEN_KIND_EOF ||
@@ -1883,12 +2000,8 @@ GrdError* grdc_handle_prep_directive(GrdcPrep* p, GrdcTokenSlice tokens, s64* cu
 		grd_add(&dp->spans, { start, *cursor, 1 });
 		grdc_add_dp(e, dp);
 		return e;
-	} else if (grdc_tok_str(directive_tok) == "if") {
-		
-	} else {
-		return grdc_make_prep_file_error(p, directive_tok, "Unknown preprocessor directive '%'", grdc_tok_str(directive_tok));
 	}
-	return NULL;
+	return grdc_make_prep_file_error(p, directive_tok, "Unknown preprocessor directive '%'", grdc_tok_str(directive_tok));
 }
 
 GrdError* grdc_preprocess_file(GrdcPrep* p, GrdcPrepFileSource* source_file) {
@@ -1920,6 +2033,16 @@ GrdError* grdc_preprocess_file(GrdcPrep* p, GrdcPrepFileSource* source_file) {
 			}
 			continue;
 		}
+		if (tok->kind == GRDC_PREP_TOKEN_KIND_EOF) {
+			if (grd_len(p->if_stack) > 0) {
+				// @TODO: add #if site.
+				return grdc_make_prep_file_error(p, tok, "#if is not closed");
+			}
+			break;
+		}
+		if (grdc_prep_is_conditioned_out(p)) {
+			continue;
+		}
 		if (tok->kind == GRDC_PREP_TOKEN_KIND_IDENT) {
 			auto mb = grdc_maybe_expand_macro(p, grdc_make_tok_slice(included->tokens), &cursor);
 			if (mb.e) {
@@ -1929,9 +2052,6 @@ GrdError* grdc_preprocess_file(GrdcPrep* p, GrdcPrepFileSource* source_file) {
 				grd_add(&p->tokens, mb.exp->body);
 				continue;
 			}
-		}
-		if (tok->kind == GRDC_PREP_TOKEN_KIND_EOF) {
-			break;
 		}
 		grd_add(&p->tokens, tok);
 	}
