@@ -105,15 +105,15 @@ void grd_clear(GrdArray<T>* arr, GrdCodeLoc loc = grd_caller_loc()) {
 }
 
 template <typename T>
-GrdArray<T> grd_clear_array(GrdAllocator allocator, GrdSpan<T> src, GrdCodeLoc loc = grd_caller_loc()) {
+GrdArray<T> grd_copy_array(GrdAllocator allocator, GrdSpan<T> src, GrdCodeLoc loc = grd_caller_loc()) {
 	GrdArray<T> result = { .allocator = allocator };
 	grd_add(&result, src, -1, loc);
 	return result;
 }
 
 template <typename T>
-GrdArray<T> grd_clear_array(GrdSpan<T> src, GrdCodeLoc loc = grd_caller_loc()) {
-	return grd_clear_array(c_allocator, src, loc);
+GrdArray<T> grd_copy_array(GrdSpan<T> src, GrdCodeLoc loc = grd_caller_loc()) {
+	return grd_copy_array(c_allocator, src, loc);
 }
 
 template <typename T>

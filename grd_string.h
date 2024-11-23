@@ -99,7 +99,7 @@ T* grd_copy_c_str(GrdSpan<T> str, GrdAllocator allocator = c_allocator) {
 
 template <GrdStringChar T>
 GrdArray<T> grd_copy_string(GrdAllocator allocator, GrdSpan<T> str, GrdCodeLoc loc = grd_caller_loc()) {
-	return grd_clear_array(allocator, str, loc);
+	return grd_copy_array(allocator, str, loc);
 }
 
 template <GrdStringChar T>
