@@ -219,3 +219,5 @@ GRD_TEST_CASE(if_directive) {
 	expect_str(simple_prep(U"#if 1\n42\n#else\n99\n#endif\n"_b, {}), U"42\n"_b);
 	expect_error(simple_prep(U"#if 0\n42\n#else\n99\n#endif\n"_b, {}), U"Expected an identifier after #if"_b);
 }
+
+// @TODO: write tests based on: https://mailund.dk/posts/macro-metaprogramming/

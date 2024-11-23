@@ -9,80 +9,6 @@
 #include "../grd_string.h"
 #include "../grd_panic.h"
 
-
-enum GrdcAstOperatorFlags {
-	GRDC_AST_OP_FLAG_LEFT_ASSOC = 1 << 0,
-	GRDC_AST_OP_FLAG_MOD_ASSIGN = 1 << 1,
-	GRDC_AST_OP_FLAG_BOOL       = 1 << 3,
-	GRDC_AST_OP_FLAG_INT        = 1 << 4,
-	GRDC_AST_OP_FLAG_PRIMITIVE  = 1 << 5,
-	GRDC_AST_OP_FLAG_NUMERIC    = 1 << 6,
-	GRDC_AST_OP_FLAG_POSTFIX    = 1 << 7,
-	GRDC_AST_OP_FLAG_PREFIX     = 1 << 8,
-};
-
-struct GrdcAstOperator {
-	GrdUnicodeString op;
-	s32              prec;
-	s32              flags = 0;
-
-	GRD_REFLECT(GrdcAstOperator) {
-		GRD_MEMBER(op);
-		GRD_MEMBER(prec);
-		GRD_MEMBER(flags);
-	}
-};
-
-GrdcAstOperator GRDC_AST_BINARY_OPERATORS_UNSORTED[] = { 
-	{ U","_b, 10, GRDC_AST_OP_FLAG_LEFT_ASSOC },
-	{ U"="_b, 11, 0 },
-	{ U"|="_b, 11, GRDC_AST_OP_FLAG_MOD_ASSIGN },
-	{ U"^="_b, 11, GRDC_AST_OP_FLAG_MOD_ASSIGN },
-	{ U"&="_b, 11, GRDC_AST_OP_FLAG_MOD_ASSIGN },
-	{ U"<<="_b, 11, GRDC_AST_OP_FLAG_MOD_ASSIGN },
-	{ U">>="_b, 11, GRDC_AST_OP_FLAG_MOD_ASSIGN },
-	{ U"+="_b, 11, GRDC_AST_OP_FLAG_MOD_ASSIGN },
-	{ U"-="_b, 11, GRDC_AST_OP_FLAG_MOD_ASSIGN },
-	{ U"*="_b, 11, GRDC_AST_OP_FLAG_MOD_ASSIGN },
-	{ U"/="_b, 11, GRDC_AST_OP_FLAG_MOD_ASSIGN },
-	{ U"%="_b, 11, GRDC_AST_OP_FLAG_MOD_ASSIGN },
-	{ U"?"_b, 12, 0 },
-	{ U"||"_b, 13, GRDC_AST_OP_FLAG_LEFT_ASSOC | GRDC_AST_OP_FLAG_BOOL },
-	{ U"&&"_b, 14, GRDC_AST_OP_FLAG_LEFT_ASSOC | GRDC_AST_OP_FLAG_BOOL },
-	{ U"|"_b, 15, GRDC_AST_OP_FLAG_LEFT_ASSOC | GRDC_AST_OP_FLAG_INT },
-	{ U"^"_b, 16, GRDC_AST_OP_FLAG_LEFT_ASSOC | GRDC_AST_OP_FLAG_INT},
-	{ U"&"_b, 17, GRDC_AST_OP_FLAG_LEFT_ASSOC | GRDC_AST_OP_FLAG_INT},
-	{ U"=="_b, 18, GRDC_AST_OP_FLAG_LEFT_ASSOC | GRDC_AST_OP_FLAG_PRIMITIVE },
-	{ U"!="_b, 18, GRDC_AST_OP_FLAG_LEFT_ASSOC | GRDC_AST_OP_FLAG_PRIMITIVE},
-	{ U"<"_b, 19, GRDC_AST_OP_FLAG_LEFT_ASSOC | GRDC_AST_OP_FLAG_NUMERIC },
-	{ U">"_b, 19, GRDC_AST_OP_FLAG_LEFT_ASSOC | GRDC_AST_OP_FLAG_NUMERIC},
-	{ U"<="_b, 19, GRDC_AST_OP_FLAG_LEFT_ASSOC },
-	{ U">="_b, 19, GRDC_AST_OP_FLAG_LEFT_ASSOC },
-	{ U"<<"_b, 20, GRDC_AST_OP_FLAG_LEFT_ASSOC | GRDC_AST_OP_FLAG_INT },
-	{ U">>"_b, 20, GRDC_AST_OP_FLAG_LEFT_ASSOC | GRDC_AST_OP_FLAG_INT },
-	{ U"+"_b, 21, GRDC_AST_OP_FLAG_LEFT_ASSOC | GRDC_AST_OP_FLAG_NUMERIC },
-	{ U"-"_b, 21, GRDC_AST_OP_FLAG_LEFT_ASSOC | GRDC_AST_OP_FLAG_NUMERIC },
-	{ U"*"_b, 22, GRDC_AST_OP_FLAG_LEFT_ASSOC | GRDC_AST_OP_FLAG_NUMERIC },
-	{ U"/"_b, 22, GRDC_AST_OP_FLAG_LEFT_ASSOC | GRDC_AST_OP_FLAG_NUMERIC },
-	{ U"%"_b, 22, GRDC_AST_OP_FLAG_LEFT_ASSOC | GRDC_AST_OP_FLAG_INT },
-};
-
-GrdcAstOperator GRDC_AST_PREFIX_UNARY_OPERATORS_UNSORTED[] = {
-	{ U"!"_b, 30, GRDC_AST_OP_FLAG_PREFIX },
-	{ U"~"_b, 30, GRDC_AST_OP_FLAG_PREFIX },
-	{ U"+"_b, 30, GRDC_AST_OP_FLAG_PREFIX },
-	{ U"-"_b, 30, GRDC_AST_OP_FLAG_PREFIX },
-	{ U"++"_b, 30, GRDC_AST_OP_FLAG_PREFIX },
-	{ U"--"_b, 30, GRDC_AST_OP_FLAG_PREFIX },
-	{ U"*"_b, 30, GRDC_AST_OP_FLAG_PREFIX },
-	{ U"&"_b, 30, GRDC_AST_OP_FLAG_PREFIX },
-};
-
-GrdcAstOperator GRDC_AST_POSTFIX_UNARY_OPERATORS_UNSORTED[] = {
-	{ U"++"_b, 40, GRDC_AST_OP_FLAG_POSTFIX },
-	{ U"--"_b, 40, GRDC_AST_OP_FLAG_POSTFIX },
-};
-
 enum GrdcTokenFlags {
 	CTOKEN_FLAG_FLOATING_POINT = 1 << 0,
 	CTOKEN_FLAG_INTEGER = 1 << 1,
@@ -1130,34 +1056,6 @@ struct GrdcAstFunctionCall: GrdcAstExpr {
 		GRD_MEMBER(args);
 	}
 };
-
-GrdcAstOperator* grdc_find_binary_operator(GrdcParser* p, GrdUnicodeString op) {
-	for (auto& it: GRDC_AST_BINARY_OPERATORS_UNSORTED) {
-		if (op == it.op) {
-			return &it;
-		}
-	}
-	return NULL;
-}
-
-GrdcAstOperator* grdc_find_prefix_unary_operator(GrdcParser* p, GrdUnicodeString op) {
-	for (auto& it: GRDC_AST_PREFIX_UNARY_OPERATORS_UNSORTED) {
-		if (op == it.op) {
-			return &it;
-		}
-	}
-	return NULL;
-}
-
-GrdcAstOperator* grdc_find_postfix_unary_operator(GrdcParser* p, GrdUnicodeString op) {
-	for (auto& it: GRDC_AST_POSTFIX_UNARY_OPERATORS_UNSORTED) {
-		if (op == it.op) {
-			return &it;
-		}
-	}
-	return NULL;
-}
-
 
 GrdTuple<GrdcAstExpr*, GrdError*> grdc_parse_function_call(GrdcParser* p, GrdcToken func_token, GrdcAstFunction* func) {
 	auto tok = grdc_peek(p);
