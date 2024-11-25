@@ -296,6 +296,7 @@ struct GrdcMacroExp {
 	GrdArray<GrdcToken*>       after_stringize;
 	GrdArray<GrdcToken*>       after_concat;
 	GrdArray<GrdcToken*>       after_prescan;
+	GrdArray<GrdcToken*>       after_rescan;
 	s64                        exp_start = 0;
 	s64                        exp_end;
 };
@@ -1562,6 +1563,10 @@ GrdOptional<GrdcTokenSlice> grdc_get_arg_tokens(GrdcPrepMacro* macro, GrdSpan<Gr
 	}
 }
 
+GrdSpan<GrdcToken*> grdc_get_macro_exp_body(GrdcMacroExp* exp) {
+	return exp->after_rescan;
+}
+
 GrdTuple<GrdError*, GrdcMacroExp*> grdc_maybe_expand_macro(GrdcPrep* p, GrdcTokenSlice tokens, s64* out_cursor) {
 	s64 cursor = *out_cursor;
 	if (cursor >= grd_len(tokens) || 
@@ -1598,6 +1603,7 @@ GrdTuple<GrdError*, GrdcMacroExp*> grdc_maybe_expand_macro(GrdcPrep* p, GrdcToke
 	exp->after_stringize.allocator = p->allocator;
 	exp->after_concat.allocator = p->allocator;
 	exp->after_prescan.allocator = p->allocator;
+	exp->after_rescan.allocator = p->allocator;
 	p->macro_exp = exp;
 	grd_defer { p->macro_exp = exp->parent; };
 
@@ -1747,7 +1753,7 @@ GrdTuple<GrdError*, GrdcMacroExp*> grdc_maybe_expand_macro(GrdcPrep* p, GrdcToke
 								return { e };
 							}
 							if (sub_exp) {
-								grd_add(&exp->after_prescan, sub_exp->body);
+								grd_add(&exp->after_prescan, grdc_get_macro_exp_body(sub_exp));
 								// grd_add(&exp->body, sub_exp->body, body_cursor);
 								// body_cursor += grd_len(sub_exp->body);
 								arg_cursor += 1;
@@ -1768,14 +1774,29 @@ GrdTuple<GrdError*, GrdcMacroExp*> grdc_maybe_expand_macro(GrdcPrep* p, GrdcToke
 		}
 	}
 
-	
-	
+	s64 rescan_cursor = 0;
+	while (rescan_cursor < grd_len(exp->after_prescan)) {
+		auto tok = exp->after_prescan[rescan_cursor];
+		if (tok->kind == GRDC_PREP_TOKEN_KIND_IDENT || tok->kind == GRDC_PREP_TOKEN_KIND_MACRO_PRESCAN_IDENT) {
+			auto [e, sub_exp] = grdc_maybe_expand_macro(p, grdc_make_tok_slice(exp->after_prescan), &rescan_cursor);
+			if (e) {
+				return { e };
+			}
+			if (sub_exp) {
+				grd_add(&exp->after_prescan, grdc_get_macro_exp_body(sub_exp));
+				rescan_cursor += 1;
+				continue;
+			}
+		}
+		grd_add(&exp->after_rescan, exp->after_prescan[rescan_cursor]);
+	}
 
-	// @TODO: rescan and expand.
 	// print steps.
 	grd_println("before_stringize: %", grd_to_array(grd_map(exp->before_stringize, grd_lambda(x, grdc_tok_str(x)))));
 	grd_println("after_stringize: %", grd_to_array(grd_map(exp->after_stringize, grd_lambda(x, grdc_tok_str(x)))));
 	grd_println("after_concat: %", grd_to_array(grd_map(exp->after_concat, grd_lambda(x, grdc_tok_str(x)))));
+	grd_println("after_prescan: %", grd_to_array(grd_map(exp->after_prescan, grd_lambda(x, grdc_tok_str(x)))));
+	grd_println("after_rescan: %", grd_to_array(grd_map(exp->after_rescan, grd_lambda(x, grdc_tok_str(x)))));
 
 	exp->exp_start = exp_start;
 	exp->exp_end = cursor;
@@ -1932,7 +1953,7 @@ GrdTuple<GrdError*, s64> grdc_prep_eval_condition(GrdcPrep* p, GrdcTokenSlice to
 				return { e };
 			}
 			if (exp) {
-				grd_add(&res_tokens, exp->body);
+				grd_add(&res_tokens, grdc_get_macro_exp_body(exp));
 				continue;
 			}
 		}
@@ -2055,7 +2076,7 @@ GrdError* grdc_handle_prep_directive(GrdcPrep* p, GrdcTokenSlice tokens, s64* cu
 					return e;
 				}
 				if (exp) {
-					grd_add(&path_toks, exp->body);
+					grd_add(&path_toks, grdc_get_macro_exp_body(exp));
 				} else {
 					continue;
 				}
@@ -2304,7 +2325,7 @@ GrdError* grdc_preprocess_file(GrdcPrep* p, GrdcPrepFileSource* source_file) {
 				return e;
 			}
 			if (exp) {
-				grd_add(&p->tokens, exp->body);
+				grd_add(&p->tokens, grdc_get_macro_exp_body(exp));
 				continue;
 			}
 		}
