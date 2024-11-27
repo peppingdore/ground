@@ -208,7 +208,7 @@ class CompileResult:
 
 def compile_unit(unit, params, target, out_path=None):
 	if not out_path:
-		out_path = Path(unit).parent / "build_temp" / f'{Path(unit).stem}.obj' 
+		out_path = Path(unit).parent / "built/inter" / f'{Path(unit).stem}.obj' 
 	os.makedirs(os.path.dirname(out_path), exist_ok=True)
 	cmdline = build_compile_cmdline(unit, params, target, out_path)
 	process, elapsed = run(cmdline)
@@ -553,7 +553,7 @@ def build_main():
 	builder.print_compile_results(stdout, compile_results)
 	if not builder.did_all_units_compile_successfully(compile_results):
 		return 1
-	output_path = Path(file).parent / "runnable" / builder.build_exec_name(str(Path(file).stem))
+	output_path = Path(file).parent / "build" / builder.build_exec_name(str(Path(file).stem))
 	link_result = builder.link(compile_results, params.link_params, params.target, output_path)
 	builder.print_link_result(stdout, link_result)
 	if not builder.did_link_successfully(link_result):
