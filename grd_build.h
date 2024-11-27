@@ -3,9 +3,11 @@
 #include "grd_base.h"
 
 #define GRD_BUILD_RUN(code)\
-constexpr auto GRD_CONCAT(__GRD_BUILD_RUN_ENTRY__, __COUNTER__) = code;\
-constexpr auto GRD_CONCAT(__GRD_BUILD_RUN_FILE__, __COUNTER__) = __FILE__;\
-constexpr auto GRD_CONCAT(__GRD_BUILD_RUN_LINE__, __COUNTER__) = __LINE__;
+constexpr auto GRD_CONCAT(__GRD_BUILD_RUN_START__, __COUNTER__)=0;\
+constexpr auto GRD_CONCAT(__GRD_BUILD_RUN_ENTRY__, __COUNTER__)=code;\
+constexpr auto GRD_CONCAT(__GRD_BUILD_RUN_FILE__, __COUNTER__)=__FILE__;\
+constexpr auto GRD_CONCAT(__GRD_BUILD_RUN_LINE__, __COUNTER__)=__LINE__;\
+constexpr auto GRD_CONCAT(__GRD_BUILD_RUN_END__, __COUNTER__)= 0;
 
 // GRD_BUILD_RUN("params.add_define('_UNICODE')");
 // GRD_BUILD_RUN("params.add_define('UNICODE')");

@@ -368,82 +368,29 @@ class BuildRun:
 	def __str__(self):
 		return f'{self.file}:{self.line} -----\n{self.code}\n-----'
 
+# @TODO: rename build runs to something else.
+#   maybe build exec?
 def collect_build_runs(out):
-	arr = []
-	cursor = 0
-	def search(x, do_not_advance=False):
-		nonlocal cursor
-		found = out.find(x, cursor)
-		if found != -1:
-			if not do_not_advance: cursor = found + len(x)
-			return found
+	res = []
+	import re
+	matches = re.findall("GRD_BUILD_RUN_ENTRY.*?=(.*?);.*?GRD_BUILD_RUN_FILE.*?=(.*?);.*?GRD_BUILD_RUN_LINE.*?=(.*?);", out, flags=re.MULTILINE)
+	for it in matches:
+		if len(it) != 3:
+			raise Exception(f'build run expects 3 items, got {len(it)}, {it}')
+		code, file, line = it
+		code = code.strip()
+		if code.startswith('R"'):
+			match = re.search('^R"(.*?)\((.*)\)(.*?)"$', code).groups()
+			if len(match) != 3:
+				raise Exception(f'build run raw literal regex expects 3 items, got {len(match)}, {match}')
+			if match[0] != match[2]:
+				raise Exception(f'build run raw literal prefix and suffix must be the same, got {match[0]} and {match[2]}')
+			code = match[0]
 		else:
-			return -1
-	def skip_space():
-		nonlocal cursor
-		while cursor < len(out):
-			if not out[cursor: cursor + 1].decode('utf-8').isspace():
-				break
-			cursor += 1
-	def find_plain_string_end():
-		nonlocal cursor
-		while cursor < len(out):
-			if out[cursor:].startswith(b'"'):
-				if not out[cursor-1:].startswith(b'\\'):
-					cursor += 1
-					return cursor - 1
-			cursor += 1
-		return -1
-	while True:
-		idx = search(b"__BUILD_RUN_ENTRY__")
-		if idx == -1: break
-		if search(b"=") == -1: break
-
-		# pieces are pieces of concatted C++ string literal.  
-		pieces = []
-		while True:
-			skip_space()
-			start = -1
-			end = -1
-			if out[cursor:].startswith(b'R"'):
-				# raw string literal.
-				tag_start = cursor + len('R"')
-				tag_end = search(b'(')
-				start = cursor
-				tag = out[tag_start:tag_end]
-				end = search(b')' + tag)
-				cursor = end + len(b')') + len(tag) + len(b'"')
-			elif out[cursor:].startswith(b'"'):
-				cursor += 1
-				start = cursor
-				end = find_plain_string_end()
-			else:
-				break
-			if end == -1:
-				break
-			p = out[start:end]
-			pieces.append(p.decode('unicode_escape'))
-
-		if len(pieces) == 0: continue
-		if search(b"__BUILD_RUN_FILE__") == -1: continue
-		if search(b"=") == -1: continue
-		if search(b'"') == -1: continue
-		file_name_start = cursor
-		file_name_end = find_plain_string_end()
-		if file_name_end == -1: continue
-		file_name = out[file_name_start: file_name_end].decode('unicode_escape')
-
-		if search(b"__BUILD_RUN_LINE__") == -1: continue
-		if search(b"=") == -1: continue
-		skip_space()
-		line_num_start = cursor
-		line_num_end = search(b';')
-		if line_num_end == -1: continue
-		line = int(out[line_num_start: line_num_end].decode('unicode_escape'))
-
-		code = ''.join(pieces)
-		arr.append(BuildRun(code, file_name, line))
-	return arr
+			code = code.removeprefix('"').removesuffix('"')
+		file = file.removeprefix('"').removesuffix('"')
+		res.append(BuildRun(code, file, int(line)))
+	return res
 
 def run_preprocessor(compiler, path):
 	args = [ compiler ]
@@ -464,7 +411,7 @@ def run_preprocessor(compiler, path):
 
 def run_build_runs(file, scope):
 	process, _ = run_preprocessor('clang++', file)
-	runs = collect_build_runs(process.stdout)
+	runs = collect_build_runs(process.stdout.decode('utf-8', errors='ignore'))
 	for it in runs:
 		verbose(f'BUILD_RUN {it}')
 		name = f'{it.file}: {it.line}'
