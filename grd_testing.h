@@ -302,6 +302,7 @@ int grd_register_test_##name = []() { grd_register_test_case(&grd_test_##name, #
 inline void grd_test_##name()
 
 #define GRD_EXPECT_BASIC(cond, ...) grd_test_expect(cond, #cond, ## __VA_ARGS__);
+// #include "grd_format.h" for if you want to use macros below.
 #define GRD_EXPECT(cond, ...) grd_test_expect(cond, #cond, grd_copy_c_str(grd_sprint(__VA_ARGS__)));
 #define GRD_EXPECT_OP(a, op, b, ...) GRD_EXPECT(a op b, grd_sprint("Expected % " #op " %\0", a, b).data, ## __VA_ARGS__);
 #define GRD_EXPECT_EQ(a, b, ...) GRD_EXPECT_OP(a, ==, b, ## __VA_ARGS__)
