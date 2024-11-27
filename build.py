@@ -181,6 +181,8 @@ def build_compile_cmdline(unit, params, target, out_path):
 	if not is_msvc_interface(params.compiler):
 		# If we don't specify -x c++/objective-c++ clang will compile *.h files into a precompiled header.
 		args.append('-x objective-c++' if is_darwin(target.os) else '-x c++')
+	if target.os == OS_LINUX:
+		args.append('-stdlib=libstdc++')
 	if not is_msvc_interface(params.compiler):
 		args.append(f'--target={make_target_triplet(target)}')
 	if params.optimization_level < 0 or params.optimization_level > 3:
