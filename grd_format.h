@@ -351,8 +351,13 @@ void grd_format_impl(GrdFormatter* formatter, GrdSpan<T> format_str, std::initia
 }
 
 template <GrdStringChar T, typename... Args>
-void grd_format(GrdFormatter* formatter, const T* c_str, Args... args) {
-	grd_format_impl(formatter, grd_make_string(c_str), { grd_make_any(&args)... });
+void grd_format(GrdFormatter* formatter, const T* fmt_str, Args... args) {
+	grd_format_impl(formatter, grd_make_string(fmt_str), { grd_make_any(&args)... });
+}
+
+template <GrdStringChar T, typename... Args>
+void grd_format(GrdFormatter* formatter, GrdSpan<T> fmt_str, Args... args) {
+	grd_format_impl(formatter, fmt_str, { grd_make_any(&args)... });
 }
 
 template <typename... Args>
@@ -561,6 +566,7 @@ Map_Printer grd_make_map_printer(GrdFormatter* formatter) {
 	return { .formatter = formatter };
 }
 
+// @TODO: add grd prefixes. and remove underscores.
 void format_struct(GrdFormatter* formatter, GrdStructType* type, void* thing) {
 	auto printer = grd_make_struct_printer(formatter);
 	printer.head(grd_make_string(type->name));
