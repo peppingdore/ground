@@ -683,6 +683,8 @@ using GrdReflectMacroPickType = std::conditional_t<std::is_class_v<T>, GrdStruct
 // template <typename __T = __X> requires (std::is_same_v<__X, __T>)\
 // static void grd_reflect_type(__T* x, GrdReflectMacroPickType<__T>* type)
 
+// grd_reflect_type() must be a template to make sure,
+//   grd_reflect_type_of<T> returns the correct type if occurs earlier in the code than grd_reflect_type(T*).
 #define GRD_REFLECT_NAME(__T, _name)\
 template <int _N = 0> requires (_N == 0)\
 static GrdReflectMacroPickType<__T>* grd_reflect_create_type(__T* x) { return grd_reflect_add_type_named<__T, GrdReflectMacroPickType<__T>>(_name); }\
