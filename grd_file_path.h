@@ -31,7 +31,7 @@ GrdUnicodeString grd_path_stem(GrdUnicodeString path) {
 	return grd_len(last) > 0 ? prev : last;
 }
 
-GrdUnicodeString path_ext(GrdUnicodeString path) {
+GrdUnicodeString grd_path_ext(GrdUnicodeString path) {
 	auto base = grd_path_basename(path);
 	s64    index;
 	GrdUnicodeString last;
