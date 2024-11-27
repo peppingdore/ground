@@ -572,6 +572,7 @@ def build(file, *, stdout=sys.stdout, scope={}):
 		"file": file,
 	})
 	exec(DEFAULT_BUILD_MAIN, scope)
+	# BUILD_RUN's invoked by run_build_runs() may override DEFAULT_BUILD_MAIN's build_main().
 	run_build_runs(file, scope)
 	return eval("build_main()", scope)
 
