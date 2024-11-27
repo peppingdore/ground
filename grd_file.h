@@ -105,7 +105,7 @@ GrdTuple<GrdFile, GrdError*> grd_open_file(GrdUnicodeString path, GrdOpenFileFla
 	} else if (flags & GRD_FILE_READ) {
 		o_flag = O_RDONLY;
 	} else {
-		return { {}, grd_make_error("expecting any FILE_WRITE/FILE_READ in |flags|") };
+		return { {}, grd_make_error("Expecting any of FILE_WRITE/FILE_READ in |flags|") };
 	}
 
 	if (flags & GRD_FILE_CREATE_NEW) {
