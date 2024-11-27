@@ -26,7 +26,7 @@ void expect_str(GrdTuple<GrdError*, GrdcPrep*> x, GrdUnicodeString expected, Grd
 	grd_tester_scope_pop();
 }
 
-void expect_error(GrdTuple<GrdError*, GrdcPrep*> x, GrdUnicodeString expected, GrdCodeLoc loc = grd_caller_loc()) {
+GrdError* expect_error(GrdTuple<GrdError*, GrdcPrep*> x, GrdUnicodeString expected, GrdCodeLoc loc = grd_caller_loc()) {
 	grd_tester_scope_push(loc);
 	auto [e, p] = x;
 	GRD_EXPECT(e);
@@ -34,6 +34,7 @@ void expect_error(GrdTuple<GrdError*, GrdcPrep*> x, GrdUnicodeString expected, G
 		GRD_EXPECT(grd_contains(e->text, expected), e);
 	}
 	grd_tester_scope_pop();
+	return e;
 }
 
 GrdTuple<GrdError*, GrdcPrep*> simple_prep(GrdUnicodeString str, GrdSpan<GrdTuple<GrdUnicodeString, GrdUnicodeString>> files) {
@@ -53,13 +54,56 @@ GrdTuple<GrdError*, GrdcPrep*> simple_prep(GrdUnicodeString str, GrdSpan<GrdTupl
 }
 
 void tests_to_add() {
-	expect_error(simple_prep(U"#define"_b, {}), U"Expected an identifier after #define"_b);
-	expect_str(simple_prep(U"#define AAAAA"_b, {}), U"\n"_b);
-	expect_str(simple_prep(U"#define AAAAA '\nAAAAA a AAAAA"_b, {}), U"\n' a '\n"_b);
-	expect_error(simple_prep(U"#if (1"_b, {}), U"Expected ')' in preprocessor expression"_b);
-	expect_error(simple_prep(U"#if (1  "_b, {}), U"Expected ')' in preprocessor expression"_b);
+	
 }
 
-GRD_TEST_CASE(xxxx) {
+bool          did_setup = false;
+GrdArray<s64> expected_lines;
+GrdArray<s64> lines_got;
+
+GrdError* count_error_in(GrdTuple<GrdError*, GrdcPrep*> x, GrdUnicodeString expected, GrdCodeLoc loc = grd_caller_loc()) {
+	grd_tester_scope_push(loc);
+	auto e = expect_error(x, expected, loc);
+	if (auto x = grd_reflect_cast<GrdcPrepDetailedError>(e)) {
+		
+	}
+	grd_tester_scope_pop();
+	return e;
+}
+
+GRD_TEST_CASE(trigger_every_error_setup) {
+	auto fpath = grd_copy_unicode_string(grd_make_string(__FILE__));
+	GrdLogTrace("File: %"_b, fpath);
+	auto path = grd_path_join({ grd_path_parent(fpath), U"grdc_preprocess.h"_b });
+	GrdLogTrace("Path: %", path);
+	auto [txt, e] = grd_read_text_at_path(path);
+	GRD_EXPECT(!e, e);
+	if (e) {
+		return;
+	}
+	s64 line = 1;
+	for (auto it: grd_iterate_lines(txt)) {
+		if (grd_contains(it, U"grdc_make_prep_file_error"_b)) {
+			grd_add(&expected_lines, line);
+		}
+		line += 1;
+	}
+	if (grd_len(expected_lines) > 0) {
+		grd_remove(&expected_lines, 0);
+	}
+	GrdLogTrace("Found %", expected_lines);
+	did_setup = true;
+}
+
+GRD_TEST_CASE(trigger_errors) {
 	
+}
+
+GRD_TEST_CASE(trigger_every_error_results) {
+	if (!did_setup) {
+		return;
+	}
+	grd_sort(expected_lines);
+	grd_sort(lines_got);
+	GRD_EXPECT_EQ(grd_len(expected_lines), grd_len(lines_got), "Expected %, got %", expected_lines, lines_got);
 }

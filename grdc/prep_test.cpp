@@ -210,3 +210,11 @@ GRD_TEST_CASE(if_cond_complex) {
 	expect_error(simple_prep(U"#if (1 +)\n42\n#endif\n"_b, {}), U"Expected preprocessor expression"_b);
 }
 // @TODO: write tests based on: https://mailund.dk/posts/macro-metaprogramming/
+
+GRD_TEST_CASE(errors) {
+	expect_error(simple_prep(U"#define"_b, {}), U"Expected an identifier after #define"_b);
+	expect_str(simple_prep(U"#define AAAAA"_b, {}), U"\n"_b);
+	expect_str(simple_prep(U"#define AAAAA '\nAAAAA a AAAAA"_b, {}), U"\n' a '\n"_b);
+	expect_error(simple_prep(U"#if (1"_b, {}), U"Expected ')' in preprocessor expression"_b);
+	expect_error(simple_prep(U"#if (1  "_b, {}), U"Expected ')' in preprocessor expression"_b);
+}
