@@ -42,23 +42,30 @@ GrdUnicodeString path_ext(GrdUnicodeString path) {
 	return index >= 2 ? last : GrdUnicodeString{};
 }
 
-GrdAllocatedUnicodeString grd_path_join(GrdAllocator allocator, auto... args) {
+GrdAllocatedUnicodeString grd_path_join(GrdAllocator allocator, GrdSpan<GrdUnicodeString> args) {
 	GrdArray<char32_t> result = { .allocator = allocator };
-	auto pieces = { grd_make_string(args)... };
-	for (auto idx: grd_range(pieces.size())) {
-		auto it = *pieces[idx];
+	for (auto idx: grd_range(grd_len(args))) {
+		auto it = args[idx];
 		if (idx > 0) {
-			if (it.length > 0 && grd_is_path_sep(it[0])) {
-				it = slice(it, 1);
+			if (grd_len(it) > 0 && grd_is_path_sep(it[0])) {
+				it = it[{1, {}}];
 			}
-			if (it.length > 0 && grd_is_path_sep(it[it.length - 1])) {
-				it = slice(it, 0, it.length - 1);
+			if (grd_len(it) > 0 && grd_is_path_sep(it[-1])) {
+				it = it[{0, -1}];
 			}
 			grd_add(&result, '/');
 		}
 		grd_add(&result, it);
 	}
 	return result;
+}
+
+GrdAllocatedUnicodeString grd_path_join(GrdAllocator allocator, std::initializer_list<GrdUnicodeString> args) {
+	return grd_path_join(allocator, grd_make_span(args));
+}
+
+GrdAllocatedUnicodeString grd_path_join(std::initializer_list<GrdUnicodeString> args) {
+	return grd_path_join(c_allocator, args);
 }
 
 GrdGenerator<GrdUnicodeString> grd_path_segments(GrdUnicodeString path) {
@@ -70,5 +77,5 @@ GrdUnicodeString grd_path_parent(GrdUnicodeString path) {
 	for (auto it: grd_path_segments(path)) {
 		last = it;
 	}
-	return path[0, grd_len(path) - grd_len(last)];
+	return path[{0, grd_len(path) - grd_len(last)}];
 }
