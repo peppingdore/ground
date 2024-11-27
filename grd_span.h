@@ -75,6 +75,11 @@ GrdSpan<T> grd_make_span(const T (&arr)[N]) {
 }
 
 template <typename T>
+GrdSpan<T> grd_make_span(std::initializer_list<T> list) {
+	return { (T*) list.begin(), (s64) list.size() };
+}
+
+template <typename T>
 s64 grd_len(GrdSpan<T> span) {
 	return span.count;
 }
