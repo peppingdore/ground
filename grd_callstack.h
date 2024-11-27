@@ -2,6 +2,14 @@
 
 #if __cpp_lib_stacktrace
 	#include <stacktrace>
+#else
+	#include "grd_build.h"
+	#if GRD_OS_LINUX
+		GRD_BUILD_RUN("params.add_lib('dwarf')")
+		GRD_BUILD_RUN("params.add_lib('elf')")
+		#define BACKWARD_HAS_DWARF 1
+	#endif
+	#include "third_party/backward_cpp.h"
 #endif
 
 #include <string>
