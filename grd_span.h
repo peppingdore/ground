@@ -175,6 +175,18 @@ bool grd_contains(std::initializer_list<T> list, auto item) {
 }
 
 template <typename T>
+s64 grd_count_occurances(GrdSpan<T> src, GrdSpan<T> entry) {
+	s64 cnt = 0;
+	for (s64 i = 0; i < grd_len(src) - grd_len(entry); i++) {
+		if (grd_starts_with(src[{i, {}}], entry)) {
+			cnt += 1;
+			i += grd_len(entry) - 1;
+		}
+	}
+	return cnt;
+}
+
+template <typename T>
 void grd_type_hash(GrdHasher* hasher, GrdSpan<T> array) {
 	grd_update(hasher, array.count);
 	for (auto item: array) {
