@@ -320,28 +320,11 @@ struct GrdcPrep {
 	GrdArray<GrdcPrepIf>           if_stack;
 };
 
-struct GrdcPrepFileError;
 struct GrdcPrepTokenError;
 struct GrdcPrepDetailedError;
 
-void grd_type_format(GrdFormatter* f, GrdcPrepFileError* e, GrdString spec);
 void grd_type_format(GrdFormatter* f, GrdcPrepTokenError* e, GrdString spec);
 void grd_type_format(GrdFormatter* f, GrdcPrepDetailedError* e, GrdString spec);
-
-struct GrdcPrepFileError: GrdError {
-	GrdcPrep*           prep = NULL;
-	GrdcPrepFileSource* file = NULL;
-	s64                 start = 0;
-	s64                 end   = 0;
-
-	GRD_REFLECT(GrdcPrepFileError) {
-		GRD_BASE_TYPE(GrdError);
-		GRD_MEMBER(prep);
-		GRD_MEMBER(file);
-		GRD_MEMBER(start);
-		GRD_MEMBER(end);
-	}
-};
 
 struct GrdcPrepTokenError: GrdError {
 	GrdcPrep*  prep = NULL;
@@ -353,16 +336,6 @@ struct GrdcPrepTokenError: GrdError {
 		GRD_MEMBER(tok);
 	}
 };
-
-GrdcPrepFileError* grdc_make_prep_file_error(GrdcPrep* p, GrdcPrepFileSource* file, s64 start, s64 end, auto... args) {
-	auto msg = grd_sprint(p->allocator, args...);
-	auto e = grd_make_error<GrdcPrepFileError>(msg);
-	e->prep = p;
-	e->file = file;
-	e->start = start;
-	e->end = end;
-	return e;
-}
 
 GrdcToken* grdc_file_tok(GrdcToken* tok);
 
@@ -959,13 +932,7 @@ void grdc_print_token_spans(GrdcTokenDumper* dumper, GrdSpan<GrdcTokenSpan> span
 void grdc_print_prep_error(GrdFormatter* f, GrdError* e) {
 	grd_formatln(f);
 	grd_formatln(f, "Error: %", e->text);
-	if (auto x = grd_reflect_cast<GrdcPrepFileError>(e)) {
-		grd_formatln(f);
-		grd_formatln(f, "   at %", x->file->fullpath);
-		grdc_print_file_range_highlighted(f, x->file, x->start, x->end, 1);
-		grd_formatln(f);
-		grd_formatln(f);
-	} else if (auto x = grd_reflect_cast<GrdcPrepTokenError>(e)) {
+	if (auto x = grd_reflect_cast<GrdcPrepTokenError>(e)) {
 		grd_formatln(f);
 		GrdcTokenDumper dumper;
 		grdc_dump_token(&dumper, x->tok, 1);
@@ -982,10 +949,6 @@ void grdc_print_prep_error(GrdFormatter* f, GrdError* e) {
 	} else {
 		grd_formatln(f, e);
 	}
-}
-
-void grd_type_format(GrdFormatter* f, GrdcPrepFileError* e, GrdString spec) {
-	grdc_print_prep_error(f, e);
 }
 
 void grd_type_format(GrdFormatter* f, GrdcPrepTokenError* e, GrdString spec) {
