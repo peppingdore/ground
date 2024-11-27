@@ -569,7 +569,7 @@ def build(file, *, stdout=sys.stdout, scope={}):
 		"builder": __import__(__name__),
 		"params": DefaultBuildParams(),
 		"stdout": stdout,
-		"file": file,
+		"file": Path(file).resolve(),
 	})
 	exec(DEFAULT_BUILD_MAIN, scope)
 	# BUILD_RUN's invoked by run_build_runs() may override DEFAULT_BUILD_MAIN's build_main().
