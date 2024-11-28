@@ -93,11 +93,6 @@ GrdCallStack grd_get_callstack(GrdAllocator allocator = c_allocator) {
 			}
 			st.entries[i].desc = grd_callstack_copy_std_string(allocator, std::move(func));
 		}
-		backward::Printer p;
-		p.object = true;
-		p.color_mode = backward::ColorMode::always;
-		p.address = true;
-		p.print(b_st, stderr);
 	#endif
 	return st;
 }
