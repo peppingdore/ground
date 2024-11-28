@@ -1,6 +1,8 @@
 #pragma once
 
-#if __cpp_lib_stacktrace
+#define GRD_USE_STD_STACKTRACE __cpp_lib_stacktrace && 1
+
+#if GRD_USE_STD_STACKTRACE
 	#include <stacktrace>
 #else
 	#include "grd_build.h"
@@ -10,6 +12,7 @@
 		#define BACKWARD_HAS_DWARF 1
 	#endif
 	#include "third_party/backward_cpp.h"
+	#define GRD_USE_BACKWARD_CPP_STACKTRACE 1
 #endif
 
 #include <string>
@@ -45,7 +48,7 @@ const char* grd_callstack_copy_std_string(GrdAllocator allocator, std::string&& 
 GrdCallStack grd_get_callstack(GrdAllocator allocator = c_allocator) {
 	GrdCallStack st;
 	st.allocator = allocator;
-	#if __cpp_lib_stacktrace
+	#if GRD_USE_STD_STACKTRACE
 		auto cpp_st = std::stacktrace::current();
 		// Skipping first entry to skip grd_get_callstack()'s frame.
 		st.count = cpp_st.size() - 1;
@@ -55,6 +58,27 @@ GrdCallStack grd_get_callstack(GrdAllocator allocator = c_allocator) {
 			auto f_str = grd_callstack_copy_std_string(allocator, x.source_file());
 			st.entries[i - 1].loc = grd_make_code_loc(x.source_line(), f_str);
 			st.entries[i - 1].desc = grd_callstack_copy_std_string(allocator, x.description());
+		}
+	#elif GRD_USE_BACKWARD_CPP_STACKTRACE
+		backward::StackTrace b_st;
+		b_st.load_here(32);
+		b_st.skip_n_firsts(3);
+		backward::TraceResolver tr;
+		tr.load_stacktrace(b_st);
+		st.count = b_st.size();
+		st.entries = GrdAlloc<GrdCallStackEntry>(allocator, st.count);
+		for (auto i: grd_range(st.count)) {
+			backward::ResolvedTrace trace = tr.resolve(b_st[i]);
+			std::string file = std::move(trace.source.filename);
+			if (file == "") {
+				file = std::move(trace.object_filename);
+			}
+			st.entries[i].loc = grd_make_code_loc(trace.source.line, grd_callstack_copy_std_string(allocator, std::move(file)));
+			std::string func = std::move(trace.source.function);
+			if (func == "") {
+				func = std::move(trace.object_function);
+			}
+			st.entries[i].desc = grd_callstack_copy_std_string(allocator, std::move(func));
 		}
 	#endif
 	return st;
