@@ -19,7 +19,7 @@ concept GrdAtomicSize =
 	sizeof(T) == 1 || sizeof(T) == 2 ||
 	sizeof(T) == 4 || sizeof(T) == 8 || sizeof(T) == 16;
 
-#if !COMPILER_MSVC
+#if !GRD_COMPILER_MSVC
 	consteval int grd_memory_order_to_gcc(GrdMemoryOrder mo) {
 		if (mo == GrdMemoryOrder::Relaxed) return __ATOMIC_RELAXED;
 		if (mo == GrdMemoryOrder::Consume) return __ATOMIC_CONSUME;
@@ -34,13 +34,13 @@ concept GrdAtomicSize =
 template <int N> struct GrdAtomicIntegralImpl;
 template <>      struct GrdAtomicIntegralImpl<1> { using Type = s8; };
 template <>      struct GrdAtomicIntegralImpl<2> { using Type = s16; };
-#if COMPILER_MSVC
+#if GRD_COMPILER_MSVC
 	template <>  struct GrdAtomicIntegralImpl<4> { using Type = long; };
 #else
 	template <>  struct GrdAtomicIntegralImpl<4> { using Type = s32; };
 #endif
 template <>      struct GrdAtomicIntegralImpl<8> { using Type = s64; };
-#if COMPILER_MSVC
+#if GRD_COMPILER_MSVC
 	template <>  struct alignas(16) GrdAtomicIntegralImpl<16> { using Type = struct { s64 low; s64 high; }; };
 #else
 	template <>  struct alignas(16) GrdAtomicIntegralImpl<16>{ using Type = __int128_t; };
@@ -54,7 +54,7 @@ template <GrdAtomicSize T, GrdMemoryOrder mo = GrdMemoryOrder::SeqCst>
 T grd_atomic_exchange(T* dst, std::type_identity_t<T> value) {
 	using N = GrdAtomicIntegral<T>;
 
-	#if COMPILER_MSVC
+	#if GRD_COMPILER_MSVC
 		#if ARCH_X64
 			#define GRD_INTERLOCKED_EXCHANGE(postfix, ...) result = _InterlockedExchange##postfix((N*) dst, __VA_ARGS__);
 		#elif ARCH_ARM64
@@ -111,7 +111,7 @@ template <
 T grd_compare_and_swap(T* dst, T comp_v, T xchg_v) {
 	using N = GrdAtomicIntegral<T>;
 
-	#if COMPILER_MSVC
+	#if GRD_COMPILER_MSVC
 		#if ARCH_X64
 			#define GRD_INTERLOCKED_COMPARE_EXCHANGE(postfix) return _InterlockedCompareExchange##postfix((N*) dst, grd_bitcast<N>(xchg_v), grd_bitcast<N>(comp_v));
 		#elif ARCH_ARM64
