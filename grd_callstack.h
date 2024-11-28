@@ -11,6 +11,9 @@
 		GRD_BUILD_RUN("params.add_lib('elf')")
 		#define BACKWARD_HAS_DWARF 1
 	#endif
+	#if GRD_OS_DARWIN
+		#define BACKWARD_HAS_LIBUNWIND 1
+	#endif
 	#include "third_party/backward_cpp.h"
 	#define GRD_USE_BACKWARD_CPP_STACKTRACE 1
 #endif
