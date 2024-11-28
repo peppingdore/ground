@@ -3673,7 +3673,7 @@ public:
     if (SymGetLineFromAddr(process, (ULONG64)t.addr, &offset, &line)) {
       t.object_filename = line.FileName;
       t.source.filename = line.FileName;
-      t.source.line = line.LineNumber;
+      t.source.line = line.LineNumber - 1;
       t.source.col = offset;
     }
 
