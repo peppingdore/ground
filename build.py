@@ -388,6 +388,7 @@ def collect_build_runs(out):
 			code = match[0]
 		else:
 			code = code.removeprefix('"').removesuffix('"')
+		code = code.encode('utf-8').decode('unicode_escape')
 		file = file.removeprefix('"').removesuffix('"')
 		res.append(BuildRun(code, file, int(line)))
 	return res
