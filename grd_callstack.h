@@ -75,7 +75,13 @@ GrdCallStack grd_get_callstack(GrdAllocator allocator = c_allocator) {
 
 		backward::StackTrace b_st;
 		b_st.load_here(32);
-		// b_st.skip_n_firsts(3);
+		#if GRD_OS_WINDOWS
+			b_st.skip_n_firsts(1);
+		#elif GRD_OS_DARWIN
+			b_st.skip_n_firsts(2);
+		#elif GRD_OS_LINUX
+			b_st.skip_n_firsts(2);
+		#endif
 		backward::TraceResolver tr;
 		tr.load_stacktrace(b_st);
 		st.count = b_st.size();
