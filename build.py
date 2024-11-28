@@ -385,7 +385,7 @@ def collect_build_runs(out):
 				raise Exception(f'build run raw literal regex expects 3 items, got {len(match)}, {match}')
 			if match[0] != match[2]:
 				raise Exception(f'build run raw literal prefix and suffix must be the same, got {match[0]} and {match[2]}')
-			code = match[0]
+			code = match[1]
 		else:
 			code = code.removeprefix('"').removesuffix('"')
 		code = code.encode('utf-8').decode('unicode_escape')
