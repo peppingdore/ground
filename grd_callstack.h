@@ -12,6 +12,7 @@
 		#define BACKWARD_HAS_DWARF 1
 	#endif
 	#if GRD_OS_DARWIN
+		#define BACKWARD_HAS_DWARF 1
 		#define BACKWARD_HAS_LIBUNWIND 1
 	#endif
 	#include "third_party/backward_cpp.h"
@@ -81,7 +82,7 @@ GrdCallStack grd_get_callstack(GrdAllocator allocator = c_allocator) {
 		#if GRD_OS_WINDOWS
 			b_st.skip_n_firsts(1);
 		#elif GRD_OS_DARWIN
-			b_st.skip_n_firsts(2);
+			b_st.skip_n_firsts(0);
 		#elif GRD_OS_LINUX
 			b_st.skip_n_firsts(2);
 		#endif
