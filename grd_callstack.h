@@ -1,6 +1,6 @@
 #pragma once
 
-#define GRD_USE_STD_STACKTRACE __cpp_lib_stacktrace && 1
+#define GRD_USE_STD_STACKTRACE (__cpp_lib_stacktrace && 0)
 
 #if GRD_USE_STD_STACKTRACE
 	#include <stacktrace>
@@ -17,6 +17,8 @@
 
 #include <string>
 #include "grd_format.h"
+#include "grd_defer.h"
+#include "sync/grd_spinlock.h"
 
 struct GrdCallStackEntry {
 	GrdCodeLoc   loc;
@@ -60,6 +62,17 @@ GrdCallStack grd_get_callstack(GrdAllocator allocator = c_allocator) {
 			st.entries[i - 1].desc = grd_callstack_copy_std_string(allocator, x.description());
 		}
 	#elif GRD_USE_BACKWARD_CPP_STACKTRACE
+	
+	#if GRD_OS_WINDOWS
+		static GrdSpinlock symbol_lock;
+		grd_lock(&symbol_lock);
+		SymInitialize(GetCurrentProcess(), NULL, TRUE);
+		grd_defer {
+			SymCleanup(GetCurrentProcess());
+			grd_unlock(&symbol_lock);
+		};
+	#endif
+
 		backward::StackTrace b_st;
 		b_st.load_here(32);
 		b_st.skip_n_firsts(3);
@@ -80,6 +93,11 @@ GrdCallStack grd_get_callstack(GrdAllocator allocator = c_allocator) {
 			}
 			st.entries[i].desc = grd_callstack_copy_std_string(allocator, std::move(func));
 		}
+		backward::Printer p;
+		p.object = true;
+		p.color_mode = backward::ColorMode::always;
+		p.address = true;
+		p.print(b_st, stderr);
 	#endif
 	return st;
 }

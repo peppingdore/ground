@@ -1152,6 +1152,7 @@ public:
     }
 
     HANDLE process = GetCurrentProcess();
+	// SymInitialize(process, nullptr, TRUE);
 
     STACKFRAME64 s;
     memset(&s, 0, sizeof(STACKFRAME64));
@@ -3615,7 +3616,7 @@ public:
     std::vector<module_data> modules;
     DWORD cbNeeded;
     std::vector<HMODULE> module_handles(1);
-    SymInitialize(process, NULL, false);
+    // SymInitialize(process, NULL, false);
     DWORD symOptions = SymGetOptions();
     symOptions |= SYMOPT_LOAD_LINES | SYMOPT_UNDNAME;
     SymSetOptions(symOptions);
