@@ -26,6 +26,7 @@
 #include "sync/grd_spinlock.h"
 
 struct GrdStackTraceEntry {
+	void*        addr = NULL;
 	const char*  obj = NULL;
 	const char*  obj_func = NULL;
 	GrdCodeLoc   src_loc;
@@ -85,7 +86,7 @@ GrdStackTrace grd_get_stack_trace(GrdAllocator allocator = c_allocator) {
 		backward::StackTrace b_st;
 		b_st.load_here(32);
 		#if GRD_OS_WINDOWS
-			b_st.skip_n_firsts(1);
+			b_st.skip_n_firsts(2);
 		#elif GRD_OS_DARWIN
 			b_st.skip_n_firsts(2);
 		#elif GRD_OS_LINUX
@@ -98,10 +99,16 @@ GrdStackTrace grd_get_stack_trace(GrdAllocator allocator = c_allocator) {
 		for (auto i: grd_range(st.count)) {
 			backward::ResolvedTrace trace = tr.resolve(b_st[i]);
 			auto entry = &st.entries[i];
+			entry->addr = trace.addr;
 			entry->obj = grd_stack_trace_copy_std_str(allocator, trace.object_filename);
 			entry->obj_func = grd_stack_trace_copy_std_str(allocator, trace.object_function);
 			entry->src_func = grd_stack_trace_copy_std_str(allocator, trace.source.function);
 			entry->src_loc = grd_make_code_loc(trace.source.line, grd_stack_trace_copy_std_str(allocator, trace.source.filename));
+			// printf("addr: %p\n", entry->addr);
+			// printf("obj: %s\n", entry->obj);
+			// printf("obj_func: %s\n", entry->obj_func);
+			// printf("src_func: %s\n", entry->src_func);
+			// printf("src_loc: %d %s\n", entry->src_loc.line, entry->src_loc.file);
 		}
 	#endif
 	return st;
