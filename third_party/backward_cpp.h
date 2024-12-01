@@ -3653,17 +3653,19 @@ public:
 
     if (!SymFromAddr(process, (ULONG64)t.addr, &displacement, &sym.sym)) {
       // TODO:  error handling everywhere
-      char* lpMsgBuf;
-      DWORD dw = GetLastError();
+    //   char* lpMsgBuf;
+    //   DWORD dw = GetLastError();
 
-      if (FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER |
-                             FORMAT_MESSAGE_FROM_SYSTEM |
-                             FORMAT_MESSAGE_IGNORE_INSERTS,
-                         NULL, dw, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                         (char*)&lpMsgBuf, 0, NULL)) {
-        std::fprintf(stderr, "%s\n", lpMsgBuf);
-        LocalFree(lpMsgBuf);
-      }
+    //   if (FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER |
+    //                          FORMAT_MESSAGE_FROM_SYSTEM |
+    //                          FORMAT_MESSAGE_IGNORE_INSERTS,
+    //                      NULL, dw, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+    //                      (char*)&lpMsgBuf, 0, NULL)) {
+    //     std::fprintf(stderr, "%s\n", lpMsgBuf);
+    //     LocalFree(lpMsgBuf);
+    //   }
+
+		return t;
 
       // abort();
     }
