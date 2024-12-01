@@ -5,8 +5,8 @@
 #include <string.h>
 
 struct GrdCodeLoc {
-	s32         line;
-	const char* file;
+	s32         line = 0;
+	const char* file = NULL;
 
 	bool operator==(GrdCodeLoc rhs) {
 		return line == rhs.line && (strcmp(file, rhs.file) == 0);
