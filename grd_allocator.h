@@ -37,8 +37,8 @@ struct GrdAllocator {
 	// We could just put |proc| in AllocatorData struct,
 	//   but that wold mean having level of indirection 2,
 	//   which I don't like.
-	GrdAllocatorProc* proc;
-	void*             data;
+	GrdAllocatorProc* proc = NULL;
+	void*             data = NULL;
 
 	bool operator==(GrdAllocator rhs) {
 		return proc == rhs.proc && data == rhs.data;
