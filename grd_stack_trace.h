@@ -181,15 +181,19 @@ void grd_print_stack_trace(GrdStackTrace st) {
 		printf("#%d ", (s32) i);
 		if (entry->src_loc.file && strcmp(entry->src_loc.file, "") != 0) {
 			printf("%s:%d ", entry->src_loc.file, entry->src_loc.line);
-			if (entry->src_func) {
+			if (entry->src_func && strcmp(entry->src_func, "") != 0) {
 				printf(" %s", entry->src_func);
+			} else {
+				printf(" %p", entry->addr);
 			}
 			printf("\n");
 			grd_print_stack_trace_src(entry);
 		} else {
 			printf("%s ", entry->obj);
-			if (entry->obj_func) {
+			if (entry->obj_func && strcmp(entry->obj_func, "") != 0) {
 				printf(" %s", entry->obj_func);
+			} else {
+				printf(" %p", entry->addr);
 			}
 			printf("\n");
 		}
