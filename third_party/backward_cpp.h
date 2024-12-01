@@ -3680,8 +3680,14 @@ public:
       t.source.col = offset;
     }
 
+	char mod_name[MAX_PATH];
+	strcpy(mod_name, "");
+	if (GetModuleFileNameA((HMODULE) sym.sym.ModBase, mod_name, sizeof(mod_name)) != 0) {
+		t.object_filename = std::string(mod_name);
+	}
+
     t.source.function = name;
-    t.object_filename = "";
+    // t.object_filename = "";
     t.object_function = name;
 
     return t;
