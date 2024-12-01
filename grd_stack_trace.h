@@ -88,7 +88,7 @@ GrdStackTrace grd_get_stack_trace(GrdAllocator allocator = c_allocator) {
 		#if GRD_OS_WINDOWS
 			b_st.skip_n_firsts(2);
 		#elif GRD_OS_DARWIN
-			b_st.skip_n_firsts(2);
+			b_st.skip_n_firsts(1);
 		#elif GRD_OS_LINUX
 			b_st.skip_n_firsts(3);
 		#endif
