@@ -24,6 +24,7 @@
 #include "grd_allocator.h"
 #include "grd_code_location.h"
 #include "sync/grd_spinlock.h"
+#include <stdarg.h>
 
 struct GrdStackTraceEntry {
 	void*        addr = NULL;
@@ -114,7 +115,18 @@ GrdStackTrace grd_get_stack_trace(GrdAllocator allocator = c_allocator) {
 	return st;
 }
 
-bool grd_print_stack_trace_src(GrdStackTraceEntry* entry) {
+void grd_stack_trace_sprintf(char** buf, s64* buf_len, const char* fmt, ...) {
+	va_list args;
+    va_start(args, fmt);
+	s64 written = vsnprintf(*buf, *buf_len, fmt, args);
+	*buf += written;
+	*buf_len -= written;
+	if (*buf_len < 0) {
+		*buf_len = 0;
+	}
+}
+
+bool grd_print_stack_trace_src(GrdStackTraceEntry* entry, char** buf, s64* buf_len) {
 	if (!entry->src_loc.file || entry->src_loc.line < 1) {
 		return false;
 	}
@@ -139,27 +151,27 @@ bool grd_print_stack_trace_src(GrdStackTraceEntry* entry) {
 			entry->src_loc.line >= line_idx - LINE_OVERFLOW &&
 			entry->src_loc.line <= line_idx + LINE_OVERFLOW)
 		{
-			printf("    ");
+			grd_stack_trace_sprintf(buf, buf_len, "    ");
 			for (auto i: grd_range(line_len)) {
 				if (line[i] == '\t') {
-					printf("    ");
+					grd_stack_trace_sprintf(buf, buf_len, "    ");
 				} else {
-					printf("%c", line[i]);
+					grd_stack_trace_sprintf(buf, buf_len, "%c", line[i]);
 				}
 			}
 			if (missing_line_break) {
-				printf("\n");
+				grd_stack_trace_sprintf(buf, buf_len, "\n");
 			}
 			if (line_idx == entry->src_loc.line) {
-				printf("    ");
+				grd_stack_trace_sprintf(buf, buf_len, "    ");
 				bool struct_non_whitespace = false;
 				for (auto i: grd_range(line_len)) {
 					if (line[i] != '\t' && line[i] != ' ') {
 						struct_non_whitespace = true;
 					}
-					printf("%.*s", line[i] == '\t' ? 4 : 1, struct_non_whitespace ? "~~~~" : "    ");
+					grd_stack_trace_sprintf(buf, buf_len, "%.*s", line[i] == '\t' ? 4 : 1, struct_non_whitespace ? "~~~~" : "    ");
 				}
-				printf("\n");
+				grd_stack_trace_sprintf(buf, buf_len, "\n");
 			}
 		}
 		if (missing_line_break) {
@@ -171,31 +183,49 @@ bool grd_print_stack_trace_src(GrdStackTraceEntry* entry) {
 			}
 		}
 	}
-	printf("\n");
+	grd_stack_trace_sprintf(buf, buf_len, "\n");
 	return true;
 }
 
-void grd_print_stack_trace(GrdStackTrace st) {
+enum GrdStackTracePrintFlags {
+	GRD_STACK_TRACE_PRINT_FLAG_NONE = 0,
+	GRD_STACK_TRACE_PRINT_SOURCE = 1 << 0,
+};
+
+void grd_print_stack_trace(GrdStackTrace st, char* buf, s64 buf_len, u32 flags = GRD_STACK_TRACE_PRINT_SOURCE) {
 	for (auto i: grd_reverse(grd_range(st.count))) {
 		auto entry = &st.entries[i];
-		printf("#%d ", (s32) i);
+		// grd_stack_trace_sprintf(&buf, &buf_len, "#%d ", (s32) i);
 		if (entry->src_loc.file && strcmp(entry->src_loc.file, "") != 0) {
-			printf("%s:%d ", entry->src_loc.file, entry->src_loc.line);
 			if (entry->src_func && strcmp(entry->src_func, "") != 0) {
-				printf(" %s", entry->src_func);
+				grd_stack_trace_sprintf(&buf, &buf_len, "%s", entry->src_func);
 			} else {
-				printf(" %p", entry->addr);
+				grd_stack_trace_sprintf(&buf, &buf_len, "%p", entry->addr);
 			}
-			printf("\n");
-			grd_print_stack_trace_src(entry);
+			// grd_stack_trace_sprintf(&buf, &buf_len, " at %s:%d ", entry->src_loc.file, entry->src_loc.line);
+			grd_stack_trace_sprintf(&buf, &buf_len, "\n");
+			grd_stack_trace_sprintf(&buf, &buf_len, "  %s:%d ", entry->src_loc.file, entry->src_loc.line);
+			grd_stack_trace_sprintf(&buf, &buf_len, "\n");
+			if (flags & GRD_STACK_TRACE_PRINT_SOURCE) {
+				grd_print_stack_trace_src(entry, &buf, &buf_len);
+			}
 		} else {
-			printf("%s ", entry->obj);
 			if (entry->obj_func && strcmp(entry->obj_func, "") != 0) {
-				printf(" %s", entry->obj_func);
+				grd_stack_trace_sprintf(&buf, &buf_len, "%s", entry->obj_func);
 			} else {
-				printf(" %p", entry->addr);
+				grd_stack_trace_sprintf(&buf, &buf_len, "%p", entry->addr);
 			}
-			printf("\n");
+			// grd_stack_trace_sprintf(&buf, &buf_len, " at %s", entry->obj);
+			grd_stack_trace_sprintf(&buf, &buf_len, "\n");
+			grd_stack_trace_sprintf(&buf, &buf_len, "  %s", entry->obj);
+			grd_stack_trace_sprintf(&buf, &buf_len, "\n");
 		}
 	}
+}
+
+void grd_print_stack_trace(GrdStackTrace st) {
+	char buf[4 * 1024];
+	buf[0] = '\0';
+	grd_print_stack_trace(st, buf, sizeof(buf));
+	printf("%s\n", buf);
 }
