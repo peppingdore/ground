@@ -172,7 +172,7 @@ void grd_print_stack_trace(GrdStackTrace st) {
 	for (auto i: grd_reverse(grd_range(st.count))) {
 		auto entry = &st.entries[i];
 		printf("#%d ", (s32) i);
-		if (entry->src_loc.file) {
+		if (entry->src_loc.file && strcmp(entry->src_loc.file, "") != 0) {
 			printf("%s:%d ", entry->src_loc.file, entry->src_loc.line);
 			if (entry->src_func) {
 				printf(" %s", entry->src_func);
