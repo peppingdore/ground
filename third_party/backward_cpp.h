@@ -840,6 +840,7 @@ private:
       // calculating 0-1 for unsigned, looks like a possible bug to sanitizers,
       // so let's do it explicitly:
       if (ip == 0) {
+		return _URC_NO_REASON;
         ip = std::numeric_limits<uintptr_t>::max(); // set it to 0xffff... (as
                                                     // from casting 0-1)
       } else {
