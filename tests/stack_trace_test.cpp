@@ -3,12 +3,12 @@
 #endif
 #pragma once
 
-#include "../grd_callstack.h"
+#include "../grd_stack_trace.h"
 #include "../grd_log.h"
 #include "../grd_testing.h"
 
-GRD_TEST_CASE(callstack) {
-	auto cs = grd_get_callstack();
-	grd_print_callstack_verbose(cs);
+GRD_TEST_CASE(stack_trace) {
+	auto cs = grd_get_stack_trace();
+	grd_print_stack_trace(cs);
 	GRD_EXPECT(false);
 }
