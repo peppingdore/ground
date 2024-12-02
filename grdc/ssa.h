@@ -1155,7 +1155,7 @@ GrdTuple<GrdcSsa*, GrdError*> grdc_emit_function_ssa(GrdAllocator allocator, Grd
 	return { ssa, NULL };
 }
 
-#include "../third_party/spirv_reflect.h"
+#include "../third_party/spirv/spirv_reflect.h"
 
 struct GrdcSpirvEntryPoint {
 	GrdcAstFunction*                      f;

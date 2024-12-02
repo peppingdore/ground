@@ -1,6 +1,6 @@
 #pragma once
 
-#include "third_party/spooky_hash.h"
+#include "third_party/spooky_hash/spooky_hash.h"
 #include "grd_type_utils.h"
 #include "math/grd_basic_functions.h"
 
