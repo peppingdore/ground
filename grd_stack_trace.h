@@ -38,16 +38,16 @@ struct GrdStackTrace {
 	GrdAllocator        allocator;
 	GrdStackTraceEntry* entries = NULL;
 	s64                 count = 0;
-};
 
-void grd_free_stack_trace(GrdStackTrace st) {
-	for (auto i: grd_range(st.count)) {
-		GrdFree(st.allocator, (void*) st.entries[i].obj);
-		GrdFree(st.allocator, (void*) st.entries[i].obj_func);
-		GrdFree(st.allocator, (void*) st.entries[i].src_loc.file);
-		GrdFree(st.allocator, (void*) st.entries[i].src_func);
+	void free() {
+		for (auto i: grd_range(count)) {
+			GrdFree(allocator, (void*) entries[i].obj);
+			GrdFree(allocator, (void*) entries[i].obj_func);
+			GrdFree(allocator, (void*) entries[i].src_loc.file);
+			GrdFree(allocator, (void*) entries[i].src_func);
+		}
 	}
-}
+};
 
 const char* grd_stack_trace_copy_std_str(GrdAllocator allocator, std::string& str) {
 	auto str_mem = GrdAlloc<char>(allocator, str.size() + 1);
