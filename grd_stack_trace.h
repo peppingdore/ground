@@ -223,9 +223,9 @@ void grd_print_stack_trace(GrdStackTrace st, char* buf, s64 buf_len, u32 flags =
 	}
 }
 
-void grd_print_stack_trace(GrdStackTrace st) {
+void grd_print_stack_trace(GrdStackTrace st, u32 flags = GRD_STACK_TRACE_PRINT_SOURCE) {
 	char buf[4 * 1024];
 	buf[0] = '\0';
-	grd_print_stack_trace(st, buf, sizeof(buf));
+	grd_print_stack_trace(st, buf, sizeof(buf), GRD_STACK_TRACE_PRINT_SOURCE);
 	printf("%s\n", buf);
 }
