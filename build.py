@@ -411,7 +411,7 @@ def run_preprocessor(compiler, path):
 	return run(cmdline)
 
 class DefaultBuildParams:
-	def __init__(self, build_run_scope, *,
+	def __init__(self, ctx, *,
 		units=[],
 		compile_params=CompilationParams(),
 		link_params=LinkParams(),
@@ -421,7 +421,7 @@ class DefaultBuildParams:
 		self.compile_params = compile_params
 		self.link_params = link_params
 		self.target = target
-		self.build_run_scope = build_run_scope
+		self.ctx = ctx
 
 	def set_target(self, target):
 		self.target = target
@@ -433,22 +433,9 @@ class DefaultBuildParams:
 		self.compile_params.compiler = compiler
 		self.link_params.compiler = compiler
 
-	def run_build_runs(self, file):
-		process, _ = run_preprocessor('clang++', file)
-		runs = collect_build_runs(process.stdout.decode('utf-8', errors='ignore'))
-		for it in runs:
-			verbose(f'BUILD_RUN {it}')
-			name = f'{it.file}: {it.line}'
-			lines = it.code.splitlines(True)
-			linecache.cache[name] = len(it.code), None, lines, name
-			code = compile(it.code, name, 'exec')
-			self.build_run_scope['__GRD_BUILD_RUN_FILE__'] = Path(it.file).resolve()
-			exec(code, self.build_run_scope)
-			del self.build_run_scope['__GRD_BUILD_RUN_FILE__']
-
 	# @TODO: write tests for this. 
 	def add_unit(self, unit):
-		self.run_build_runs(unit)
+		self.ctx.run_build_runs(unit)
 		self.units.append(unit)
 
 	def add_define(self, define):
@@ -475,8 +462,10 @@ from pathlib import Path
 import sys
 import argparse
 
+ctx.params = ctx.module.DefaultBuildParams(ctx)
+
 def build_main():
-	params.units.append(file)
+	ctx.params.units.append(ctx.file)
 
 	argparser = argparse.ArgumentParser()
 	argparser.add_argument('--run', '-r', action='store_true', help="Runs executable after successful compiling")
@@ -488,46 +477,65 @@ def build_main():
 	argparser.add_argument('--time_trace_high_granularity', action='store_true', help="Enables compile time tracing with high granularity")
 	args, extra = argparser.parse_known_args()
 
-	target = builder.native_target()
+	target = ctx.module.native_target()
 
 	if args.compiler:
-		params.set_compiler(args.compiler)
+		ctx.params.set_compiler(args.compiler)
 	if args.arch:
-		target = builder.Target(target.os, args.arch)
+		target = ctx.module.Target(target.os, args.arch)
 	if args.time_trace or args.time_trace_high_granularity:
-		params.compile_params.compiler_flags.append(builder.COMPILE_TIME_TRACE)
+		ctx.params.compile_params.compiler_flags.append(ctx.module.COMPILE_TIME_TRACE)
 	if args.time_trace_high_granularity:
-		params.compile_params.compiler_flags.append(builder.COMPILE_TIME_TRACE_HIGH_GRANULARITY)
+		ctx.params.compile_params.compiler_flags.append(ctx.module.COMPILE_TIME_TRACE_HIGH_GRANULARITY)
 	
-	params.set_target(target)
-	params.set_optimization_level(args.opt_level)
-	params.add_natvis_file(builder.MODULE_ROOT / "grd.natvis")
+	ctx.params.set_target(target)
+	ctx.params.set_optimization_level(args.opt_level)
+	ctx.params.add_natvis_file(ctx.module.MODULE_ROOT / "grd.natvis")
 
-	compile_results = builder.compile_units_parallel(params.units, params.compile_params, params.target)
-	builder.print_compile_results(stdout, compile_results)
-	if not builder.did_all_units_compile_successfully(compile_results):
+	compile_results = ctx.module.compile_units_parallel(ctx.params.units, ctx.params.compile_params, ctx.params.target)
+	ctx.module.print_compile_results(ctx.stdout, compile_results)
+	if not ctx.module.did_all_units_compile_successfully(compile_results):
 		return 1
-	output_path = Path(file).parent / "built" / builder.build_exec_name(str(Path(file).stem))
-	link_result = builder.link(compile_results, params.link_params, params.target, output_path)
-	builder.print_link_result(stdout, link_result)
-	if not builder.did_link_successfully(link_result):
+	output_path = Path(ctx.file).parent / "built" / ctx.module.build_exec_name(str(Path(ctx.file).stem))
+	link_result = ctx.module.link(compile_results, ctx.params.link_params, ctx.params.target, output_path)
+	ctx.module.print_link_result(ctx.stdout, link_result)
+	if not ctx.module.did_link_successfully(link_result):
 		return 1
 	if args.run:
 		if len(extra) > 0: extra = extra[1:] # Skip double dash (--)
-		builder.run([str(Path(link_result.output_path).resolve()), *extra], stdout=sys.stdout, stdin=sys.stdin, cwd=Path(link_result.output_path).parent, shell=False)
-	return builder.RunnableExecutable(link_result.output_path)
+		ctx.module.run([str(Path(link_result.output_path).resolve()), *extra], stdout=sys.stdout, stdin=sys.stdin, cwd=Path(link_result.output_path).parent, shell=False)
+	return ctx.module.RunnableExecutable(link_result.output_path)
 """
 
-def build(file, *, stdout=sys.stdout, scope={}):
-	scope.update({
-		"builder": __import__(__name__),
-		"params": DefaultBuildParams(scope),
-		"stdout": stdout,
-		"file": Path(file).resolve(),
-	})
+class BuildCtx:
+	def __init__(self, stdout, file):
+		self.module = __import__(__name__)
+		self.stdout = stdout
+		self.file = file
+		self.verbose = False
+
+	def run_build_runs(self, file):
+		process, _ = run_preprocessor('clang++', file)
+		runs = collect_build_runs(process.stdout.decode('utf-8', errors='ignore'))
+		for it in runs:
+			verbose(f'BUILD_RUN {it}')
+			# Inform Python about source code location. 
+			name = f'{it.file}: {it.line}'
+			lines = it.code.splitlines(True)
+			linecache.cache[name] = len(it.code), None, lines, name
+			code = compile(it.code, name, 'exec')
+			self.__GRD_BUILD_RUN_FILE__ = Path(it.file).resolve()
+			exec(code, { "ctx": self })
+			del self.__GRD_BUILD_RUN_FILE__
+
+def build(file, *, stdout=sys.stdout, ctx:BuildCtx=None):
+	if ctx is None:
+		ctx = BuildCtx(stdout, file)
+	ctx.verbose = VERBOSE
+	scope = { "ctx": ctx }
 	exec(DEFAULT_BUILD_MAIN, scope)
 	# BUILD_RUN's invoked by run_build_runs() may override DEFAULT_BUILD_MAIN's build_main().
-	scope['params'].run_build_runs(file)
+	ctx.run_build_runs(file)
 	return eval("build_main()", scope)
 
 def main():
@@ -538,7 +546,6 @@ def main():
 	args, _ = argparser.parse_known_args()
 	VERBOSE = args.verbose
 	res = build(args.file)
-	# print(f'Running BUILD_RUN macros took {BUILD_RUN_TIME:.2f} sec')
 	if isinstance(res, int):
 		return res
 	return 0

@@ -302,8 +302,9 @@ class CppTest(Test):
 	def build(self):
 		self.tester.print(f'Building: {self.path}')
 		stdout = StringIO()
-		scope = { "test": self }
-		res = builder.build(self.path, stdout=stdout, scope=scope)	
+		ctx=builder.BuildCtx(stdout, self.path)
+		ctx.test = self
+		res = builder.build(self.path, stdout=stdout, ctx=ctx)	
 		if isinstance(res, builder.RunnableExecutable):
 			self.exec_path = res.path
 			self.status = 'test_built'
