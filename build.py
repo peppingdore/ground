@@ -410,19 +410,8 @@ def run_preprocessor(compiler, path):
 	cmdline = ' '.join(args)
 	return run(cmdline)
 
-def run_build_runs(file, scope):
-	process, _ = run_preprocessor('clang++', file)
-	runs = collect_build_runs(process.stdout.decode('utf-8', errors='ignore'))
-	for it in runs:
-		verbose(f'BUILD_RUN {it}')
-		name = f'{it.file}: {it.line}'
-		lines = it.code.splitlines(True)
-		linecache.cache[name] = len(it.code), None, lines, name
-		code = compile(it.code, name, 'exec')
-		exec(code, scope)
-
 class DefaultBuildParams:
-	def __init__(self, *,
+	def __init__(self, build_run_scope, *,
 		units=[],
 		compile_params=CompilationParams(),
 		link_params=LinkParams(),
@@ -432,6 +421,7 @@ class DefaultBuildParams:
 		self.compile_params = compile_params
 		self.link_params = link_params
 		self.target = target
+		self.build_run_scope = build_run_scope
 
 	def set_target(self, target):
 		self.target = target
@@ -443,8 +433,22 @@ class DefaultBuildParams:
 		self.compile_params.compiler = compiler
 		self.link_params.compiler = compiler
 
+	def run_build_runs(self, file):
+		process, _ = run_preprocessor('clang++', file)
+		runs = collect_build_runs(process.stdout.decode('utf-8', errors='ignore'))
+		for it in runs:
+			verbose(f'BUILD_RUN {it}')
+			name = f'{it.file}: {it.line}'
+			lines = it.code.splitlines(True)
+			linecache.cache[name] = len(it.code), None, lines, name
+			code = compile(it.code, name, 'exec')
+			self.build_run_scope['__GRD_BUILD_RUN_FILE__'] = Path(it.file).resolve()
+			exec(code, self.build_run_scope)
+			del self.build_run_scope['__GRD_BUILD_RUN_FILE__']
+
+	# @TODO: write tests for this. 
 	def add_unit(self, unit):
-		run_build_runs(unit)
+		self.run_build_runs(unit)
 		self.units.append(unit)
 
 	def add_define(self, define):
@@ -517,13 +521,13 @@ def build_main():
 def build(file, *, stdout=sys.stdout, scope={}):
 	scope.update({
 		"builder": __import__(__name__),
-		"params": DefaultBuildParams(),
+		"params": DefaultBuildParams(scope),
 		"stdout": stdout,
 		"file": Path(file).resolve(),
 	})
 	exec(DEFAULT_BUILD_MAIN, scope)
 	# BUILD_RUN's invoked by run_build_runs() may override DEFAULT_BUILD_MAIN's build_main().
-	run_build_runs(file, scope)
+	scope['params'].run_build_runs(file)
 	return eval("build_main()", scope)
 
 def main():
