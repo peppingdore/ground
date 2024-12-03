@@ -322,7 +322,7 @@ def main():
 	builder.VERBOSE = ARGS.verbose
 	os.chdir(ARGS.path)
 	tester = Tester(Path('.'))
-	sys.modules['test_mod'] = tester
+	tester.add_path_filter(lambda x: 'third_party' in Path(x).parts)
 	return tester.run()
 
 if __name__ == "__main__":
