@@ -373,14 +373,14 @@ class BuildRun:
 def collect_build_runs(out):
 	res = []
 	import re
-	matches = re.findall(r"GRD_BUILD_RUN_ENTRY.*?=(.*?);.*?GRD_BUILD_RUN_FILE.*?=(.*?);.*?GRD_BUILD_RUN_LINE.*?=(.*?);", out, flags=re.MULTILINE)
+	matches = re.findall(r"GRD_BUILD_RUN_ENTRY.*?=(.*?);.*?GRD_BUILD_RUN_FILE.*?=(.*?);.*?GRD_BUILD_RUN_LINE.*?=(.*?);", out, flags=re.MULTILINE|re.S)
 	for it in matches:
 		if len(it) != 3:
 			raise Exception(f'build run expects 3 items, got {len(it)}, {it}')
 		code, file, line = it
 		code = code.strip()
 		if code.startswith('R"'):
-			match = re.search(r'^R"(.*?)\((.*)\)(.*?)"$', code).groups()
+			match = re.search(r'^R"(.*?)\((.*)\)(.*?)"$', code, flags=re.S).groups()
 			if len(match) != 3:
 				raise Exception(f'build run raw literal regex expects 3 items, got {len(match)}, {match}')
 			if match[0] != match[2]:
