@@ -6,3 +6,4 @@ single_file_compilation_tests
 .vscode
 *.pdb
 *.exe
+grd_cmake_build
