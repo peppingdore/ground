@@ -3,7 +3,7 @@
 #include "grd_format.h"
 #include "sync/grd_spinlock.h"
 #include "grd_code_location.h"
-#include "grd_callstack.h"
+#include "grd_stack_trace.h"
 
 // One of reason we could call panic() is fail of 
 //   heap allocator, so we have to have some way to allocate memory for error message.
@@ -69,8 +69,8 @@ inline void grd_panic(const char* file_name, int line_number, auto... args) {
 	// snprintf(buf, sizeof(buf), "%d", line_number);
 	// fwrite(buf, strlen(buf), 1, stderr);
 	grd_panic_write_string("\n");
-	auto cs = grd_get_callstack();
-	grd_print_callstack(cs, 1);
+	auto st = grd_get_stack_trace();
+	grd_print_stack_trace(st);
 	GrdDebugBreak();
 	exit(-1);
 }

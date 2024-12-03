@@ -44,7 +44,7 @@
  * Very fast non cryptographic hash
  */
 
-#include "../grd_base.h"
+#include "../../grd_base.h"
 
 #if defined(__GNUC__) || defined(__clang__)
 	#define SPOOKYHASH_RESTRICT __restrict__

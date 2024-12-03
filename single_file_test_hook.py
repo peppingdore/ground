@@ -8,7 +8,7 @@ CPP_CONTENT = '''
 #include "{testing_header}"
 #include "{file}"
 
-GRD_TEST(single_file_compilation) {{
+GRD_TEST_CASE(single_file_compilation) {{
 
 }}
 
