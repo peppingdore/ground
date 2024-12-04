@@ -21,6 +21,7 @@ def get_file_content_mtime(path: Path):
 	return mtime
 
 def build_cmake(ctx, root, *, track_paths=[]):
+	print(f"{Path(__file__).name}: building {root}")
 	root = Path(root)
 	name = root.name
 	if not name:
