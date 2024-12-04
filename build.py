@@ -113,19 +113,19 @@ DEFAULT_COMPILER = 'clang-cl' if platform.system() == 'Windows' else 'clang++'
 
 class CompilationParams:
 	def __init__(self, *,
-		compiler=DEFAULT_COMPILER,
-		target=native_target(),
-		defines=[],
-		include_dirs=[],
+		compiler=None,
+		target=None,
+		defines=None,
+		include_dirs=None,
 		optimization_level=0,
-		compiler_flags=DEFAULT_COMPILER_FLAGS,
+		compiler_flags=None,
 	):
-		self.compiler = compiler
-		self.target = target
-		self.defines = defines
-		self.include_dirs = include_dirs
+		self.compiler = compiler or DEFAULT_COMPILER
+		self.target = target or native_target()
+		self.defines = defines or []
+		self.include_dirs = include_dirs or []
 		self.optimization_level = optimization_level
-		self.compiler_flags = compiler_flags
+		self.compiler_flags = compiler_flags or DEFAULT_COMPILER_FLAGS
 
 def is_msvc_interface(compiler):
 	return compiler == 'cl' or compiler == 'clang-cl'
@@ -275,24 +275,24 @@ def did_all_units_compile_successfully(results):
 
 class LinkParams:
 	def __init__(self, *,
-		compiler=DEFAULT_COMPILER,
-		natvis_files=[],
-		libraries=[],
-		lib_directories=[],
-		apple_frameworks=[],
+		compiler=None,
+		natvis_files=None,
+		libraries=None,
+		lib_directories=None,
+		apple_frameworks=None,
 		use_windows_subsystem=False,
 		use_windows_static_crt=False,
-		flags = [],
+		flags = None,
 		use_windows_debug_crt=True,
 	):
-		self.compiler = compiler
-		self.natvis_files = natvis_files
-		self.libraries = libraries
-		self.lib_directories = lib_directories
-		self.apple_frameworks = apple_frameworks
+		self.compiler = compiler or DEFAULT_COMPILER
+		self.natvis_files = natvis_files or []
+		self.libraries = libraries or []
+		self.lib_directories = lib_directories or []
+		self.apple_frameworks = apple_frameworks or []
 		self.use_windows_subsystem = use_windows_subsystem
 		self.use_windows_static_crt = use_windows_static_crt
-		self.flags = flags
+		self.flags = flags or []
 		self.use_windows_debug_crt = use_windows_debug_crt
 
 class LinkResult:
@@ -412,15 +412,15 @@ def run_preprocessor(compiler, path):
 
 class DefaultBuildParams:
 	def __init__(self, ctx, *,
-		units=[],
-		compile_params=CompilationParams(),
-		link_params=LinkParams(),
-		target=native_target(),
+		units=None,
+		compile_params=None,
+		link_params=None,
+		target=None,
 	):
-		self.units = units.copy()
-		self.compile_params = compile_params
-		self.link_params = link_params
-		self.target = target
+		self.units = units or []
+		self.compile_params = compile_params or CompilationParams()
+		self.link_params = link_params or LinkParams()
+		self.target = target or native_target()
 		self.ctx = ctx
 
 	def set_target(self, target):
@@ -530,7 +530,8 @@ class BuildCtx:
 			exec(code, self.create_exec_scope())
 			self.file_stack.pop()
 
-def build(file, *, stdout=sys.stdout, ctx:BuildCtx=None):
+def build(file, *, stdout=None, ctx:BuildCtx=None):
+	stdout = stdout or sys.stdout
 	if ctx is None:
 		ctx = BuildCtx(stdout, file)
 	ctx.verbose = VERBOSE
