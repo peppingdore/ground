@@ -455,72 +455,66 @@ class RunnableExecutable:
 		self.path = path
 	def __str__(self):
 		return str(self.path)
-
-DEFAULT_BUILD_MAIN = """
-from pathlib import Path
-import sys
-import argparse
-
-ctx.params = ctx.module.DefaultBuildParams(ctx)
-
-def build_main():
-	ctx.params.units.append(__FILE__)
-
-	argparser = argparse.ArgumentParser()
-	argparser.add_argument('--run', '-r', action='store_true', help="Runs executable after successful compiling")
-	argparser.add_argument('--compiler')
-	argparser.add_argument('--opt_level', type=int, default=0, help="Optimization level")
-	argparser.add_argument('--arch')
-	argparser.add_argument('extra', nargs='*')
-	argparser.add_argument('--time_trace', action='store_true', help="Enables compile time tracing")
-	argparser.add_argument('--time_trace_high_granularity', action='store_true', help="Enables compile time tracing with high granularity")
-	args, extra = argparser.parse_known_args()
-
-	target = ctx.module.native_target()
-
-	if args.compiler:
-		ctx.params.set_compiler(args.compiler)
-	if args.arch:
-		target = ctx.module.Target(target.os, args.arch)
-	if args.time_trace or args.time_trace_high_granularity:
-		ctx.params.compile_params.compiler_flags.append(ctx.module.COMPILE_TIME_TRACE)
-	if args.time_trace_high_granularity:
-		ctx.params.compile_params.compiler_flags.append(ctx.module.COMPILE_TIME_TRACE_HIGH_GRANULARITY)
 	
-	ctx.params.set_target(target)
-	ctx.params.set_optimization_level(args.opt_level)
-	ctx.params.add_natvis_file(ctx.module.MODULE_ROOT / "grd.natvis")
-
-	compile_results = ctx.module.compile_units_parallel(ctx.params.units, ctx.params.compile_params, ctx.params.target)
-	ctx.module.print_compile_results(ctx.stdout, compile_results)
-	if not ctx.module.did_all_units_compile_successfully(compile_results):
-		return 1
-	output_path = Path(__FILE__).parent / "built" / ctx.module.build_exec_name(str(Path(__FILE__).stem))
-	link_result = ctx.module.link(compile_results, ctx.params.link_params, ctx.params.target, output_path)
-	ctx.module.print_link_result(ctx.stdout, link_result)
-	if not ctx.module.did_link_successfully(link_result):
-		return 1
-	if args.run:
-		if len(extra) > 0: extra = extra[1:] # Skip double dash (--)
-		ctx.module.run([str(Path(link_result.output_path).resolve()), *extra], stdout=sys.stdout, stdin=sys.stdin, cwd=Path(link_result.output_path).parent, shell=False)
-	return ctx.module.RunnableExecutable(link_result.output_path)
-"""
-
 class BuildCtx:
 	def __init__(self, stdout, file):
 		self.module = __import__(__name__)
 		self.stdout = stdout
 		self.file_stack = [file]
 		self.verbose = False
+		self.params = DefaultBuildParams(self)
+
+	@property
+	def root(self):
+		return self.file_stack[0]
+
+	@property
+	def file(self):
+		return self.file_stack[-1]
+
+	def build(self):
+		self.params.units.append(self.root)
+		argparser = argparse.ArgumentParser()
+		argparser.add_argument('--run', '-r', action='store_true', help="Runs executable after successful compiling")
+		argparser.add_argument('--compiler')
+		argparser.add_argument('--opt_level', type=int, default=0, help="Optimization level")
+		argparser.add_argument('--arch')
+		argparser.add_argument('extra', nargs='*')
+		argparser.add_argument('--time_trace', action='store_true', help="Enables compile time tracing")
+		argparser.add_argument('--time_trace_high_granularity', action='store_true', help="Enables compile time tracing with high granularity")
+		args, extra = argparser.parse_known_args()
+
+		target = native_target()
+
+		if args.compiler:
+			self.params.set_compiler(args.compiler)
+		if args.arch:
+			target = Target(target.os, args.arch)
+		if args.time_trace or args.time_trace_high_granularity:
+			self.params.compile_params.compiler_flags.append(COMPILE_TIME_TRACE)
+		if args.time_trace_high_granularity:
+			self.params.compile_params.compiler_flags.append(COMPILE_TIME_TRACE_HIGH_GRANULARITY)
+
+		self.params.set_target(target)
+		self.params.set_optimization_level(args.opt_level)
+		self.params.add_natvis_file(MODULE_ROOT / "grd.natvis")
+
+		compile_results = compile_units_parallel(self.params.units, self.params.compile_params, self.params.target)
+		print_compile_results(self.stdout, compile_results)
+		if not did_all_units_compile_successfully(compile_results):
+			return 1
+		output_path = Path(self.root).parent / "built" / build_exec_name(str(Path(self.root).stem))
+		link_result = link(compile_results, self.params.link_params, self.params.target, output_path)
+		print_link_result(self.stdout, link_result)
+		if not did_link_successfully(link_result):
+			return 1
+		if args.run:
+			if len(extra) > 0: extra = extra[1:] # Skip double dash (--)
+			run([str(Path(link_result.output_path).resolve()), *extra], stdout=sys.stdout, stdin=sys.stdin, cwd=Path(link_result.output_path).parent, shell=False)
+		return RunnableExecutable(link_result.output_path)
 
 	def create_exec_scope(self):
 		return { 'ctx': self, '__FILE__': self.file_stack[-1] }
-
-	def exec(self, file, code):
-		self.file_stack.append(Path(file).resolve())
-		res = exec(code, self.create_exec_scope())
-		self.file_stack.pop()
-		return res
 
 	def run_build_runs(self, file):
 		process, _ = run_preprocessor('clang++', file)
@@ -533,7 +527,7 @@ class BuildCtx:
 			linecache.cache[name] = len(it.code), None, lines, name
 			code = compile(it.code, name, 'exec')
 			self.file_stack.append(Path(it.file).resolve())
-			exec(code, { "ctx": self, "__FILE__": self.file_stack[-1] })
+			exec(code, self.create_exec_scope())
 			self.file_stack.pop()
 
 def build(file, *, stdout=sys.stdout, ctx:BuildCtx=None):
@@ -542,10 +536,9 @@ def build(file, *, stdout=sys.stdout, ctx:BuildCtx=None):
 	ctx.verbose = VERBOSE
 	ctx.file_stack.append(Path(file).resolve())
 	scope = ctx.create_exec_scope()
-	exec(DEFAULT_BUILD_MAIN, scope)
-	# BUILD_RUN's invoked by run_build_runs() may override DEFAULT_BUILD_MAIN's build_main().
+	# this may override ctx.build()
 	ctx.run_build_runs(file)
-	return eval("build_main()", scope)
+	return eval("ctx.build()", scope)
 
 def main():
 	global VERBOSE
