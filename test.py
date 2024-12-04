@@ -78,7 +78,8 @@ class Tester:
 		self.verbose(f"Scanning and running hooks in {dir}")
 		for it in os.scandir(dir):
 			if it.is_dir():
-				self.scan_and_load_hooks(it.path)
+				if not it.name.startswith('.'):
+					self.scan_and_load_hooks(it.path)
 				continue
 			if it.name.lower().endswith("_test_hook.py"):
 				self.load_hook(it.path)
