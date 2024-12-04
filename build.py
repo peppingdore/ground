@@ -433,7 +433,6 @@ class DefaultBuildParams:
 		self.compile_params.compiler = compiler
 		self.link_params.compiler = compiler
 
-	# @TODO: write tests for this. 
 	def add_unit(self, unit):
 		self.ctx.run_build_runs(unit)
 		self.units.append(unit)
@@ -465,7 +464,7 @@ import argparse
 ctx.params = ctx.module.DefaultBuildParams(ctx)
 
 def build_main():
-	ctx.params.units.append(ctx.file)
+	ctx.params.units.append(__FILE__)
 
 	argparser = argparse.ArgumentParser()
 	argparser.add_argument('--run', '-r', action='store_true', help="Runs executable after successful compiling")
@@ -496,7 +495,7 @@ def build_main():
 	ctx.module.print_compile_results(ctx.stdout, compile_results)
 	if not ctx.module.did_all_units_compile_successfully(compile_results):
 		return 1
-	output_path = Path(ctx.file).parent / "built" / ctx.module.build_exec_name(str(Path(ctx.file).stem))
+	output_path = Path(__FILE__).parent / "built" / ctx.module.build_exec_name(str(Path(__FILE__).stem))
 	link_result = ctx.module.link(compile_results, ctx.params.link_params, ctx.params.target, output_path)
 	ctx.module.print_link_result(ctx.stdout, link_result)
 	if not ctx.module.did_link_successfully(link_result):
@@ -511,8 +510,17 @@ class BuildCtx:
 	def __init__(self, stdout, file):
 		self.module = __import__(__name__)
 		self.stdout = stdout
-		self.file = file
+		self.file_stack = [file]
 		self.verbose = False
+
+	def create_exec_scope(self):
+		return { 'ctx': self, '__FILE__': self.file_stack[-1] }
+
+	def exec(self, file, code):
+		self.file_stack.append(Path(file).resolve())
+		res = exec(code, self.create_exec_scope())
+		self.file_stack.pop()
+		return res
 
 	def run_build_runs(self, file):
 		process, _ = run_preprocessor('clang++', file)
@@ -524,15 +532,16 @@ class BuildCtx:
 			lines = it.code.splitlines(True)
 			linecache.cache[name] = len(it.code), None, lines, name
 			code = compile(it.code, name, 'exec')
-			self.__GRD_BUILD_RUN_FILE__ = Path(it.file).resolve()
-			exec(code, { "ctx": self })
-			del self.__GRD_BUILD_RUN_FILE__
+			self.file_stack.append(Path(it.file).resolve())
+			exec(code, { "ctx": self, "__FILE__": self.file_stack[-1] })
+			self.file_stack.pop()
 
 def build(file, *, stdout=sys.stdout, ctx:BuildCtx=None):
 	if ctx is None:
 		ctx = BuildCtx(stdout, file)
 	ctx.verbose = VERBOSE
-	scope = { "ctx": ctx }
+	ctx.file_stack.append(Path(file).resolve())
+	scope = ctx.create_exec_scope()
 	exec(DEFAULT_BUILD_MAIN, scope)
 	# BUILD_RUN's invoked by run_build_runs() may override DEFAULT_BUILD_MAIN's build_main().
 	ctx.run_build_runs(file)
