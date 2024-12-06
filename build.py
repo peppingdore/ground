@@ -10,6 +10,7 @@ from pathlib import Path
 from collections import namedtuple
 import linecache
 from multiprocessing.pool import ThreadPool
+from enum import Enum
 
 MODULE_ROOT = Path(__file__).parent
 
@@ -60,6 +61,12 @@ ARCH_X64   = "x64"
 
 Target = namedtuple("Target", "os arch")
 
+def is_os_apple(os):
+	return os in [OS_MACOS, OS_IOS]
+
+def is_os_linux(os):
+	return os in [OS_LINUX, OS_ANDROID]
+
 def parse_arch(arch):
 	arch = arch.lower()
 	if arch in ['x86_64', 'amd64']:  return ARCH_X64
@@ -94,11 +101,6 @@ def make_target_triplet(target):
 		return f'{arch_to_compiler_arch(target.arch)}-apple-darwin-macho'
 	if is_linux(target.os):
 		return f'{arch_to_compiler_arch(target.arch)}-linux-gnu'
-
-def build_exec_name(name, *, os=native_os()):
-	if os == OS_WINDOWS: return f'{name}.exe'
-	if is_darwin(os):    return f'{name}.app'
-	return name
 
 def is_darwin(os):
 	return os in [OS_MACOS, OS_IOS]
@@ -217,15 +219,15 @@ def compile_unit(unit, params, target, out_path=None):
 	return CompileResult(unit, process, elapsed, target, out_path)
 
 def compile_units_parallel(units, params, target):
-	results = []
 	def proc(unit):
 		res = compile_unit(unit, params, target)
-		results.append(res)
+		return res
 	pool = ThreadPool()
 	res = pool.map_async(proc, units)
 	while True:
 		if res.ready(): break
 		time.sleep(0.1)
+	results = res.get()
 	return results
 
 def did_all_units_compile_successfully(results):
@@ -273,11 +275,18 @@ def did_all_units_compile_successfully(results):
 # 		arr.extend(["UIKit"])
 # 	return arr
 
+class LinkOutputKind(Enum):
+	Executable = 1,
+	StaticLibrary = 2,
+	DynamicLibrary = 3,
+
 class LinkParams:
 	def __init__(self, *,
 		compiler=None,
 		natvis_files=None,
+		output_kind=LinkOutputKind.Executable,
 		libraries=None,
+		static_libraries=None,
 		lib_directories=None,
 		apple_frameworks=None,
 		use_windows_subsystem=False,
@@ -287,32 +296,46 @@ class LinkParams:
 	):
 		self.compiler = compiler or DEFAULT_COMPILER
 		self.natvis_files = natvis_files or []
+		self.output_kind = output_kind
 		self.libraries = libraries or []
+		self.static_libraries = static_libraries or []
 		self.lib_directories = lib_directories or []
 		self.apple_frameworks = apple_frameworks or []
 		self.use_windows_subsystem = use_windows_subsystem
 		self.use_windows_static_crt = use_windows_static_crt
 		self.flags = flags or []
 		self.use_windows_debug_crt = use_windows_debug_crt
-
+	
 class LinkResult:
 	def __init__(self, process, elapsed, output_path):
 		self.process = process
 		self.elapsed = elapsed
 		self.output_path = output_path
 
+def get_binary_ext(kind, os=native_os()):
+	if kind == LinkOutputKind.Executable and os == OS_WINDOWS: return '.exe'
+	if kind == LinkOutputKind.Executable: return ''
+	if kind == LinkOutputKind.StaticLibrary and os == OS_WINDOWS: return '.lib'
+	if kind == LinkOutputKind.StaticLibrary: return '.a'
+	if kind == LinkOutputKind.DynamicLibrary and os == OS_WINDOWS: return '.dll'
+	if kind == LinkOutputKind.DynamicLibrary and is_os_apple(os): return '.dylib'
+	if kind == LinkOutputKind.DynamicLibrary and is_os_linux(os): return '.so'
+	raise Exception(f'Unknown output kind {kind}')
+
 def link(objects, params, target, output_path):
 	os.makedirs(Path(output_path).parent, exist_ok=True)
 	args = []
 	args.append(params.compiler)
-	if VERBOSE:
-		args.append('/clang:-v' if is_msvc_interface(params.compiler) else '-v')
 	for it in objects:
 		x = it
 		if isinstance(x, CompileResult):
 			x = x.out_path
 		args.append(x)
+	for it in params.static_libraries:
+		args.append(it)
 	prefix = '/clang:' if is_msvc_interface(params.compiler) else ""
+	if VERBOSE:
+		args.append(f'{prefix}-v')
 	if params.compiler != 'cl':
 		args.append(f'{prefix}--target={make_target_triplet(target)}')
 	args.append(f'{prefix}--output="{output_path}"')
@@ -325,18 +348,29 @@ def link(objects, params, target, output_path):
 		args.append(f'-framework {it}')
 	args.append(f'{prefix}-g') # do not strip away debug info.
 	args.extend(params.flags)
+	if params.output_kind == LinkOutputKind.DynamicLibrary:
+		args.append(f'{prefix}-shared')
+	elif params.output_kind == LinkOutputKind.StaticLibrary:
+		args.append(f'{prefix}-static')
+		if is_msvc_interface(params.compiler):
+			args.append(f'{prefix}-fuse-ld=llvm-lib')
+	elif params.output_kind == LinkOutputKind.Executable:
+		pass
+	else:
+		raise Exception(f'Unknown output kind {params.output_kind}')
 	if is_msvc_interface(params.compiler):
 		args.append(f'/M{"T" if params.use_windows_static_crt else "D"}{"d" if params.use_windows_debug_crt else ""}')
-		args.append('/link') # Rest of |args| is passed to linker.
-		args.append('/INCREMENTAL:NO')
-		args.append('/PDBTMCACHE:NO')
-		for it in params.lib_directories:
-			args.append(f'/LIBPATH:"{it}"')
-		if params.use_windows_subsystem:
-			args.append('/ENTRY:mainCRTStartup')
-			args.append('/SUBSYSTEM:WINDOWS')
-		for it in params.natvis_files:
-			args.append(f'/NATVIS:"{it}"')
+		if params.output_kind != LinkOutputKind.StaticLibrary:
+			args.append('/link') # Rest of |args| is passed to linker.
+			args.append('/INCREMENTAL:NO')
+			args.append('/PDBTMCACHE:NO')
+			for it in params.lib_directories:
+				args.append(f'/LIBPATH:"{it}"')
+			if params.use_windows_subsystem:
+				args.append('/ENTRY:mainCRTStartup')
+				args.append('/SUBSYSTEM:WINDOWS')
+			for it in params.natvis_files:
+				args.append(f'/NATVIS:"{it}"')
 	verbose(args)
 	cmdline = ' '.join(str(it) for it in args)
 	process, elapsed = run(cmdline)
@@ -444,25 +478,48 @@ class DefaultBuildParams:
 		self.compile_params.include_dirs.append(dir)
 
 	def add_lib(self, lib):
+		if str(lib).endswith('.a') or str(lib).endswith('.lib'):
+			lib = Path(lib).resolve()
+			if not lib in self.link_params.static_libraries:
+				self.link_params.static_libraries.append(lib)
+			return
 		if lib in self.link_params.libraries: return
 		self.link_params.libraries.append(lib)
 
 	def add_natvis_file(self, file):
 		self.link_params.natvis_files.append(file)
 
-class RunnableExecutable:
+class OutputBinary:
 	def __init__(self, path):
 		self.path = path
 	def __str__(self):
 		return str(self.path)
 	
 class BuildCtx:
-	def __init__(self, stdout, file):
+	def __init__(self, file, stdout=None):
 		self.module = __import__(__name__)
-		self.stdout = stdout
-		self.file_stack = [file]
-		self.verbose = False
+		self.stdout = stdout or sys.stdout
+		self.file_stack = [Path(file).resolve()]
+		self.VERBOSE = False
 		self.params = DefaultBuildParams(self)
+		self.pre_compile_hooks = []
+		self.pre_link_hooks = []
+		self.run_build_runs(file)
+
+	# You may want to use this hooks, to postpone some actions,
+	#   that may, for example, depend on args parsed at the start of ctx.build()
+	def add_pre_compile_hook(self, hook):
+		self.pre_compile_hooks.append(hook)
+	def add_pre_link_hook(self, hook):
+		self.pre_link_hooks.append(hook)
+	def run_pre_compile_hooks(self):
+		for it in self.pre_compile_hooks: it(self)
+	def run_pre_link_hooks(self):
+		for it in self.pre_link_hooks: it(self)
+
+	def verbose(self, *args):
+		if self.VERBOSE:
+			print(*args)
 
 	@property
 	def root(self):
@@ -471,47 +528,11 @@ class BuildCtx:
 	@property
 	def file(self):
 		return self.file_stack[-1]
-
-	def build(self):
-		self.params.units.append(self.root)
-		argparser = argparse.ArgumentParser()
-		argparser.add_argument('--run', '-r', action='store_true', help="Runs executable after successful compiling")
-		argparser.add_argument('--compiler')
-		argparser.add_argument('--opt_level', type=int, default=0, help="Optimization level")
-		argparser.add_argument('--arch')
-		argparser.add_argument('extra', nargs='*')
-		argparser.add_argument('--time_trace', action='store_true', help="Enables compile time tracing")
-		argparser.add_argument('--time_trace_high_granularity', action='store_true', help="Enables compile time tracing with high granularity")
-		args, extra = argparser.parse_known_args()
-
-		target = native_target()
-
-		if args.compiler:
-			self.params.set_compiler(args.compiler)
-		if args.arch:
-			target = Target(target.os, args.arch)
-		if args.time_trace or args.time_trace_high_granularity:
-			self.params.compile_params.compiler_flags.append(COMPILE_TIME_TRACE)
-		if args.time_trace_high_granularity:
-			self.params.compile_params.compiler_flags.append(COMPILE_TIME_TRACE_HIGH_GRANULARITY)
-
-		self.params.set_target(target)
-		self.params.set_optimization_level(args.opt_level)
-		self.params.add_natvis_file(MODULE_ROOT / "grd.natvis")
-
-		compile_results = compile_units_parallel(self.params.units, self.params.compile_params, self.params.target)
-		print_compile_results(self.stdout, compile_results)
-		if not did_all_units_compile_successfully(compile_results):
-			return 1
-		output_path = Path(self.root).parent / "built" / build_exec_name(str(Path(self.root).stem))
-		link_result = link(compile_results, self.params.link_params, self.params.target, output_path)
-		print_link_result(self.stdout, link_result)
-		if not did_link_successfully(link_result):
-			return 1
-		if args.run:
-			if len(extra) > 0: extra = extra[1:] # Skip double dash (--)
-			run([str(Path(link_result.output_path).resolve()), *extra], stdout=sys.stdout, stdin=sys.stdin, cwd=Path(link_result.output_path).parent, shell=False)
-		return RunnableExecutable(link_result.output_path)
+	
+	def set_build_main(self, build_main):
+		if hasattr(self, 'build_main'): raise Exception("BuildCtx: set_build_main() was already called")
+		# setattr(self, 'build_main', build_main)
+		self.build_main = build_main
 
 	def create_exec_scope(self):
 		return { 'ctx': self, '__FILE__': self.file_stack[-1] }
@@ -530,16 +551,69 @@ class BuildCtx:
 			exec(code, self.create_exec_scope())
 			self.file_stack.pop()
 
-def build(file, *, stdout=None, ctx:BuildCtx=None):
-	stdout = stdout or sys.stdout
-	if ctx is None:
-		ctx = BuildCtx(stdout, file)
-	ctx.verbose = VERBOSE
-	ctx.file_stack.append(Path(file).resolve())
-	scope = ctx.create_exec_scope()
-	# this may override ctx.build()
-	ctx.run_build_runs(file)
-	return eval("ctx.build()", scope)
+	def build(self):
+		scope = self.create_exec_scope()
+		if not hasattr(self, 'build_main'): self.set_build_main(default_build_main)
+		return eval("ctx.build_main(ctx)", scope)
+	
+	def is_ok(self, build_res):
+		if isinstance(build_res, OutputBinary):
+			return True
+		if build_res == 0:
+			return True
+		return False
+
+def default_build_main(self):
+	self.params.units.append(self.root)
+	argparser = argparse.ArgumentParser()
+	argparser.add_argument('--run', '-r', action='store_true', help="Runs executable after successful compiling")
+	argparser.add_argument('--compiler')
+	argparser.add_argument('--opt_level', type=int, default=0, help="Optimization level")
+	argparser.add_argument('--arch')
+	argparser.add_argument('extra', nargs='*')
+	argparser.add_argument('--time_trace', action='store_true', help="Enables compile time tracing")
+	argparser.add_argument('--time_trace_high_granularity', action='store_true', help="Enables compile time tracing with high granularity")
+	args, extra = argparser.parse_known_args()
+
+	target = native_target()
+
+	if args.compiler:
+		self.params.set_compiler(args.compiler)
+	if args.arch:
+		target = Target(target.os, args.arch)
+	if args.time_trace or args.time_trace_high_granularity:
+		self.params.compile_params.compiler_flags.append(COMPILE_TIME_TRACE)
+	if args.time_trace_high_granularity:
+		self.params.compile_params.compiler_flags.append(COMPILE_TIME_TRACE_HIGH_GRANULARITY)
+
+	self.params.set_target(target)
+	self.params.set_optimization_level(args.opt_level)
+	self.params.add_natvis_file(MODULE_ROOT / "grd.natvis")
+	
+	self.run_pre_compile_hooks()
+	self.params.add_define(('GRD_BUILD_COMPILING', 1))
+
+	compile_results = compile_units_parallel(self.params.units, self.params.compile_params, self.params.target)
+	print_compile_results(self.stdout, compile_results)
+	if not did_all_units_compile_successfully(compile_results):
+		return 1
+	output_path = Path(self.root).parent / "built" / f'{str(Path(self.root).stem)}{get_binary_ext(self.params.link_params.output_kind)}'
+	
+	self.run_pre_link_hooks()
+
+	link_result = link(compile_results, self.params.link_params, self.params.target, output_path)
+	print_link_result(self.stdout, link_result)
+	if not did_link_successfully(link_result):
+		return 1
+	if args.run:
+		if len(extra) > 0: extra = extra[1:] # Skip double dash (--)
+		run([str(Path(link_result.output_path).resolve()), *extra], stdout=sys.stdout, stdin=sys.stdin, cwd=Path(link_result.output_path).parent, shell=False)
+	return OutputBinary(link_result.output_path)
+
+def build_file(file, *, stdout=None):
+	ctx = BuildCtx(file, stdout=stdout or sys.stdout)
+	ctx.VERBOSE = VERBOSE
+	return ctx.build()
 
 def main():
 	global VERBOSE
@@ -548,10 +622,8 @@ def main():
 	argparser.add_argument('--verbose', '-v', action='store_true')
 	args, _ = argparser.parse_known_args()
 	VERBOSE = args.verbose
-	res = build(args.file)
-	if isinstance(res, int):
-		return res
-	return 0
+	res = build_file(args.file)
+	return res if isinstance(res, int) else 0
 
 if __name__ == "__main__":
 	exit(main())

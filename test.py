@@ -307,10 +307,10 @@ class CppTest(Test):
 		ctx.test = self
 		res = None
 		try:
-			res = builder.build(self.path, stdout=stdout, ctx=ctx)
+			res = ctx.build()
 		except Exception as e:
 			self.tester.verbose(f'Failed to build: {self.path}\n{e}')
-		if isinstance(res, builder.RunnableExecutable):
+		if isinstance(res, builder.OutputBinary):
 			self.exec_path = res.path
 			self.status = 'test_built'
 		else:
