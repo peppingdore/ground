@@ -35,7 +35,8 @@ def need_to_build(name):
 	args, _ = parser.parse_known_args()
 	return args.subprojects != "none" and (args.subprojects == "all" or (name in args.subprojects.split(',')))
 
-def cmake(ctx, root, *, build_type=None, callback=None):
+def cmake(ctx, root, *, opts=None, build_type=None, callback=None):
+	opts = opts or []
 	def build_hook(ctx):
 		nonlocal root
 		nonlocal build_type
@@ -53,7 +54,7 @@ def cmake(ctx, root, *, build_type=None, callback=None):
 		if args.subprojects != "none" and (args.subprojects == "all" or (name in args.subprojects.split(','))):
 			print(f"{Path(__file__).name}: building {root}\n{Path(__file__).name}: build type: {build_type}")
 			os.makedirs(build, exist_ok=True)
-			subprocess.check_call(["cmake", f"-DCMAKE_BUILD_TYPE={build_type}", ".", f"-B{build.resolve()}"], cwd=root)
+			subprocess.check_call(["cmake", *opts, "-DCMAKE_CXX_STANDARD=23", f"-DCMAKE_BUILD_TYPE={build_type}", ".", f"-B{build.resolve()}"], cwd=root)
 			subprocess.check_call(["cmake",  "--build", str(build.resolve()), f'--config {build_type}'], cwd=root)
 			did_build = True
 		if callback:
