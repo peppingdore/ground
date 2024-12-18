@@ -121,6 +121,8 @@ class CompilationParams:
 		include_dirs=None,
 		optimization_level=0,
 		compiler_flags=None,
+		use_windows_static_crt=False,
+		use_windows_debug_crt=True,
 	):
 		self.compiler = compiler or DEFAULT_COMPILER
 		self.target = target or native_target()
@@ -128,6 +130,8 @@ class CompilationParams:
 		self.include_dirs = include_dirs or []
 		self.optimization_level = optimization_level
 		self.compiler_flags = compiler_flags or DEFAULT_COMPILER_FLAGS
+		self.use_windows_static_crt = use_windows_static_crt
+		self.use_windows_debug_crt = use_windows_debug_crt
 
 def is_msvc_interface(compiler):
 	return compiler == 'cl' or compiler == 'clang-cl'
@@ -196,8 +200,12 @@ def build_compile_cmdline(unit, params, target, out_path):
 		if params.optimization_level == 3: args.append('/O2ix')
 	else:
 		args.append(f'-O{params.optimization_level}')
+	if params.compiler != 'cl':
+		args.append(("/clang:" if is_msvc_interface(params.compiler) else "") + "-fvisibility=internal")
 	for it in params.compiler_flags:
 		args.append(resolve_compiler_flag(it, params.compiler))
+	if is_msvc_interface(params.compiler):
+		args.append(f'/M{"T" if params.use_windows_static_crt else "D"}{"d" if params.use_windows_debug_crt else ""}')
 	args.append(unit)
 	verbose(args)
 	return ' '.join(map(str, args))
@@ -290,9 +298,7 @@ class LinkParams:
 		lib_directories=None,
 		apple_frameworks=None,
 		use_windows_subsystem=False,
-		use_windows_static_crt=False,
 		flags = None,
-		use_windows_debug_crt=True,
 	):
 		self.compiler = compiler or DEFAULT_COMPILER
 		self.natvis_files = natvis_files or []
@@ -302,9 +308,7 @@ class LinkParams:
 		self.lib_directories = lib_directories or []
 		self.apple_frameworks = apple_frameworks or []
 		self.use_windows_subsystem = use_windows_subsystem
-		self.use_windows_static_crt = use_windows_static_crt
 		self.flags = flags or []
-		self.use_windows_debug_crt = use_windows_debug_crt
 	
 class LinkResult:
 	def __init__(self, process, elapsed, output_path):
@@ -359,7 +363,7 @@ def link(objects, params, target, output_path):
 	else:
 		raise Exception(f'Unknown output kind {params.output_kind}')
 	if is_msvc_interface(params.compiler):
-		args.append(f'/M{"T" if params.use_windows_static_crt else "D"}{"d" if params.use_windows_debug_crt else ""}')
+		# args.append(f'/M{"T" if params.use_windows_static_crt else "D"}{"d" if params.use_windows_debug_crt else ""}')
 		if params.output_kind != LinkOutputKind.StaticLibrary:
 			args.append('/link') # Rest of |args| is passed to linker.
 			args.append('/INCREMENTAL:NO')
@@ -562,6 +566,9 @@ class BuildCtx:
 		if build_res == 0:
 			return True
 		return False
+	
+def get_binary_path(file, output_kind):
+	return file.parent / "built" / f'{str(Path(file).stem)}{get_binary_ext(output_kind)}'
 
 def default_build_main(self):
 	self.params.units.append(self.root)
@@ -597,7 +604,7 @@ def default_build_main(self):
 	print_compile_results(self.stdout, compile_results)
 	if not did_all_units_compile_successfully(compile_results):
 		return 1
-	output_path = Path(self.root).parent / "built" / f'{str(Path(self.root).stem)}{get_binary_ext(self.params.link_params.output_kind)}'
+	output_path = get_binary_path(self.root, self.params.link_params.output_kind)
 	
 	self.run_pre_link_hooks()
 
