@@ -4,25 +4,55 @@
 #include "grd_span.h"
 #include "grd_range.h"
 
-void grd_quick_sort(auto arr, s64 start, s64 end, auto less, auto swap) {
+GRD_API void grd_quick_sort(void* data, s64 start, s64 end, bool (*less)(void*, s64, s64), void (*swap)(void*, s64, s64)) {
 	if ((end - start) < 2) {
 		return;
 	}
 	s64 left = start;
 	s64 right = end - 1;
 	s64 pivot_index = (left) + (end - left) / 2;
-	swap(arr, right, pivot_index);
+	swap(data, right, pivot_index);
 	
 	for (auto i: grd_range_from_to(start, end)) {
-		if (less(arr, i, right)) { 
-			swap(arr, i, left);
+		if (less(data, i, right)) { 
+			swap(data, i, left);
 			left += 1;
 		}
 	}
-	swap(arr, left, right);
+	swap(data, left, right);
 
-	grd_quick_sort(arr, start, left, less, swap);
-	grd_quick_sort(arr, left + 1, end, less, swap);
+	grd_quick_sort(data, start, left, less, swap);
+	grd_quick_sort(data, left + 1, end, less, swap);
+}
+
+GRD_API bool grd_is_sorted(void* data, s64 start, s64 length, bool (*less)(void*, s64, s64)) {
+	for (auto i: grd_range(length - 1)) {
+		if (less(data, i + 1, i)) {
+			return false;
+		}
+	}
+	return true;
+}
+
+void grd_quick_sort(auto arr, s64 start, s64 end, auto less, auto swap) {
+	struct Data {
+		decltype(arr)&  arr;
+		decltype(less)& less;
+		decltype(swap)& swap;
+	} data = {
+		arr, less, swap
+	};
+
+	grd_quick_sort(&data, start, end,
+		[](void* uncasted, s64 a, s64 b) {
+			auto data = (Data*)uncasted;
+			return data->less(data->arr, a, b);
+		},
+		[](void* uncasted, s64 a, s64 b) {
+			auto data = (Data*)uncasted;
+			data->swap(data->arr, a, b);
+		}
+	);
 }
 
 void grd_sort(auto arr, auto less, auto swap) {
@@ -46,12 +76,19 @@ void grd_sort(auto arr) {
 }
 
 bool grd_is_sorted(auto arr, s64 start, s64 length, auto less) {
-	for (auto i: grd_range(length - 1)) {
-		if (less(arr, i + 1, i)) {
-			return false;
+	struct Data {
+		decltype(arr)&  arr;
+		decltype(less)& less;
+	} data = {
+		arr, less
+	};
+
+	return grd_is_sorted(&data, start, length,
+		[](void* uncasted, s64 a, s64 b) {
+			auto data = (Data*)uncasted;
+			return data->less(data->arr, a, b);
 		}
-	}
-	return true;
+	);
 }
 
 bool grd_is_sorted(auto arr, auto less) {

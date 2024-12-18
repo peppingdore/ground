@@ -51,6 +51,8 @@
 	#define GrdDebugBreak() __builtin_debugtrap()
 #endif
 
+#define GRD_API extern "C" inline 
+
 #define GRD_STRINGIFY(x) #x
 #define GRD_TOSTRING(x) GRD_STRINGIFY(x)
 #define GRD_CONCAT_INTERNAL(x,y) x##y
