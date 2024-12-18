@@ -1,9 +1,9 @@
 #pragma once
 
-#include "grd_testing.h"
-#include "grd_array.h"
-#include "grd_sort.h"
-#include "grd_format.h"
+#include "../grd_testing.h"
+#include "../grd_array.h"
+#include "../grd_sort.h"
+#include "../grd_format.h"
 
 GRD_TEST_CASE(sort) {
 	GrdArray<s64> arr;
