@@ -1,3 +1,6 @@
+#if 0
+	`dirname "$0"`/../build.sh $0 $@; exit
+#endif
 #pragma once
 
 #include "../grd_testing.h"

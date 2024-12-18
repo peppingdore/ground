@@ -43,12 +43,12 @@ void grd_quick_sort(auto arr, s64 start, s64 end, auto less, auto swap) {
 		arr, less, swap
 	};
 
-	grd_quick_sort(&data, start, end,
-		[](void* uncasted, s64 a, s64 b) {
+	grd_quick_sort((void*) &data, start, end,
+		+[](void* uncasted, s64 a, s64 b) {
 			auto data = (Data*)uncasted;
 			return data->less(data->arr, a, b);
 		},
-		[](void* uncasted, s64 a, s64 b) {
+		+[](void* uncasted, s64 a, s64 b) {
 			auto data = (Data*)uncasted;
 			data->swap(data->arr, a, b);
 		}
@@ -83,8 +83,8 @@ bool grd_is_sorted(auto arr, s64 start, s64 length, auto less) {
 		arr, less
 	};
 
-	return grd_is_sorted(&data, start, length,
-		[](void* uncasted, s64 a, s64 b) {
+	return grd_is_sorted((void*) &data, start, length,
+		+[](void* uncasted, s64 a, s64 b) {
 			auto data = (Data*)uncasted;
 			return data->less(data->arr, a, b);
 		}
