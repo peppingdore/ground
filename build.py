@@ -379,6 +379,8 @@ def link(objects, params, target, output_path):
 				args.append('/SUBSYSTEM:WINDOWS')
 			for it in params.natvis_files:
 				args.append(f'/NATVIS:"{it}"')
+	if not is_msvc_interface(params.compiler):
+		args.append('-fuse-ld=lld')
 	verbose(args)
 	cmdline = ' '.join(str(it) for it in args)
 	process, elapsed = run(cmdline)
