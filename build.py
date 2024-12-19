@@ -507,12 +507,6 @@ class DefaultBuildParams:
 	def add_natvis_file(self, file):
 		self.link_params.natvis_files.append(file)
 
-class OutputBinary:
-	def __init__(self, path):
-		self.path = path
-	def __str__(self):
-		return str(self.path)
-	
 class BuildCtx:
 	def __init__(self, file, stdout=None):
 		self.module = __import__(__name__)
@@ -569,43 +563,32 @@ class BuildCtx:
 			exec(code, self.create_exec_scope())
 			self.file_stack.pop()
 
-	def build(self):
+	def build(self, **kwargs):
 		scope = self.create_exec_scope()
+		scope['__build_args__'] = kwargs
 		if not hasattr(self, 'build_main'): self.set_build_main(default_build_main)
-		return eval("ctx.build_main(ctx)", scope)
-	
-	def is_ok(self, build_res):
-		if isinstance(build_res, OutputBinary):
-			return True
-		if build_res == 0:
-			return True
-		return False
+		return eval("ctx.build_main(ctx, **__build_args__)", scope)
 	
 def get_binary_path(file, output_kind):
-	return file.parent / "built" / f'{str(Path(file).stem)}{get_binary_ext(output_kind)}'
+	return file.parent / "built" / f'{get_binary_prefix(output_kind)}{str(Path(file).stem)}{get_binary_ext(output_kind)}'
 
-def default_build_main(self):
+def default_build_main(self, *, do_not_link=False, **kwargs):
 	self.params.units.append(self.root)
 	argparser = argparse.ArgumentParser()
 	argparser.add_argument('--run', '-r', action='store_true', help="Runs executable after successful compiling")
 	argparser.add_argument('--compiler')
 	argparser.add_argument('--opt_level', type=int, default=0, help="Optimization level")
 	argparser.add_argument('--arch')
-	argparser.add_argument('extra', nargs='*')
 	argparser.add_argument('--time_trace', action='store_true', help="Enables compile time tracing")
 	argparser.add_argument('--time_trace_high_granularity', action='store_true', help="Enables compile time tracing with high granularity")
 	args, extra = argparser.parse_known_args()
 
 	target = native_target()
 
-	if args.compiler:
-		self.params.set_compiler(args.compiler)
-	if args.arch:
-		target = Target(target.os, args.arch)
-	if args.time_trace or args.time_trace_high_granularity:
-		self.params.compile_params.compiler_flags.append(COMPILE_TIME_TRACE)
-	if args.time_trace_high_granularity:
-		self.params.compile_params.compiler_flags.append(COMPILE_TIME_TRACE_HIGH_GRANULARITY)
+	if args.compiler: self.params.set_compiler(args.compiler)
+	if args.arch: target = Target(target.os, args.arch)
+	if args.time_trace or args.time_trace_high_granularity: self.params.compile_params.compiler_flags.append(COMPILE_TIME_TRACE)
+	if args.time_trace_high_granularity: self.params.compile_params.compiler_flags.append(COMPILE_TIME_TRACE_HIGH_GRANULARITY)
 
 	self.params.set_target(target)
 	self.params.set_optimization_level(args.opt_level)
@@ -616,20 +599,20 @@ def default_build_main(self):
 
 	compile_results = compile_units_parallel(self.params.units, self.params.compile_params, self.params.target)
 	print_compile_results(self.stdout, compile_results)
-	if not did_all_units_compile_successfully(compile_results):
-		return 1
+	if not did_all_units_compile_successfully(compile_results): raise Exception("Failed to compile")
 	output_path = get_binary_path(self.root, self.params.link_params.output_kind)
 	
 	self.run_pre_link_hooks()
+	
+	if do_not_link: return compile_results
 
 	link_result = link(compile_results, self.params.link_params, self.params.target, output_path)
 	print_link_result(self.stdout, link_result)
-	if not did_link_successfully(link_result):
-		return 1
+	if not did_link_successfully(link_result): raise Exception("Failed to link")
 	if args.run:
 		if len(extra) > 0: extra = extra[1:] # Skip double dash (--)
 		run([str(Path(link_result.output_path).resolve()), *extra], stdout=sys.stdout, stdin=sys.stdin, cwd=Path(link_result.output_path).parent, shell=False)
-	return OutputBinary(link_result.output_path)
+	return link_result
 
 def build_file(file, *, stdout=None):
 	ctx = BuildCtx(file, stdout=stdout or sys.stdout)
