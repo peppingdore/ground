@@ -320,6 +320,14 @@ class LinkResult:
 		self.output_path = output_path
 		self.params = params
 
+# supply os properly to these 2 functions.
+def get_binary_prefix(kind, os=native_os()):
+	if os == OS_WINDOWS: return ''
+	if kind == LinkOutputKind.Executable: return ''
+	if kind == LinkOutputKind.StaticLibrary: return 'lib'
+	if kind == LinkOutputKind.DynamicLibrary: return ''
+	raise Exception(f'Unknown output kind {kind}')
+
 def get_binary_ext(kind, os=native_os()):
 	if kind == LinkOutputKind.Executable and os == OS_WINDOWS: return '.exe'
 	if kind == LinkOutputKind.Executable: return ''
