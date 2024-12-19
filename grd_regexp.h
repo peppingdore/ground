@@ -1,3 +1,6 @@
+#if 0
+	`dirname "$0"`/build.sh $0 $@; exit
+#endif
 #pragma once
 
 #include "grd_build.h"
@@ -9,6 +12,7 @@ sys.path.append(__FILE__.parent)
 import build_subproj
 import argparse
 
+STATIC_LIB_PREF = '' if sys.platform == 'win32' else 'lib'
 STATIC_LIB_EXT = '.lib' if sys.platform == 'win32' else '.a'
 
 def get_absl_path(path, sub, build_type):
@@ -18,9 +22,9 @@ def absl_link_dir(ctx, path, sub, build_type):
 	root = get_absl_path(path, sub, build_type)
 	for it in root.glob(f'*{STATIC_LIB_EXT}'):
 		ctx.params.add_lib(root / it)
-
+'''
 def re2_callback(ctx, *, build_path, build_type, did_build, **kwargs):
-	path = build_path / 're2' /  build_subproj.get_binary_path_segments(build_type) / f"re2{STATIC_LIB_EXT}"
+	path = build_path / 're2' /  build_subproj.get_binary_path_segments(build_type) / f"{STATIC_LIB_PREF}re2{STATIC_LIB_EXT}"
 	ctx.verbose('re2 path:', path)
 	if build_subproj.need_to_build("re2_wrapper") or did_build:
 		sub_ctx = ctx.module.BuildCtx(__FILE__.parent / "third_party/re2_wrapper/re2_wrapper.cpp", stdout=ctx.stdout)
@@ -40,18 +44,28 @@ def re2_callback(ctx, *, build_path, build_type, did_build, **kwargs):
 		res = sub_ctx.build()
 		if not ctx.is_ok(res):
 			raise Exception("Failed to build re2_wrapper")
+		raise Exception("TODO: remove me")
+'''
 
-build_subproj.cmake(
-	ctx,
-	__FILE__.parent / "third_party/re2_build",
-	#track_paths=[
-	#	__FILE__.parent/"third_party/re2/",
-	#	__FILE__.parent/"third_party/abseil-cpp/",
-	#],
-	callback=re2_callback,
-)
-
-ctx.params.add_lib(ctx.module.get_binary_path(__FILE__.parent / "third_party/re2_wrapper/re2_wrapper.cpp", ctx.module.LinkOutputKind.StaticLibrary))
+@ctx.add_pre_compile_hook
+def build_re2(_):
+	# build_path, build_type, did_build
+	re2 = build_subproj.cmake(
+		ctx,
+		__FILE__.parent / "third_party/re2_build",
+		#track_paths=[
+		#	__FILE__.parent/"third_party/re2/",
+		#	__FILE__.parent/"third_party/abseil-cpp/",
+		#],
+	)
+	re2libpath = re2.build_path / 're2' /  build_subproj.get_binary_path_segments(re2.build_type) / f"{STATIC_LIB_PREF}re2{STATIC_LIB_EXT}"
+	ctx.verbose('re2libpath path:', re2libpath)
+	if build_subproj.need_to_build("re2_wrapper") or re2.did_build:
+		sub_ctx = ctx.module.BuildCtx(__FILE__.parent / "third_party/re2_wrapper/re2_wrapper.cpp", stdout=ctx.stdout)
+		sub_ctx.params.add_include_dir(__FILE__.parent / "third_party/abseil-cpp")
+		sub_ctx.params.add_include_dir(__FILE__.parent / "third_party/re2")
+		re2wrapper = sub_ctx.build(do_not_link=True)
+	ctx.params.add_lib(ctx.module.get_default_obj_path(__FILE__.parent / "third_party/re2_wrapper/re2_wrapper.cpp"))
 
 )CMD")
 
