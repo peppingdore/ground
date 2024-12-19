@@ -36,9 +36,10 @@ WARNING_IS_ERROR=CompilerFlag(clang='-Werror', msvc='/WX')
 ALLOW_UNUSED_CMDLINE_ARGUMENT=CompilerFlag(clang='-Wno-unused-command-line-argument', msvc='')
 ALLOW_UNSAFE_CRT=CompilerFlag(clang='-Wno-deprecated-declarations', msvc='')
 ALLOW_PRAGMA_ONCE_OUTSIDE_HEADER=CompilerFlag(clang='-Wno-pragma-once-outside-header', msvc='')
-FILENAME_CASE_MISMATCH_WARNING=CompilerFlag(clang='-Wnonportable-include-path', msvc='')
+ALLOW_FILENAME_CASE_MISMATCH=CompilerFlag(clang='-Wnonportable-include-path', msvc='')
 ALLOW_DEPRECATED=CompilerFlag(clang='-Wno-deprecated', msvc='')
 ALLOW_MICROSOFT_INCLUDE=CompilerFlag(clang='-Wno-microsoft-include', msvc='')
+ALLOW_UNDEFINED_INLINE=CompilerFlag(clang='-Wno-undefined-inline', msvc='')
 ENABLE_WIDE_CMPXCHG=CompilerFlag(clang="-mcx16", msvc="")
 COMPILE_TIME_TRACE=CompilerFlag(clang=("-ftime-trace"), msvc="")
 COMPILE_TIME_TRACE_HIGH_GRANULARITY=CompilerFlag(clang=("-ftime-trace-granularity=0"), msvc="")
@@ -47,8 +48,8 @@ DEFAULT_COMPILER_FLAGS = [
 	DISABLE_LINKER, LATEST_CPP_VERSION, MISSING_RETURN_IS_ERROR,
 	DEFINED_SIGNED_OVERFLOW, ASSUME_ALIASING, DEBUG_SYMBOLS, LIMIT_ERROR_SPAM, WARNING_IS_ERROR,
 	ALLOW_UNUSED_CMDLINE_ARGUMENT, ALLOW_UNSAFE_CRT, ALLOW_PRAGMA_ONCE_OUTSIDE_HEADER,
-	ALLOW_DEPRECATED, FILENAME_CASE_MISMATCH_WARNING, COLOR_OUTPUT, ALLOW_MICROSOFT_INCLUDE,
-	ENABLE_WIDE_CMPXCHG ]
+	ALLOW_DEPRECATED, ALLOW_FILENAME_CASE_MISMATCH, COLOR_OUTPUT, ALLOW_MICROSOFT_INCLUDE,
+	ALLOW_UNDEFINED_INLINE, ENABLE_WIDE_CMPXCHG ]
 
 OS_WINDOWS = "windows"
 OS_LINUX   = "linux"
