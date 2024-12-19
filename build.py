@@ -496,7 +496,7 @@ class DefaultBuildParams:
 		self.compile_params.include_dirs.append(dir)
 
 	def add_lib(self, lib):
-		if str(lib).endswith('.a') or str(lib).endswith('.lib'):
+		if str(lib).endswith('.a') or str(lib).endswith('.lib') or str(lib).endswith('.obj') or str(lib).endswith('.o'):
 			lib = Path(lib).resolve()
 			if not lib in self.link_params.static_libraries:
 				self.link_params.static_libraries.append(lib)
