@@ -219,9 +219,11 @@ class CompileResult:
 		self.target = target
 		self.out_path = out_path
 
+def get_default_obj_path(src):
+	return Path(src).parent / "built/inter" / f'{Path(src).stem}.obj' 
+
 def compile_unit(unit, params, target, out_path=None):
-	if not out_path:
-		out_path = Path(unit).parent / "built/inter" / f'{Path(unit).stem}.obj' 
+	if not out_path: out_path = get_default_obj_path(unit)
 	os.makedirs(os.path.dirname(out_path), exist_ok=True)
 	cmdline = build_compile_cmdline(unit, params, target, out_path)
 	process, elapsed = run(cmdline)
