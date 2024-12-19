@@ -314,10 +314,11 @@ class LinkParams:
 		self.flags = flags or []
 	
 class LinkResult:
-	def __init__(self, process, elapsed, output_path):
+	def __init__(self, process, elapsed, output_path, params):
 		self.process = process
 		self.elapsed = elapsed
 		self.output_path = output_path
+		self.params = params
 
 def get_binary_ext(kind, os=native_os()):
 	if kind == LinkOutputKind.Executable and os == OS_WINDOWS: return '.exe'
@@ -381,7 +382,7 @@ def link(objects, params, target, output_path):
 	verbose(args)
 	cmdline = ' '.join(str(it) for it in args)
 	process, elapsed = run(cmdline)
-	return LinkResult(process, elapsed, output_path)
+	return LinkResult(process, elapsed, output_path, params)
 
 def print_compile_results(stdout, results):
 	for it in results:
