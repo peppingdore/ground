@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-def run_hook(tester):
+def grd_test_hook(tester):
 	@tester.add_file_filter
 	def file_filter(path: Path):
 		if os.name == 'nt':

@@ -72,7 +72,7 @@ class Tester:
 		spec = importlib.util.spec_from_loader(loader.name, loader)
 		module = importlib.util.module_from_spec(spec)
 		loader.exec_module(module)
-		module.run_hook(self)
+		module.grd_test_hook(self)
 
 	def scan_and_load_hooks(self, dir):
 		self.verbose(f"Scanning and running hooks in {dir}")
@@ -324,7 +324,6 @@ def main():
 	parser.add_argument('--verbose', action='store_true')
 	parser.add_argument('--whitelist', help='Regex pattern', default=None)
 	ARGS = parser.parse_args()
-	builder.VERBOSE = ARGS.verbose
 	os.chdir(ARGS.path)
 	tester = Tester(Path('.'))
 	tester.add_path_filter(lambda x: 'third_party' in Path(x).parts)

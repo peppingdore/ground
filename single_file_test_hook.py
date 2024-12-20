@@ -54,7 +54,7 @@ def build_all_files():
 """
 	(path / "all_file_compilation_test.cpp").write_text(HEADER + '\n'.join(map(lambda x: '#include "' + x + '"', filtered)) + FOOTER)
 
-def run_hook(tester):
+def grd_test_hook(tester):
 	shutil.rmtree(path, ignore_errors=True)
 	gen(Path('.'))
 	build_all_files()
