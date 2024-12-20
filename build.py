@@ -156,59 +156,55 @@ def run(cmd, *, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subproce
 	elapsed = time.perf_counter() - start
 	return (process, elapsed)
 
-VERBOSE = 0
-def verbose(*args):
-	if VERBOSE:
-		print(*args)
-
-def build_compile_cmdline(unit, params, target, out_path):
+def build_compile_cmdline(ctx, unit, out_path):
 	args = []
-	args.append(params.compiler)
+	p = ctx.params
+	args.append(p.compiler)
 	if VERBOSE:
-		if params.compiler == 'cl':
+		if p.compiler == 'cl':
 			args.append('/VERBOSE')
 		else:
-			args.append('/clang:-v' if is_msvc_interface(params.compiler) else '-v')
-	if is_msvc_interface(params.compiler):
+			args.append('/clang:-v' if is_msvc_interface(p.compiler) else '-v')
+	if is_msvc_interface(p.compiler):
 		args.append(f'/Fo"{str(out_path)}"')
 	else:
 		args.append(f'--output="{str(out_path)}"')
-	for it in params.include_dirs:
-		if is_msvc_interface(params.compiler):
+	for it in p.include_dirs:
+		if is_msvc_interface(p.compiler):
 			args.append(f'/I"{it}"')
 		else:
 			args.append(f'--include-directory="{it}"')
-	for it in params.defines:
+	for it in p.defines:
 		if isinstance(it, tuple):
-			args.append(('/' if is_msvc_interface(params.compiler) else '-') + f'D{it[0]}={it[1]}')
+			args.append(('/' if is_msvc_interface(p.compiler) else '-') + f'D{it[0]}={it[1]}')
 		else:
-			args.append(('/' if is_msvc_interface(params.compiler) else '-') + f'D{it}')
-	if is_msvc_interface(params.compiler):
+			args.append(('/' if is_msvc_interface(p.compiler) else '-') + f'D{it}')
+	if is_msvc_interface(p.compiler):
 		args.append('/TP')
-	if not is_msvc_interface(params.compiler):
+	if not is_msvc_interface(p.compiler):
 		# If we don't specify -x c++/objective-c++ clang will compile *.h files into a precompiled header.
-		args.append('-x objective-c++' if is_darwin(target.os) else '-x c++')
-	if target.os == OS_LINUX:
+		args.append('-x objective-c++' if is_darwin(p.target.os) else '-x c++')
+	if p.target.os == OS_LINUX:
 		args.append('-stdlib=libstdc++')
-	if not is_msvc_interface(params.compiler):
-		args.append(f'--target={make_target_triplet(target)}')
-	if params.optimization_level < 0 or params.optimization_level > 3:
+	if not is_msvc_interface(p.compiler):
+		args.append(f'--target={make_target_triplet(p.target)}')
+	if p.optimization_level < 0 or p.optimization_level > 3:
 		raise Exception("optimization_level must be in [0, 3] range")
-	if is_msvc_interface(params.compiler):
-		if params.optimization_level == 0: args.append('/Od')
-		if params.optimization_level == 1: args.append('/O2')
-		if params.optimization_level == 2: args.append('/O2')
-		if params.optimization_level == 3: args.append('/O2ix')
+	if is_msvc_interface(p.compiler):
+		if p.optimization_level == 0: args.append('/Od')
+		if p.optimization_level == 1: args.append('/O2')
+		if p.optimization_level == 2: args.append('/O2')
+		if p.optimization_level == 3: args.append('/O2ix')
 	else:
-		args.append(f'-O{params.optimization_level}')
-	if params.compiler != 'cl':
-		args.append(("/clang:" if is_msvc_interface(params.compiler) else "") + "-fvisibility=internal")
-	for it in params.compiler_flags:
-		args.append(resolve_compiler_flag(it, params.compiler))
-	if is_msvc_interface(params.compiler):
-		args.append(f'/M{"T" if params.use_windows_static_crt else "D"}{"d" if params.use_windows_debug_crt else ""}')
+		args.append(f'-O{p.optimization_level}')
+	if p.compiler != 'cl':
+		args.append(("/clang:" if is_msvc_interface(p.compiler) else "") + "-fvisibility=internal")
+	for it in p.compiler_flags:
+		args.append(resolve_compiler_flag(it, p.compiler))
+	if is_msvc_interface(p.compiler):
+		args.append(f'/M{"T" if p.use_windows_static_crt else "D"}{"d" if p.use_windows_debug_crt else ""}')
 	args.append(unit)
-	verbose(args)
+	ctx.verbose(args)
 	return ' '.join(map(str, args))
 
 class CompileResult:
@@ -222,19 +218,19 @@ class CompileResult:
 def get_default_obj_path(src):
 	return Path(src).parent / "built/inter" / f'{Path(src).stem}.obj' 
 
-def compile_unit(unit, params, target, out_path=None):
+def compile_unit(ctx, unit, out_path=None):
 	if not out_path: out_path = get_default_obj_path(unit)
 	os.makedirs(os.path.dirname(out_path), exist_ok=True)
-	cmdline = build_compile_cmdline(unit, params, target, out_path)
+	cmdline = build_compile_cmdline(ctx, unit, out_path)
 	process, elapsed = run(cmdline)
-	return CompileResult(unit, process, elapsed, target, out_path)
+	return CompileResult(unit, process, elapsed, ctx.params.target, out_path)
 
-def compile_units_parallel(units, params, target):
+def compile_units_parallel(ctx):
 	def proc(unit):
-		res = compile_unit(unit, params, target)
+		res = compile_unit(ctx, unit)
 		return res
 	pool = ThreadPool()
-	res = pool.map_async(proc, units)
+	res = pool.map_async(proc, ctx.params.units)
 	while True:
 		if res.ready(): break
 		time.sleep(0.1)
@@ -338,61 +334,62 @@ def get_binary_ext(kind, os=native_os()):
 	if kind == LinkOutputKind.DynamicLibrary and is_os_linux(os): return '.so'
 	raise Exception(f'Unknown output kind {kind}')
 
-def link(objects, params, target, output_path):
+def link(ctx, objects, output_path):
+	p = ctx.params
 	os.makedirs(Path(output_path).parent, exist_ok=True)
 	args = []
-	args.append(params.compiler)
+	args.append(p.compiler)
 	for it in objects:
 		x = it
 		if isinstance(x, CompileResult):
 			x = x.out_path
 		args.append(x)
-	for it in params.static_libraries:
+	for it in p.static_libraries:
 		args.append(it)
-	prefix = '/clang:' if is_msvc_interface(params.compiler) else ""
+	prefix = '/clang:' if is_msvc_interface(p.compiler) else ""
 	if VERBOSE:
 		args.append(f'{prefix}-v')
-	if params.compiler != 'cl':
-		args.append(f'{prefix}--target={make_target_triplet(target)}')
+	if p.compiler != 'cl':
+		args.append(f'{prefix}--target={make_target_triplet(p.target)}')
 	args.append(f'{prefix}--output="{output_path}"')
-	for it in params.lib_directories:
-		if not is_msvc_interface(params.compiler):
+	for it in p.lib_directories:
+		if not is_msvc_interface(p.compiler):
 			args.append(f'-L"{it}"')
-	for it in params.libraries:
+	for it in p.libraries:
 		args.append(f'{prefix}-l{it}')
-	for it in params.apple_frameworks:
+	for it in p.apple_frameworks:
 		args.append(f'-framework {it}')
 	args.append(f'{prefix}-g') # do not strip away debug info.
-	args.extend(params.flags)
-	if params.output_kind == LinkOutputKind.DynamicLibrary:
+	args.extend(p.flags)
+	if p.output_kind == LinkOutputKind.DynamicLibrary:
 		args.append(f'{prefix}-shared')
-	elif params.output_kind == LinkOutputKind.StaticLibrary:
+	elif p.output_kind == LinkOutputKind.StaticLibrary:
 		args.append(f'{prefix}-static')
-		if is_msvc_interface(params.compiler):
+		if is_msvc_interface(p.compiler):
 			args.append(f'{prefix}-fuse-ld=llvm-lib')
-	elif params.output_kind == LinkOutputKind.Executable:
+	elif p.output_kind == LinkOutputKind.Executable:
 		pass
 	else:
-		raise Exception(f'Unknown output kind {params.output_kind}')
-	if is_msvc_interface(params.compiler):
-		# args.append(f'/M{"T" if params.use_windows_static_crt else "D"}{"d" if params.use_windows_debug_crt else ""}')
-		if params.output_kind != LinkOutputKind.StaticLibrary:
+		raise Exception(f'Unknown output kind {p.output_kind}')
+	if is_msvc_interface(p.compiler):
+		# args.append(f'/M{"T" if p.use_windows_static_crt else "D"}{"d" if p.use_windows_debug_crt else ""}')
+		if p.output_kind != LinkOutputKind.StaticLibrary:
 			args.append('/link') # Rest of |args| is passed to linker.
 			args.append('/INCREMENTAL:NO')
 			args.append('/PDBTMCACHE:NO')
-			for it in params.lib_directories:
+			for it in p.lib_directories:
 				args.append(f'/LIBPATH:"{it}"')
-			if params.use_windows_subsystem:
+			if p.use_windows_subsystem:
 				args.append('/ENTRY:mainCRTStartup')
 				args.append('/SUBSYSTEM:WINDOWS')
-			for it in params.natvis_files:
+			for it in p.natvis_files:
 				args.append(f'/NATVIS:"{it}"')
-	if not is_msvc_interface(params.compiler):
+	if not is_msvc_interface(p.compiler):
 		args.append('-fuse-ld=lld')
-	verbose(args)
+	ctx.verbose(args)
 	cmdline = ' '.join(str(it) for it in args)
 	process, elapsed = run(cmdline)
-	return LinkResult(process, elapsed, output_path, params)
+	return LinkResult(process, elapsed, output_path, p)
 
 def print_compile_results(stdout, results):
 	for it in results:
@@ -553,7 +550,7 @@ class BuildCtx:
 		process, _ = run_preprocessor('clang++', file)
 		runs = collect_build_runs(process.stdout.decode('utf-8', errors='ignore'))
 		for it in runs:
-			verbose(f'BUILD_RUN {it}')
+			self.verbose(f'BUILD_RUN {it}')
 			# Inform Python about source code location. 
 			name = f'{it.file}: {it.line}'
 			lines = it.code.splitlines(True)
@@ -597,7 +594,7 @@ def default_build_main(self, *, do_not_link=False, **kwargs):
 	self.run_pre_compile_hooks()
 	self.params.add_define(('GRD_BUILD_COMPILING', 1))
 
-	compile_results = compile_units_parallel(self.params.units, self.params.compile_params, self.params.target)
+	compile_results = compile_units_parallel(self)
 	print_compile_results(self.stdout, compile_results)
 	if not did_all_units_compile_successfully(compile_results): raise Exception("Failed to compile")
 	output_path = get_binary_path(self.root, self.params.link_params.output_kind)
@@ -606,7 +603,7 @@ def default_build_main(self, *, do_not_link=False, **kwargs):
 	
 	if do_not_link: return compile_results
 
-	link_result = link(compile_results, self.params.link_params, self.params.target, output_path)
+	link_result = link(self, compile_results, output_path)
 	print_link_result(self.stdout, link_result)
 	if not did_link_successfully(link_result): raise Exception("Failed to link")
 	if args.run:
