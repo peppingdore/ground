@@ -4,7 +4,9 @@
 #include "grd_span.h"
 #include "grd_range.h"
 
-GRD_API void grd_quick_sort(void* data, s64 start, s64 end, bool (*less)(void*, s64, s64), void (*swap)(void*, s64, s64)) {
+GRD_API(void grd_quick_sort(void* data, s64 start, s64 end, bool (*less)(void*, s64, s64), void (*swap)(void*, s64, s64)))
+#if GRD_IMPL
+{
 	if ((end - start) < 2) {
 		return;
 	}
@@ -24,8 +26,11 @@ GRD_API void grd_quick_sort(void* data, s64 start, s64 end, bool (*less)(void*, 
 	grd_quick_sort(data, start, left, less, swap);
 	grd_quick_sort(data, left + 1, end, less, swap);
 }
+#endif
 
-GRD_API bool grd_is_sorted(void* data, s64 start, s64 length, bool (*less)(void*, s64, s64)) {
+GRD_API(bool grd_is_sorted(void* data, s64 start, s64 length, bool (*less)(void*, s64, s64)))
+#if GRD_IMPL
+{
 	for (auto i: grd_range(length - 1)) {
 		if (less(data, i + 1, i)) {
 			return false;
@@ -33,6 +38,7 @@ GRD_API bool grd_is_sorted(void* data, s64 start, s64 length, bool (*less)(void*
 	}
 	return true;
 }
+#endif
 
 void grd_quick_sort(auto arr, s64 start, s64 end, auto less, auto swap) {
 	struct Data {

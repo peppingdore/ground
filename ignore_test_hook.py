@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+import re
 
 def grd_test_hook(tester):
 	@tester.add_file_filter

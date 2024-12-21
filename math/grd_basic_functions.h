@@ -49,12 +49,11 @@ bool grd_is_aligned(u64 number, u64 alignment) {
 	return (number % alignment) == 0;
 }
 
-bool grd_is_aligned(auto* ptr, u64 alignment) {
+bool grd_is_aligned(void* ptr, u64 alignment) {
 	return (u64(ptr) % alignment) == 0;
 }
 
-template <typename T>
-T grd_align(T number, u64 alignment) {
+u64 grd_align(u64 number, u64 alignment) {
 	if (grd_is_aligned(number, alignment)) {
 		return number;
 	}

@@ -28,7 +28,7 @@ struct GrdAllocatorProcParams {
 	void*            old_data = 0;
 	u64              old_size = 0;
 	u64              new_size = 0;
-	GrdCodeLoc  loc;
+	GrdCodeLoc       loc;
 };
 
 using GrdAllocatorProc = GrdAllocatorProcResult (void* allocator_data, GrdAllocatorProcParams);
@@ -45,16 +45,16 @@ struct GrdAllocator {
 	}
 };
 
-GrdType* grd_get_allocator_type(GrdAllocator allocator) {
-	return allocator.proc(allocator.data, {.verb = GRD_ALLOCATOR_VERB_GET_TYPE, .loc = grd_current_loc()}).allocator_type;	
+GRD_EXPORT GrdType* grd_get_allocator_type(GrdAllocator allocator) {
+	return (GrdType*) allocator.proc(allocator.data, {.verb = GRD_ALLOCATOR_VERB_GET_TYPE, .loc = grd_current_loc()}).allocator_type;	
 }
 
-void grd_free_allocator(GrdAllocator allocator) {
+GRD_EXPORT void grd_free_allocator(GrdAllocator allocator) {
 	allocator.proc(allocator.data, {.verb = GRD_ALLOCATOR_VERB_FREE_ALLOCATOR, .loc = grd_current_loc()});
 }
 
 
-void* grd_malloc_crash_on_failure(u64 size) {
+GRD_EXPORT void* grd_malloc_crash_on_failure(u64 size) {
 	void* result = malloc(size);
 	if (result) {
 		return result;
@@ -63,7 +63,7 @@ void* grd_malloc_crash_on_failure(u64 size) {
 	GrdDebugBreak();
 	exit(-1);
 }
-void* grd_realloc_crash_on_failure(void* data, u64 size) {
+GRD_EXPORT void* grd_realloc_crash_on_failure(void* data, u64 size) {
 	void* result = realloc(data, size);
 	if (result) {
 		return result;
@@ -77,7 +77,7 @@ struct GrdCrtAllocator {
 	GRD_REFLECT(GrdCrtAllocator) {}
 };
 
-GrdAllocatorProcResult grd_c_allocator_proc(void* allocator_data, GrdAllocatorProcParams params) {
+GRD_EXPORT GrdAllocatorProcResult grd_c_allocator_proc(void* allocator_data, GrdAllocatorProcParams params) {
 	switch (params.verb) {
 		case GRD_ALLOCATOR_VERB_ALLOC:
 			return { .data = grd_malloc_crash_on_failure(params.new_size) };
@@ -95,7 +95,7 @@ GrdAllocatorProcResult grd_c_allocator_proc(void* allocator_data, GrdAllocatorPr
 	return {};
 }
 
-constexpr GrdAllocator grd_crt_allocator = {
+GRD_EXPORT constexpr GrdAllocator grd_crt_allocator = {
 	.proc = &grd_c_allocator_proc,
 	.data = NULL,
 };
@@ -104,14 +104,14 @@ constexpr GrdAllocator grd_crt_allocator = {
 //   with other allocator in runtime.
 // @TODO: rename c_allocator
 // @TODO: rename null_allocator
-GrdAllocator c_allocator = grd_crt_allocator;
+GRD_EXPORT GrdAllocator c_allocator = grd_crt_allocator;
 
-constexpr GrdAllocator null_allocator = { 
+GRD_EXPORT constexpr GrdAllocator null_allocator = { 
 	.proc = NULL,
 	.data = NULL,
 };
 
-void* GrdMalloc(GrdAllocator allocator, u64 size, GrdCodeLoc loc = grd_caller_loc()) {
+GRD_EXPORT void* GrdMalloc(GrdAllocator allocator, u64 size, GrdCodeLoc loc = grd_caller_loc()) {
 	GrdAllocatorProcParams p = {
 		.verb = GRD_ALLOCATOR_VERB_ALLOC,
 		.new_size = size,
@@ -120,11 +120,11 @@ void* GrdMalloc(GrdAllocator allocator, u64 size, GrdCodeLoc loc = grd_caller_lo
 	return allocator.proc(allocator.data, p).data;
 }
 
-void* GrdMalloc(u64 size, GrdCodeLoc loc = grd_caller_loc()) {
+GRD_EXPORT void* GrdMalloc(u64 size, GrdCodeLoc loc = grd_caller_loc()) {
 	return GrdMalloc(c_allocator, size, loc);
 }
 
-void GrdFree(GrdAllocator allocator, void* data, GrdCodeLoc loc = grd_caller_loc()) {
+GRD_EXPORT void GrdFree(GrdAllocator allocator, void* data, GrdCodeLoc loc = grd_caller_loc()) {
 	if (data == NULL) {
 		return;
 	}
@@ -136,11 +136,11 @@ void GrdFree(GrdAllocator allocator, void* data, GrdCodeLoc loc = grd_caller_loc
 	allocator.proc(allocator.data, p);
 }
 
-void GrdFree(void* data, GrdCodeLoc loc = grd_caller_loc()) {
+GRD_EXPORT void GrdFree(void* data, GrdCodeLoc loc = grd_caller_loc()) {
 	GrdFree(c_allocator, data, loc);
 }
 
-void* GrdRealloc(GrdAllocator allocator, void* data, u64 old_size, u64 new_size, GrdCodeLoc loc = grd_caller_loc()) {
+GRD_EXPORT void* GrdRealloc(GrdAllocator allocator, void* data, u64 old_size, u64 new_size, GrdCodeLoc loc = grd_caller_loc()) {
 	GrdAllocatorProcParams p = {
 		.verb = GRD_ALLOCATOR_VERB_REALLOC,
 		.old_data = data,
@@ -151,35 +151,35 @@ void* GrdRealloc(GrdAllocator allocator, void* data, u64 old_size, u64 new_size,
 	return allocator.proc(allocator.data, p).data;
 }
 
-void* GrdRealloc(void* data, u64 old_size, u64 new_size, GrdCodeLoc loc = grd_caller_loc()) {
+GRD_EXPORT void* GrdRealloc(void* data, u64 old_size, u64 new_size, GrdCodeLoc loc = grd_caller_loc()) {
 	return GrdRealloc(c_allocator, data, old_size, new_size, loc);
 }
 
 template <typename T>
-T* GrdAlloc(GrdAllocator allocator, u64 count, GrdCodeLoc loc = grd_caller_loc()) {
+GRD_EXPORT T* GrdAlloc(GrdAllocator allocator, u64 count, GrdCodeLoc loc = grd_caller_loc()) {
 	return (T*) GrdMalloc(allocator, sizeof(T) * count, loc);
 }
 
 template <typename T>
-T* GrdAlloc(u64 count, GrdCodeLoc loc = grd_caller_loc()) {
+GRD_EXPORT T* GrdAlloc(u64 count, GrdCodeLoc loc = grd_caller_loc()) {
 	return GrdAlloc<T>(c_allocator, count, loc);
 }
 
 template <typename T>
-T* grd_copy_value(GrdAllocator allocator, T thing, GrdCodeLoc loc = grd_caller_loc()) {
+GRD_EXPORT T* grd_copy_value(GrdAllocator allocator, T thing, GrdCodeLoc loc = grd_caller_loc()) {
 	T* mem = GrdAlloc<T>(1, loc);
 	memcpy(mem, &thing, sizeof(T));
 	return mem;
 }
 
 template <typename T>
-T* grd_make(GrdAllocator allocator = c_allocator, GrdCodeLoc loc = grd_caller_loc()) {
+GRD_EXPORT T* grd_make(GrdAllocator allocator = c_allocator, GrdCodeLoc loc = grd_caller_loc()) {
 	T* mem = GrdAlloc<T>(allocator, 1, loc);
 	return new(mem) T();
 }
 
 template <typename T>
-T* grd_make(s64 count, GrdAllocator allocator = c_allocator, GrdCodeLoc loc = grd_caller_loc()) {
+GRD_EXPORT T* grd_make(s64 count, GrdAllocator allocator = c_allocator, GrdCodeLoc loc = grd_caller_loc()) {
 	T* mem = (T*) GrdAlloc<T>(allocator, count, loc); 
 	for (auto i: grd_range(count)) {
 		new(mem + i) T();

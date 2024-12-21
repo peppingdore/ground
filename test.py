@@ -303,15 +303,15 @@ class CppTest(Test):
 	def build(self):
 		self.tester.print(f'Building: {self.path}')
 		stdout = StringIO()
-		ctx=builder.BuildCtx(stdout, self.path)
+		ctx=builder.BuildCtx(self.path, stdout=stdout)
 		ctx.test = self
 		res = None
 		try:
 			res = ctx.build()
 		except Exception as e:
 			self.tester.verbose(f'Failed to build: {self.path}\n{e}')
-		if isinstance(res, builder.OutputBinary):
-			self.exec_path = res.path
+		if isinstance(res, builder.LinkResult):
+			self.exec_path = res.output_path
 			self.status = 'test_built'
 		else:
 			self.status = 'test_failed_to_build'

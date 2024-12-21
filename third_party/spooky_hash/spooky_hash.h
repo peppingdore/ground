@@ -110,7 +110,7 @@ typedef struct {
 } spookyhash_context;
 
 
-inline void spookyhash_context_init(spookyhash_context *context, u64 seed1, u64 seed2) {
+GRD_EXPORT void spookyhash_context_init(spookyhash_context *context, u64 seed1, u64 seed2) {
     context->m_length = 0;
     context->m_remainder = 0;
     context->m_state[0] = seed1;
@@ -120,7 +120,7 @@ inline void spookyhash_context_init(spookyhash_context *context, u64 seed1, u64 
 
 
 
-void spookyhash_short_end(u64 *SPOOKYHASH_RESTRICT h0, u64 *SPOOKYHASH_RESTRICT h1, u64 *SPOOKYHASH_RESTRICT h2, u64 *SPOOKYHASH_RESTRICT h3) {
+GRD_EXPORT void spookyhash_short_end(u64 *SPOOKYHASH_RESTRICT h0, u64 *SPOOKYHASH_RESTRICT h1, u64 *SPOOKYHASH_RESTRICT h2, u64 *SPOOKYHASH_RESTRICT h3) {
     *h3 ^= *h2;
     *h2 = SPOOKYHASH_ROTATE(*h2, 15);
     *h3 += *h2;
@@ -156,7 +156,7 @@ void spookyhash_short_end(u64 *SPOOKYHASH_RESTRICT h0, u64 *SPOOKYHASH_RESTRICT 
     *h1 += *h0;
 }
 
-void spookyhash_short_mix(u64 *SPOOKYHASH_RESTRICT h0, u64 *SPOOKYHASH_RESTRICT h1, u64 *SPOOKYHASH_RESTRICT h2, u64 *SPOOKYHASH_RESTRICT h3) {
+GRD_EXPORT void spookyhash_short_mix(u64 *SPOOKYHASH_RESTRICT h0, u64 *SPOOKYHASH_RESTRICT h1, u64 *SPOOKYHASH_RESTRICT h2, u64 *SPOOKYHASH_RESTRICT h3) {
     *h2 = SPOOKYHASH_ROTATE(*h2, 50);
     *h2 += *h3;
     *h0 ^= *h2;
@@ -195,7 +195,7 @@ void spookyhash_short_mix(u64 *SPOOKYHASH_RESTRICT h0, u64 *SPOOKYHASH_RESTRICT 
     *h3 ^= *h1;
 }
 
-void spookyhash_short(const void *SPOOKYHASH_RESTRICT message, size_t length, u64 *SPOOKYHASH_RESTRICT hash1, u64 *SPOOKYHASH_RESTRICT hash2) {
+GRD_EXPORT void spookyhash_short(const void *SPOOKYHASH_RESTRICT message, size_t length, u64 *SPOOKYHASH_RESTRICT hash1, u64 *SPOOKYHASH_RESTRICT hash2) {
 #if !SPOOKYHASH_ALLOW_UNALIGNED_READS
     u64 buffer[2 * SPOOKYHASH_VARIABLES];
 #endif
@@ -288,7 +288,7 @@ void spookyhash_short(const void *SPOOKYHASH_RESTRICT message, size_t length, u6
     *hash2 = b;
 }
 
-void spookyhash_mix(const u64 *SPOOKYHASH_RESTRICT data, u64 *SPOOKYHASH_RESTRICT s0, u64 *SPOOKYHASH_RESTRICT s1, u64 *SPOOKYHASH_RESTRICT s2, u64 *SPOOKYHASH_RESTRICT s3, u64 *SPOOKYHASH_RESTRICT s4, u64 *SPOOKYHASH_RESTRICT s5, u64 *SPOOKYHASH_RESTRICT s6, u64 *SPOOKYHASH_RESTRICT s7, u64 *SPOOKYHASH_RESTRICT s8, u64 *SPOOKYHASH_RESTRICT s9, u64 *SPOOKYHASH_RESTRICT s10, u64 *SPOOKYHASH_RESTRICT s11) {
+GRD_EXPORT void spookyhash_mix(const u64 *SPOOKYHASH_RESTRICT data, u64 *SPOOKYHASH_RESTRICT s0, u64 *SPOOKYHASH_RESTRICT s1, u64 *SPOOKYHASH_RESTRICT s2, u64 *SPOOKYHASH_RESTRICT s3, u64 *SPOOKYHASH_RESTRICT s4, u64 *SPOOKYHASH_RESTRICT s5, u64 *SPOOKYHASH_RESTRICT s6, u64 *SPOOKYHASH_RESTRICT s7, u64 *SPOOKYHASH_RESTRICT s8, u64 *SPOOKYHASH_RESTRICT s9, u64 *SPOOKYHASH_RESTRICT s10, u64 *SPOOKYHASH_RESTRICT s11) {
     *s0 += SPOOKYHASH_LITTLE_ENDIAN_64(data[0]);
     *s2 ^= *s10;
     *s11 ^= *s0;
@@ -351,7 +351,7 @@ void spookyhash_mix(const u64 *SPOOKYHASH_RESTRICT data, u64 *SPOOKYHASH_RESTRIC
     *s10 += *s0;
 }
 
-void spookyhash_end_partial(u64 *SPOOKYHASH_RESTRICT h0, u64 *SPOOKYHASH_RESTRICT h1, u64 *SPOOKYHASH_RESTRICT h2, u64 *SPOOKYHASH_RESTRICT h3, u64 *SPOOKYHASH_RESTRICT h4, u64 *SPOOKYHASH_RESTRICT h5, u64 *SPOOKYHASH_RESTRICT h6, u64 *SPOOKYHASH_RESTRICT h7, u64 *SPOOKYHASH_RESTRICT h8, u64 *SPOOKYHASH_RESTRICT h9, u64 *SPOOKYHASH_RESTRICT h10, u64 *SPOOKYHASH_RESTRICT h11) {
+GRD_EXPORT void spookyhash_end_partial(u64 *SPOOKYHASH_RESTRICT h0, u64 *SPOOKYHASH_RESTRICT h1, u64 *SPOOKYHASH_RESTRICT h2, u64 *SPOOKYHASH_RESTRICT h3, u64 *SPOOKYHASH_RESTRICT h4, u64 *SPOOKYHASH_RESTRICT h5, u64 *SPOOKYHASH_RESTRICT h6, u64 *SPOOKYHASH_RESTRICT h7, u64 *SPOOKYHASH_RESTRICT h8, u64 *SPOOKYHASH_RESTRICT h9, u64 *SPOOKYHASH_RESTRICT h10, u64 *SPOOKYHASH_RESTRICT h11) {
     *h11 += *h1;
     *h2 ^= *h11;
     *h1 = SPOOKYHASH_ROTATE(*h1, 44);
@@ -390,7 +390,7 @@ void spookyhash_end_partial(u64 *SPOOKYHASH_RESTRICT h0, u64 *SPOOKYHASH_RESTRIC
     *h0 = SPOOKYHASH_ROTATE(*h0, 54);
 }
 
-void spookyhash_end(const u64 *SPOOKYHASH_RESTRICT data, u64 *SPOOKYHASH_RESTRICT h0, u64 *SPOOKYHASH_RESTRICT h1, u64 *SPOOKYHASH_RESTRICT h2, u64 *SPOOKYHASH_RESTRICT h3, u64 *SPOOKYHASH_RESTRICT h4, u64 *SPOOKYHASH_RESTRICT h5, u64 *SPOOKYHASH_RESTRICT h6, u64 *SPOOKYHASH_RESTRICT h7, u64 *SPOOKYHASH_RESTRICT h8, u64 *SPOOKYHASH_RESTRICT h9, u64 *SPOOKYHASH_RESTRICT h10, u64 *SPOOKYHASH_RESTRICT h11) {
+GRD_EXPORT void spookyhash_end(const u64 *SPOOKYHASH_RESTRICT data, u64 *SPOOKYHASH_RESTRICT h0, u64 *SPOOKYHASH_RESTRICT h1, u64 *SPOOKYHASH_RESTRICT h2, u64 *SPOOKYHASH_RESTRICT h3, u64 *SPOOKYHASH_RESTRICT h4, u64 *SPOOKYHASH_RESTRICT h5, u64 *SPOOKYHASH_RESTRICT h6, u64 *SPOOKYHASH_RESTRICT h7, u64 *SPOOKYHASH_RESTRICT h8, u64 *SPOOKYHASH_RESTRICT h9, u64 *SPOOKYHASH_RESTRICT h10, u64 *SPOOKYHASH_RESTRICT h11) {
     *h0 += SPOOKYHASH_LITTLE_ENDIAN_64(data[0]);
     *h1 += SPOOKYHASH_LITTLE_ENDIAN_64(data[1]);
     *h2 += SPOOKYHASH_LITTLE_ENDIAN_64(data[2]);
@@ -408,7 +408,7 @@ void spookyhash_end(const u64 *SPOOKYHASH_RESTRICT data, u64 *SPOOKYHASH_RESTRIC
     spookyhash_end_partial(h0, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11);
 }
 
-void spookyhash_128(const void *SPOOKYHASH_RESTRICT message, size_t length, u64 *SPOOKYHASH_RESTRICT hash1, u64 *SPOOKYHASH_RESTRICT hash2) {
+GRD_EXPORT void spookyhash_128(const void *SPOOKYHASH_RESTRICT message, size_t length, u64 *SPOOKYHASH_RESTRICT hash1, u64 *SPOOKYHASH_RESTRICT hash2) {
     if (length < SPOOKYHASH_BUFFER_SIZE) {
         spookyhash_short(message, length, hash1, hash2);
         return;
@@ -454,19 +454,19 @@ void spookyhash_128(const void *SPOOKYHASH_RESTRICT message, size_t length, u64 
     *hash2 = h1;
 }
 
-u64 spookyhash_64(const void *message, size_t length, u64 seed) {
+GRD_EXPORT u64 spookyhash_64(const void *message, size_t length, u64 seed) {
     u64 hash1 = seed;
     spookyhash_128(message, length, &hash1, &seed);
     return hash1;
 }
 
-uint32_t spookyhash_32(const void *message, size_t length, uint32_t seed) {
+GRD_EXPORT uint32_t spookyhash_32(const void *message, size_t length, uint32_t seed) {
     u64 hash1 = seed, hash2 = seed;
     spookyhash_128(message, length, &hash1, &hash2);
     return (uint32_t) hash1;
 }
 
-void spookyhash_update(spookyhash_context *SPOOKYHASH_RESTRICT context, const void *SPOOKYHASH_RESTRICT message, size_t length) {
+GRD_EXPORT void spookyhash_update(spookyhash_context *SPOOKYHASH_RESTRICT context, const void *SPOOKYHASH_RESTRICT message, size_t length) {
     u64 h0, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11;
     size_t newLength = length + context->m_remainder;
     u8 remainder;
@@ -550,7 +550,7 @@ void spookyhash_update(spookyhash_context *SPOOKYHASH_RESTRICT context, const vo
     context->m_state[11] = h11;
 }
 
-void spookyhash_final(spookyhash_context *SPOOKYHASH_RESTRICT context, u64 *SPOOKYHASH_RESTRICT hash1, u64 *SPOOKYHASH_RESTRICT hash2) {
+GRD_EXPORT void spookyhash_final(spookyhash_context *SPOOKYHASH_RESTRICT context, u64 *SPOOKYHASH_RESTRICT hash1, u64 *SPOOKYHASH_RESTRICT hash2) {
     if (context->m_length < SPOOKYHASH_BUFFER_SIZE) {
         *hash1 = context->m_state[0];
         *hash2 = context->m_state[1];

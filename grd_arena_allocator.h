@@ -16,14 +16,14 @@ struct GrdLinkedArenas {
 	GrdArena     first;
 };
 
-void* grd_get_arena_mem_block(GrdLinkedArenas* arenas, GrdArena* arena) {
+GRD_EXPORT void* grd_get_arena_mem_block(GrdLinkedArenas* arenas, GrdArena* arena) {
 	if (&arenas->first == arena) {
 		return arenas;
 	}
 	return arena;
 }
 
-void grd_free_linked_arenas(GrdLinkedArenas* arenas) {
+GRD_EXPORT void grd_free_linked_arenas(GrdLinkedArenas* arenas) {
 	auto arena = &arenas->first;
 	auto parent_allocator = arenas->parent_allocator;
 	while (arena) {
@@ -33,13 +33,13 @@ void grd_free_linked_arenas(GrdLinkedArenas* arenas) {
 	}
 }
 
-GrdArena* grd_make_arena(GrdAllocator parent_allocator, u64 size) {
+GRD_EXPORT GrdArena* grd_make_arena(GrdAllocator parent_allocator, u64 size) {
 	GrdArena* arena = (GrdArena*) GrdMalloc(parent_allocator, sizeof(GrdArena) + size);
 	*arena = GrdArena{};
 	return arena;
 }
 
-GrdAllocatorProcResult grd_arena_allocator_proc(void* allocator_data, GrdAllocatorProcParams p) {
+GRD_EXPORT GrdAllocatorProcResult grd_arena_allocator_proc(void* allocator_data, GrdAllocatorProcParams p) {
 	auto arenas = (GrdLinkedArenas*) allocator_data;
 	switch (p.verb) {
 		case GRD_ALLOCATOR_VERB_ALLOC: {
@@ -84,7 +84,7 @@ GrdAllocatorProcResult grd_arena_allocator_proc(void* allocator_data, GrdAllocat
 	return {};
 }
 
-GrdAllocator grd_make_arena_allocator(GrdAllocator parent_allocator, u64 arena_size = GRD_DEFAULT_ARENA_SIZE) {
+GRD_EXPORT GrdAllocator grd_make_arena_allocator(GrdAllocator parent_allocator, u64 arena_size = GRD_DEFAULT_ARENA_SIZE) {
 	if (arena_size == 0) {
 		grd_panic("GrdArena size must be greater than 0");
 	}
@@ -101,7 +101,7 @@ GrdAllocator grd_make_arena_allocator(GrdAllocator parent_allocator, u64 arena_s
 	return allocator;
 }
 
-GrdAllocator grd_make_arena_allocator(u64 arena_size = GRD_DEFAULT_ARENA_SIZE) {
+GRD_EXPORT GrdAllocator grd_make_arena_allocator(u64 arena_size = GRD_DEFAULT_ARENA_SIZE) {
 	return grd_make_arena_allocator(c_allocator, arena_size);
 }
 
@@ -110,7 +110,7 @@ struct ArenaAllocatorSnapshot {
 	u64 current_arena_allocated = 0;
 };
 
-ArenaAllocatorSnapshot grd_snapshot(GrdLinkedArenas* allocator) {
+GRD_EXPORT ArenaAllocatorSnapshot grd_snapshot(GrdLinkedArenas* allocator) {
 	s64 current_arena_index = 0;
 	u64 current_arena_allocated = 0;
 
@@ -130,7 +130,7 @@ ArenaAllocatorSnapshot grd_snapshot(GrdLinkedArenas* allocator) {
 	};
 }
 
-void grd_restore(GrdLinkedArenas* allocator, ArenaAllocatorSnapshot snapshot) {
+GRD_EXPORT void grd_restore(GrdLinkedArenas* allocator, ArenaAllocatorSnapshot snapshot) {
 	auto arena = &allocator->first;
 	s32 i = 0;
 	while (arena) {
@@ -146,7 +146,7 @@ void grd_restore(GrdLinkedArenas* allocator, ArenaAllocatorSnapshot snapshot) {
 	}
 }
 
-ArenaAllocatorSnapshot grd_snapshot(GrdAllocator allocator) {
+GRD_EXPORT ArenaAllocatorSnapshot grd_snapshot(GrdAllocator allocator) {
 	auto type = grd_get_allocator_type(allocator);
 	if (type != grd_reflect_type_of<GrdLinkedArenas>()) {
 		return {};
@@ -154,7 +154,7 @@ ArenaAllocatorSnapshot grd_snapshot(GrdAllocator allocator) {
 	return grd_snapshot((GrdLinkedArenas*) allocator.data);
 }
 
-void grd_restore(GrdAllocator allocator, ArenaAllocatorSnapshot snapshot) {
+GRD_EXPORT void grd_restore(GrdAllocator allocator, ArenaAllocatorSnapshot snapshot) {
 	auto type = grd_get_allocator_type(allocator);
 	if (type != grd_reflect_type_of<GrdLinkedArenas>()) {
 		return;

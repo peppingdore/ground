@@ -51,7 +51,16 @@
 	#define GrdDebugBreak() __builtin_debugtrap()
 #endif
 
-#define GRD_API extern "C" inline 
+#define GRD_EXPORT inline
+
+#define GRD_IMPL 1
+#if GRD_IMPL
+	#define GRD_API(...) extern "C" inline __VA_ARGS__
+	#define GRD_API_X(sig, ...) extern "C" inline sig __VA_ARGS__
+#else
+	#define GRD_API(...) extern "C" __VA_ARGS__ ;
+	#define GRD_API_X(sig, ...) extern "C" sig;
+#endif
 
 #define GRD_STRINGIFY(x) #x
 #define GRD_TOSTRING(x) GRD_STRINGIFY(x)
