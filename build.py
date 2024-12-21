@@ -158,9 +158,9 @@ def run(cmd, *, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subproce
 
 def build_compile_cmdline(ctx, unit, out_path):
 	args = []
-	p = ctx.params
+	p = ctx.params.compile_params
 	args.append(p.compiler)
-	if VERBOSE:
+	if ctx.VERBOSE:
 		if p.compiler == 'cl':
 			args.append('/VERBOSE')
 		else:
@@ -335,7 +335,7 @@ def get_binary_ext(kind, os=native_os()):
 	raise Exception(f'Unknown output kind {kind}')
 
 def link(ctx, objects, output_path):
-	p = ctx.params
+	p = ctx.params.link_params
 	os.makedirs(Path(output_path).parent, exist_ok=True)
 	args = []
 	args.append(p.compiler)
@@ -347,10 +347,10 @@ def link(ctx, objects, output_path):
 	for it in p.static_libraries:
 		args.append(it)
 	prefix = '/clang:' if is_msvc_interface(p.compiler) else ""
-	if VERBOSE:
+	if ctx.VERBOSE:
 		args.append(f'{prefix}-v')
 	if p.compiler != 'cl':
-		args.append(f'{prefix}--target={make_target_triplet(p.target)}')
+		args.append(f'{prefix}--target={make_target_triplet(ctx.params.target)}')
 	args.append(f'{prefix}--output="{output_path}"')
 	for it in p.lib_directories:
 		if not is_msvc_interface(p.compiler):
@@ -505,11 +505,11 @@ class DefaultBuildParams:
 		self.link_params.natvis_files.append(file)
 
 class BuildCtx:
-	def __init__(self, file, stdout=None):
+	def __init__(self, file, stdout=None, verbose=False):
 		self.module = __import__(__name__)
 		self.stdout = stdout or sys.stdout
 		self.file_stack = [Path(file).resolve()]
-		self.VERBOSE = False
+		self.VERBOSE = verbose
 		self.params = DefaultBuildParams(self)
 		self.pre_compile_hooks = []
 		self.pre_link_hooks = []
@@ -611,20 +611,21 @@ def default_build_main(self, *, do_not_link=False, **kwargs):
 		run([str(Path(link_result.output_path).resolve()), *extra], stdout=sys.stdout, stdin=sys.stdin, cwd=Path(link_result.output_path).parent, shell=False)
 	return link_result
 
-def build_file(file, *, stdout=None):
-	ctx = BuildCtx(file, stdout=stdout or sys.stdout)
-	ctx.VERBOSE = VERBOSE
+def build_file(file, *, stdout=None, **kwargs):
+	ctx = BuildCtx(file, stdout=stdout or sys.stdout, **kwargs)
 	return ctx.build()
 
 def main():
-	global VERBOSE
 	argparser = argparse.ArgumentParser(add_help=False)
 	argparser.add_argument('file')
 	argparser.add_argument('--verbose', '-v', action='store_true')
 	args, _ = argparser.parse_known_args()
-	VERBOSE = args.verbose
-	res = build_file(args.file)
-	return res if isinstance(res, int) else 0
+	try:
+		build_file(args.file, verbose=args.verbose)
+	except Exception as e:
+		if args.verbose:
+			raise e
+		raise SystemExit(e) # avoid printing traceback.
 
 if __name__ == "__main__":
-	exit(main())
+	main()
