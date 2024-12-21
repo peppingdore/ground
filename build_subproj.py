@@ -49,10 +49,16 @@ def cmake(ctx, root, *, opts=None, build_type=None):
 	build = Path(root).parent / "grd_cmake_build" / name
 	build_type = build_type or pick_cmake_build_type(ctx)
 	if args.subprojects != "none" and (args.subprojects == "all" or (name in args.subprojects.split(','))):
-		print(f"{Path(__file__).name}: building {root}\n{Path(__file__).name}: build type: {build_type}")
+		print(f"{Path(__file__).name}: building {root}\n{Path(__file__).name}: build type: {build_type}", file=ctx.stdout)
 		os.makedirs(build, exist_ok=True)
-		subprocess.check_call(["cmake", *opts, "-DCMAKE_CXX_STANDARD=23", f"-DCMAKE_BUILD_TYPE={build_type}", ".", f"-B{build.resolve()}"], cwd=root)
-		subprocess.check_call(["cmake",  "--build", str(build.resolve()), f'--config {build_type}'], cwd=root)
+		stdout = ctx.stdout if ctx.stdout.isatty() else subprocess.PIPE			
+		cmake_0 = subprocess.run(["cmake", *opts, "-DCMAKE_CXX_STANDARD=23", f"-DCMAKE_BUILD_TYPE={build_type}", ".", f"-B{build.resolve()}"], cwd=root, stdout=stdout, stderr=subprocess.STDOUT)
+		cmake_0.check_returncode()
+		cmake_1 = subprocess.run(["cmake",  "--build", str(build.resolve()), f'--config {build_type}'], cwd=root, stdout=stdout, stderr=subprocess.STDOUT)
+		cmake_1.check_returncode()
+		if stdout == subprocess.PIPE:
+			ctx.stdout.write(cmake_0.stdout.decode('utf-8', errors='ignore'))
+			ctx.stdout.write(cmake_1.stdout.decode('utf-8', errors='ignore'))
 		did_build = True
 	from collections import namedtuple
 	tp = namedtuple("BuildResult", ["build_path", "build_type", "did_build"])
