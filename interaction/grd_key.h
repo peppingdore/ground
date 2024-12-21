@@ -534,7 +534,7 @@ enum class GrdKey: u32 {
 // 	GRD_ENUM_VALUE(Play);
 // }
 
-GrdOptional<GrdKey> grd_map_mouse_button_index(int index) {
+GRD_DEDUP GrdOptional<GrdKey> grd_map_mouse_button_index(int index) {
 	switch (index) {
 		case 0:  return GrdKey::LMB;
 		case 1:  return GrdKey::RMB;

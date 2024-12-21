@@ -20,7 +20,7 @@ concept GrdAtomicSize =
 	sizeof(T) == 4 || sizeof(T) == 8 || sizeof(T) == 16;
 
 #if !GRD_COMPILER_MSVC
-	consteval int grd_memory_order_to_gcc(GrdMemoryOrder mo) {
+	GRD_DEDUP consteval int grd_memory_order_to_gcc(GrdMemoryOrder mo) {
 		if (mo == GrdMemoryOrder::Relaxed) return __ATOMIC_RELAXED;
 		if (mo == GrdMemoryOrder::Consume) return __ATOMIC_CONSUME;
 		if (mo == GrdMemoryOrder::Acquire) return __ATOMIC_ACQUIRE;
@@ -51,7 +51,7 @@ using GrdAtomicIntegral = GrdAtomicIntegralImpl<sizeof(T)>::Type;
 
 
 template <GrdAtomicSize T, GrdMemoryOrder mo = GrdMemoryOrder::SeqCst>
-T grd_atomic_exchange(T* dst, std::type_identity_t<T> value) {
+GRD_DEDUP T grd_atomic_exchange(T* dst, std::type_identity_t<T> value) {
 	using N = GrdAtomicIntegral<T>;
 
 	#if GRD_COMPILER_MSVC
@@ -94,7 +94,7 @@ T grd_atomic_exchange(T* dst, std::type_identity_t<T> value) {
 	#endif
 }
 
-consteval GrdMemoryOrder grd_map_compare_and_swap_mo(GrdMemoryOrder success_mo) {
+GRD_DEDUP consteval GrdMemoryOrder grd_map_compare_and_swap_mo(GrdMemoryOrder success_mo) {
 	if (success_mo == GrdMemoryOrder::Relaxed) return GrdMemoryOrder::Relaxed;
 	if (success_mo == GrdMemoryOrder::Consume) return GrdMemoryOrder::Consume;
 	if (success_mo == GrdMemoryOrder::Acquire) return GrdMemoryOrder::Acquire;
@@ -108,7 +108,7 @@ template <
 	GrdMemoryOrder success_mo = GrdMemoryOrder::SeqCst,
 	GrdMemoryOrder failure_mo = grd_map_compare_and_swap_mo(success_mo)
 >
-T grd_compare_and_swap(T* dst, T comp_v, T xchg_v) {
+GRD_DEDUP T grd_compare_and_swap(T* dst, T comp_v, T xchg_v) {
 	using N = GrdAtomicIntegral<T>;
 
 	#if GRD_COMPILER_MSVC
@@ -147,18 +147,18 @@ T grd_compare_and_swap(T* dst, T comp_v, T xchg_v) {
 }
 
 template <GrdAtomicSize T, GrdMemoryOrder mo = GrdMemoryOrder::SeqCst>
-T grd_atomic_load(T* x) {
+GRD_DEDUP T grd_atomic_load(T* x) {
 	T value = {};
 	return grd_compare_and_swap<T, mo>(x, value, value);
 }
 
 template <typename T>
-bool grd_atomic_internal_compare(T a, std::type_identity_t<T> b) {
+GRD_DEDUP bool grd_atomic_internal_compare(T a, std::type_identity_t<T> b) {
 	return memcmp(&a, &b, sizeof(T)) == 0;
 }
 
 template <GrdAtomicSize T, GrdMemoryOrder mo = GrdMemoryOrder::SeqCst>
-void grd_atomic_store(T* dst, std::type_identity_t<T> value) {
+GRD_DEDUP void grd_atomic_store(T* dst, std::type_identity_t<T> value) {
 	while (true) {
 		T read = *dst;
 		T prev = grd_compare_and_swap<T, mo>(dst, read, value);
@@ -169,7 +169,7 @@ void grd_atomic_store(T* dst, std::type_identity_t<T> value) {
 }
 
 template <GrdAtomicSize T, GrdMemoryOrder mo = GrdMemoryOrder::SeqCst>
-T grd_atomic_load_add(T* dst, std::type_identity_t<T> add) {
+GRD_DEDUP T grd_atomic_load_add(T* dst, std::type_identity_t<T> add) {
 	while (true) {
 		T read = *(T*) dst;
 		T prev = grd_compare_and_swap<T, mo>(dst, read, read + add);

@@ -25,7 +25,7 @@ struct GrdReader {
 	}
 };
 
-GrdTuple<GrdArray<u8>, GrdError*> grd_read_all(GrdAllocator allocator, GrdReader reader) {
+GRD_DEDUP GrdTuple<GrdArray<u8>, GrdError*> grd_read_all(GrdAllocator allocator, GrdReader reader) {
 	GrdArray<u8> data = { .allocator = allocator };
 	while (true) {
 		void* dst = grd_reserve(&data, 128);
@@ -42,11 +42,11 @@ GrdTuple<GrdArray<u8>, GrdError*> grd_read_all(GrdAllocator allocator, GrdReader
 	return { data, NULL };
 }
 
-GrdTuple<GrdArray<u8>, GrdError*> grd_read_all(GrdReader reader) {
+GRD_DEDUP GrdTuple<GrdArray<u8>, GrdError*> grd_read_all(GrdReader reader) {
 	return grd_read_all(c_allocator, reader);
 }
 
-GrdTuple<GrdAllocatedString, GrdError*> grd_read_text(GrdAllocator allocator, GrdReader reader) {
+GRD_DEDUP GrdTuple<GrdAllocatedString, GrdError*> grd_read_text(GrdAllocator allocator, GrdReader reader) {
 	auto [data, e] = grd_read_all(allocator, reader);
 	if (e) {
 		return { {}, e };
@@ -54,6 +54,6 @@ GrdTuple<GrdAllocatedString, GrdError*> grd_read_text(GrdAllocator allocator, Gr
 	return { *((GrdAllocatedString*) &data) };
 }
 
-GrdTuple<GrdAllocatedString, GrdError*> grd_read_text(GrdReader reader) {
+GRD_DEDUP GrdTuple<GrdAllocatedString, GrdError*> grd_read_text(GrdReader reader) {
 	return grd_read_text(c_allocator, reader);
 }

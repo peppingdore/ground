@@ -51,7 +51,7 @@
 	#define GrdDebugBreak() __builtin_debugtrap()
 #endif
 
-#define GRD_EXPORT inline
+#define GRD_DEDUP inline
 
 #define GRD_IMPL 1
 #if GRD_IMPL
@@ -137,6 +137,6 @@ constexpr f32 f32_epsilon = FLT_EPSILON;
 constexpr f64 f64_epsilon = DBL_EPSILON;
 
 template <typename T, u64 n>
-constexpr u64 grd_static_array_count(T(&)[n]) {
+GRD_DEDUP constexpr u64 grd_static_array_count(T(&)[n]) {
 	return n;
 }

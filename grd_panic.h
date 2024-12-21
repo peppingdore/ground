@@ -7,11 +7,11 @@
 
 // One of reason we could call panic() is fail of 
 //   heap allocator, so we have to have some way to allocate memory for error message.
-constexpr u64 grd_panic_message_memory_size = 16 * 1024; 
-inline u8     grd_panic_message_memory[grd_panic_message_memory_size];
-inline u64    grd_panic_message_memory_offset = 0;
+GRD_DEDUP constexpr u64 grd_panic_message_memory_size = 16 * 1024; 
+GRD_DEDUP u8            grd_panic_message_memory[grd_panic_message_memory_size];
+GRD_DEDUP u64           grd_panic_message_memory_offset = 0;
 
-GrdAllocatorProcResult grd_panic_allocator_proc(void* allocator_data, GrdAllocatorProcParams p) {
+GRD_DEDUP GrdAllocatorProcResult grd_panic_allocator_proc(void* allocator_data, GrdAllocatorProcParams p) {
 	switch (p.verb) {
 		case GRD_ALLOCATOR_VERB_ALLOC: {
 			if (p.new_size + grd_panic_message_memory_offset > grd_panic_message_memory_size) {
@@ -43,18 +43,18 @@ GrdAllocatorProcResult grd_panic_allocator_proc(void* allocator_data, GrdAllocat
 	return {};
 }
 
-constexpr GrdAllocator grd_panic_allocator = {
+GRD_DEDUP constexpr GrdAllocator grd_panic_allocator = {
 	.proc = &grd_panic_allocator_proc,
 	.data = NULL,
 };
 
-GrdSpinlock GRD_PANIC_LOCK;
+GRD_DEDUP GrdSpinlock GRD_PANIC_LOCK;
 
-void grd_panic_write_string(const char* str) {
+GRD_DEDUP void grd_panic_write_string(const char* str) {
 	fwrite(str, strlen(str), 1, stderr);
 }
 
-inline void grd_panic(const char* file_name, int line_number, auto... args) {
+GRD_DEDUP void grd_panic(const char* file_name, int line_number, auto... args) {
 	grd_lock(&GRD_PANIC_LOCK);
 	auto message = grd_sprint_unicode(grd_panic_allocator, args...);
 	GrdString utf8 = grd_encode_utf8(grd_panic_allocator, message);

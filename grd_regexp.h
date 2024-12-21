@@ -69,14 +69,14 @@ def build_re2(_):
 
 )CMD")
 
-GrdTuple<GrdError*, GrdRe2*> re2_make(GrdString pattern) {
+GRD_DEDUP GrdTuple<GrdError*, GrdRe2*> re2_make(GrdString pattern) {
 	GrdError* e = NULL;
 	GrdRe2* re2 = NULL;
 	re2_wrapper_make(pattern, &e, &re2);
 	return {e, re2};
 }
 
-GrdOptional<GrdReMatch> re2_match(GrdRe2* re, GrdString str) {
+GRD_DEDUP GrdOptional<GrdReMatch> re2_match(GrdRe2* re, GrdString str) {
 	GrdReMatch match;
 	bool did_match = re2_wrapper_match(re, str, &match);
 	if (!did_match) {

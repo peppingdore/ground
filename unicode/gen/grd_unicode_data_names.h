@@ -1,6 +1,6 @@
 #pragma once
 
-const char* GRD_UNICODE_CODEPOINT_NAMES[] = {
+GRD_DEDUP const char* GRD_UNICODE_CODEPOINT_NAMES[] = {
 /* %-codepoint_names */
 "<control>",
 "<control>",

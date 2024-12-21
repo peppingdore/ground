@@ -42,12 +42,12 @@ struct GrdOptional {
 };
 
 template <typename T>
-auto grd_make_optional() -> GrdOptional<T> {
+GRD_DEDUP auto grd_make_optional() -> GrdOptional<T> {
 	return {};
 }
 
 template <typename T>
-auto grd_make_optional(T value) -> GrdOptional<T> {
+GRD_DEDUP auto grd_make_optional(T value) -> GrdOptional<T> {
 	return GrdOptional<T>(value);
 }
 
@@ -58,12 +58,12 @@ struct GrdOptionalType: GrdType {
 };
 
 template <typename T>
-GrdOptionalType* grd_reflect_create_type(GrdOptional<T>* x) {
+GRD_DEDUP GrdOptionalType* grd_reflect_create_type(GrdOptional<T>* x) {
 	return grd_reflect_add_type_named<GrdOptional<T>, GrdOptionalType>("");
 }
 
 template <typename T>
-void grd_reflect_type(GrdOptional<T>* x, GrdOptionalType* type) {
+GRD_DEDUP void grd_reflect_type(GrdOptional<T>* x, GrdOptionalType* type) {
 	type->inner = grd_reflect_type_of<T>();
 	type->name = grd_heap_sprintf("GrdOptional<%s>", type->inner->name);
 }

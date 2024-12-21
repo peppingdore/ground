@@ -17,5 +17,5 @@ struct GrdReMatch {
 	GrdArray<GrdReSubmatch> submatches;
 };
 
-GRD_API void re2_wrapper_make(GrdString str, GrdError** error_dst, GrdRe2** re_dst);
-GRD_API bool re2_wrapper_match(GrdRe2* re, GrdString str, GrdReMatch* out_match);
+GRD_DEDUP void re2_wrapper_make(GrdString str, GrdError** error_dst, GrdRe2** re_dst);
+GRD_DEDUP bool re2_wrapper_match(GrdRe2* re, GrdString str, GrdReMatch* out_match);

@@ -5,29 +5,29 @@
 #include <type_traits>
 
 template <typename T>
-constexpr T grd_sign(T a) {
+GRD_DEDUP constexpr T grd_sign(T a) {
 	return a < 0 ? -1 : 1;
 }
 
 template <typename T>
-constexpr T grd_max(T a, std::type_identity_t<T> b) {
+GRD_DEDUP constexpr T grd_max(T a, std::type_identity_t<T> b) {
 	return a > b ? a : b;
 }
 
 template <typename T>
-constexpr T grd_min(T a, std::type_identity_t<T> b) {
+GRD_DEDUP constexpr T grd_min(T a, std::type_identity_t<T> b) {
 	return a < b ? a : b;
 }
 
 template <typename T>
-constexpr T grd_clamp(T min, std::type_identity_t<T> max, std::type_identity_t<T> value) {
+GRD_DEDUP constexpr T grd_clamp(T min, std::type_identity_t<T> max, std::type_identity_t<T> value) {
 	if (value < min) return min;
 	if (value > max) return max;
 	return value;
 }
 
 
-#define ALIAS_MATH_TEMPLATE_FUNCTION(name, type) constexpr auto& name##_##type = name<type>;
+#define ALIAS_MATH_TEMPLATE_FUNCTION(name, type) GRD_DEDUP constexpr auto& name##_##type = name<type>;
 #define ALIAS_MATH_TEMPLATE_FUNCTION_WITH_DEFAULT_TYPES(name)\
 ALIAS_MATH_TEMPLATE_FUNCTION(name, s8)\
 ALIAS_MATH_TEMPLATE_FUNCTION(name, u8)\
@@ -45,15 +45,15 @@ ALIAS_MATH_TEMPLATE_FUNCTION_WITH_DEFAULT_TYPES(grd_min);
 ALIAS_MATH_TEMPLATE_FUNCTION_WITH_DEFAULT_TYPES(grd_max);
 
 
-bool grd_is_aligned(u64 number, u64 alignment) {
+GRD_DEDUP bool grd_is_aligned(u64 number, u64 alignment) {
 	return (number % alignment) == 0;
 }
 
-bool grd_is_aligned(void* ptr, u64 alignment) {
+GRD_DEDUP bool grd_is_aligned(void* ptr, u64 alignment) {
 	return (u64(ptr) % alignment) == 0;
 }
 
-u64 grd_align(u64 number, u64 alignment) {
+GRD_DEDUP u64 grd_align(u64 number, u64 alignment) {
 	if (grd_is_aligned(number, alignment)) {
 		return number;
 	}
@@ -68,7 +68,7 @@ enum GrdFpClass {
 	GRD_FP_NORMAL = 4,
 };
 
-GrdFpClass grd_fp_classify(f64 x) {
+GRD_DEDUP GrdFpClass grd_fp_classify(f64 x) {
 	union{ f64 d; u64 u;}u = {x};
 	u32 exp = (u32) ( (u.u & 0x7fffffffffffffffULL) >> 52 );
 	if (exp == 0) {
@@ -88,10 +88,10 @@ GrdFpClass grd_fp_classify(f64 x) {
 #define GRD_INFINITY (1.0f / 0.0f)
 #define GRD_NAN (0.0f / 0.0f)
 
-bool grd_signbit(f64 x) {
+GRD_DEDUP bool grd_signbit(f64 x) {
 	return grd_bitcast<u64>(x) & (1ULL << 63);
 }
 
-bool grd_is_nan(f64 x) {
+GRD_DEDUP bool grd_is_nan(f64 x) {
 	return grd_fp_classify(x) == GRD_FP_NAN;
 }

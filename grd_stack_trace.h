@@ -49,7 +49,7 @@ struct GrdStackTrace {
 	}
 };
 
-const char* grd_stack_trace_copy_std_str(GrdAllocator allocator, std::string& str) {
+GRD_DEDUP const char* grd_stack_trace_copy_std_str(GrdAllocator allocator, std::string& str) {
 	auto str_mem = GrdAlloc<char>(allocator, str.size() + 1);
 	for (auto i: grd_range(str.size())) {
 		str_mem[i] = str[i];
@@ -58,7 +58,7 @@ const char* grd_stack_trace_copy_std_str(GrdAllocator allocator, std::string& st
 	return str_mem;
 }
 
-GrdStackTrace grd_get_stack_trace(GrdAllocator allocator = c_allocator) {
+GRD_DEDUP GrdStackTrace grd_get_stack_trace(GrdAllocator allocator = c_allocator) {
 	GrdStackTrace st;
 	st.allocator = allocator;
 	#if GRD_USE_STD_STACKTRACE
@@ -115,7 +115,7 @@ GrdStackTrace grd_get_stack_trace(GrdAllocator allocator = c_allocator) {
 	return st;
 }
 
-void grd_stack_trace_sprintf(char** buf, s64* buf_len, const char* fmt, ...) {
+GRD_DEDUP void grd_stack_trace_sprintf(char** buf, s64* buf_len, const char* fmt, ...) {
 	va_list args;
     va_start(args, fmt);
 	s64 written = vsnprintf(*buf, *buf_len, fmt, args);
@@ -126,7 +126,7 @@ void grd_stack_trace_sprintf(char** buf, s64* buf_len, const char* fmt, ...) {
 	}
 }
 
-bool grd_print_stack_trace_src(GrdStackTraceEntry* entry, char** buf, s64* buf_len) {
+GRD_DEDUP bool grd_print_stack_trace_src(GrdStackTraceEntry* entry, char** buf, s64* buf_len) {
 	if (!entry->src_loc.file || entry->src_loc.line < 1) {
 		return false;
 	}
@@ -192,7 +192,7 @@ enum GrdStackTracePrintFlags {
 	GRD_STACK_TRACE_PRINT_SOURCE = 1 << 0,
 };
 
-void grd_print_stack_trace(GrdStackTrace st, char* buf, s64 buf_len, u32 flags = GRD_STACK_TRACE_PRINT_SOURCE) {
+GRD_DEDUP void grd_print_stack_trace(GrdStackTrace st, char* buf, s64 buf_len, u32 flags = GRD_STACK_TRACE_PRINT_SOURCE) {
 	for (auto i: grd_reverse(grd_range(st.count))) {
 		auto entry = &st.entries[i];
 		// grd_stack_trace_sprintf(&buf, &buf_len, "#%d ", (s32) i);
@@ -223,7 +223,7 @@ void grd_print_stack_trace(GrdStackTrace st, char* buf, s64 buf_len, u32 flags =
 	}
 }
 
-void grd_print_stack_trace(GrdStackTrace st, u32 flags = GRD_STACK_TRACE_PRINT_SOURCE) {
+GRD_DEDUP void grd_print_stack_trace(GrdStackTrace st, u32 flags = GRD_STACK_TRACE_PRINT_SOURCE) {
 	char buf[4 * 1024];
 	buf[0] = '\0';
 	grd_print_stack_trace(st, buf, sizeof(buf), GRD_STACK_TRACE_PRINT_SOURCE);

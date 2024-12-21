@@ -30,7 +30,7 @@ struct GrdError {
 	}
 };
 
-inline void grd_type_format(GrdFormatter* formatter, GrdError* e, GrdString spec) {
+GRD_DEDUP void grd_type_format(GrdFormatter* formatter, GrdError* e, GrdString spec) {
 	bool is_nested = grd_contains(spec, "nested_error"_b);
 
 	GrdString prefix = ""_b;
@@ -60,7 +60,7 @@ GRD_REFLECT(GrdError) {
 }
 
 template <typename T = GrdError>
-T* grd_make_error(GrdAllocatedString text, GrdCodeLoc loc = grd_caller_loc()) {
+GRD_DEDUP T* grd_make_error(GrdAllocatedString text, GrdCodeLoc loc = grd_caller_loc()) {
 	auto e = grd_make<T>();
 	e->text = text;
 	e->type = grd_reflect_type_of<T>();
@@ -69,12 +69,12 @@ T* grd_make_error(GrdAllocatedString text, GrdCodeLoc loc = grd_caller_loc()) {
 }
 
 template <typename T = GrdError>
-T* grd_make_error(const char* str, GrdCodeLoc loc = grd_caller_loc()) {
+GRD_DEDUP T* grd_make_error(const char* str, GrdCodeLoc loc = grd_caller_loc()) {
 	return grd_make_error<T>(grd_copy_string(grd_make_string(str)), loc); 
 }
 
 template <typename T = GrdError>
-T* grd_format_error(GrdCodeLoc loc, auto... args) {
+GRD_DEDUP T* grd_format_error(GrdCodeLoc loc, auto... args) {
 	GrdAllocatedString str = sprint<char>(c_allocator, args...);
 	return grd_make_error<T>(str, loc);
 }
@@ -95,7 +95,7 @@ GRD_REFLECT(GrdWindowsError) {
 	GRD_MEMBER(code);
 }
 
-GrdWindowsError* grd_windows_error(GrdCodeLoc loc = grd_caller_loc()) {
+GRD_DEDUP GrdWindowsError* grd_windows_error(GrdCodeLoc loc = grd_caller_loc()) {
 	auto code = GetLastError();
 	char buf[256];
 	FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
@@ -116,7 +116,7 @@ struct GrdPosixError: GrdError {
 	int code;
 };
 
-GrdPosixError* grd_posix_error(GrdCodeLoc loc = grd_caller_loc()) {
+GRD_DEDUP GrdPosixError* grd_posix_error(GrdCodeLoc loc = grd_caller_loc()) {
 	char buf[512];
 	u32  cursor = 0;
 	auto num_str = grd_to_string(errno);

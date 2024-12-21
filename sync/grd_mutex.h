@@ -19,11 +19,11 @@ struct GrdMutex {
 	}
 };
 
-void grd_make_mutex(GrdMutex* out_mutex) {
+GRD_DEDUP void grd_make_mutex(GrdMutex* out_mutex) {
 	grd_os_mutex_create(&out_mutex->os_mutex);
 }
 
-GrdMutex* grd_make_mutex() {
+GRD_DEDUP GrdMutex* grd_make_mutex() {
 	auto x = grd_make<GrdMutex>();
 	grd_make_mutex(x);
 	return x;

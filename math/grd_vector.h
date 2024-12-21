@@ -227,18 +227,18 @@ using GrdVector3i = GrdVector3_s64;
 using GrdVector4i = GrdVector4_s64;
 
 
-auto grd_make_vector2(auto x, auto y) {
+GRD_DEDUP auto grd_make_vector2(auto x, auto y) {
 	return GrdVector2::grd_make(x, y);	
 }
-auto grd_make_vector3(auto x, auto y, auto z) {
+GRD_DEDUP auto grd_make_vector3(auto x, auto y, auto z) {
 	return GrdVector3::grd_make(x, y, z);	
 }
-auto grd_make_vector4(auto x, auto y, auto z, auto w) {
+GRD_DEDUP auto grd_make_vector4(auto x, auto y, auto z, auto w) {
 	return GrdVector4::grd_make(x, y, z, w);	
 }
 
 template <int N, typename T>
-auto grd_dot(GrdBaseVector<N, T> a, GrdBaseVector<N, T> b) {
+GRD_DEDUP auto grd_dot(GrdBaseVector<N, T> a, GrdBaseVector<N, T> b) {
 	T sum = 0;
 	for (auto i: grd_range(grd_static_array_count(a.components))) {
 		sum += a[i] * b[i];
@@ -247,14 +247,14 @@ auto grd_dot(GrdBaseVector<N, T> a, GrdBaseVector<N, T> b) {
 }
 
 template <int N, typename T>
-auto grd_project(GrdBaseVector<N, T> line_start, GrdBaseVector<N, T> line_end, GrdBaseVector<N, T> point) {
+GRD_DEDUP auto grd_project(GrdBaseVector<N, T> line_start, GrdBaseVector<N, T> line_end, GrdBaseVector<N, T> point) {
 	auto line          = line_end - line_start;
 	auto line_to_point = point    - line_start;
 	return line_start + line * (grd_dot(line_to_point, line) / grd_dot(line, line));
 }
 
 template <int N, typename T>
-auto grd_magnitude_squared(GrdBaseVector<N, T> v) {
+GRD_DEDUP auto grd_magnitude_squared(GrdBaseVector<N, T> v) {
 	T sum = 0;
 	for (auto i: grd_range(N)) {
 		sum += v.components[i] * v.components[i];
@@ -263,12 +263,12 @@ auto grd_magnitude_squared(GrdBaseVector<N, T> v) {
 }
 
 template <int N, typename T>
-auto grd_magnitude(GrdBaseVector<N, T> v) {
+GRD_DEDUP auto grd_magnitude(GrdBaseVector<N, T> v) {
 	return sqrt(grd_magnitude_squared(v));
 }
 
 template <int N, typename T>
-auto grd_normalize(GrdBaseVector<N, T> v) {
+GRD_DEDUP auto grd_normalize(GrdBaseVector<N, T> v) {
 	auto mag = grd_magnitude(v);
 	if (mag == 0) {
 		return v;
@@ -277,6 +277,6 @@ auto grd_normalize(GrdBaseVector<N, T> v) {
 }
 
 template <int N, typename T>
-auto grd_lerp(GrdBaseVector<N, T> a, GrdBaseVector<N, T> b, f64 c) {
+GRD_DEDUP auto grd_lerp(GrdBaseVector<N, T> a, GrdBaseVector<N, T> b, f64 c) {
 	return a + (b - a) * c;
 }

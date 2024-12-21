@@ -119,15 +119,15 @@ concept HasGrdGeneratorIterator = requires (T t) {
 	requires IsGrdGeneratorType<decltype(t.iterate())>::value;
 };
 
-auto begin(HasGrdGeneratorIterator auto t) {
+GRD_DEDUP auto begin(HasGrdGeneratorIterator auto t) {
 	return t.iterate();
 }
 
-int end(HasGrdGeneratorIterator auto t) {
+GRD_DEDUP int end(HasGrdGeneratorIterator auto t) {
 	return 0;
 }
 
-auto grd_map(auto iter, auto func) -> GrdGenerator<decltype(func(*iter.begin()))> {
+GRD_DEDUP auto grd_map(auto iter, auto func) -> GrdGenerator<decltype(func(*iter.begin()))> {
 	for (auto it: iter) {
 		co_yield func(it);
 	}

@@ -211,21 +211,21 @@ GRD_TUPLE_GET(6);
 GRD_TUPLE_GET(7);
 
 template <int N>
-auto* grd_tuple_get_ptr(auto* tuple) {
+GRD_DEDUP auto* grd_tuple_get_ptr(auto* tuple) {
 	return GrdTupleGetter<N>{}(tuple);
 }
 
 template <int N>
-auto& tuple_get(auto tuple) {
+GRD_DEDUP auto& tuple_get(auto tuple) {
 	return *grd_tuple_get_ptr<N>(&tuple);
 }
 
-auto grd_make_tuple(auto... args) {
+GRD_DEDUP auto grd_make_tuple(auto... args) {
 	return GrdTuple<decltype(args)...> { args... };
 }
 
 template <int Index>
-int tuple_reflect_member(GrdStructType* type, auto* tuple) {
+GRD_DEDUP int tuple_reflect_member(GrdStructType* type, auto* tuple) {
 	static char name[3];
 	strcpy(name, "_0");
 	name[1] = '0' + Index;
@@ -242,17 +242,17 @@ int tuple_reflect_member(GrdStructType* type, auto* tuple) {
 	return 0;
 }
 
-void grd_tuple_reflect_dummy(std::initializer_list<int> x) {
+GRD_DEDUP void grd_tuple_reflect_dummy(std::initializer_list<int> x) {
 
 }
 
 template <typename... Args>
-GrdStructType* grd_reflect_create_type(GrdTuple<Args...>* x) {
+GRD_DEDUP GrdStructType* grd_reflect_create_type(GrdTuple<Args...>* x) {
 	return grd_reflect_add_type_named<GrdTuple<Args...>, GrdStructType>("");
 }
 
 template <typename... Args>
-void grd_reflect_type(GrdTuple<Args...>* tuple, GrdStructType* type) {
+GRD_DEDUP void grd_reflect_type(GrdTuple<Args...>* tuple, GrdStructType* type) {
 	auto impl = [&]
 		<s64... Indices>
 		(std::integer_sequence<s64, Indices...>) {

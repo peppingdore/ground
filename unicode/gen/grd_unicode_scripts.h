@@ -174,7 +174,7 @@ struct GrdUnicodeScriptRange {
 	GrdUnicodeScript script;
 };
 
-const GrdUnicodeScriptRange UNICODE_SCRIPT_RANGES[] = {
+GRD_DEDUP const GrdUnicodeScriptRange UNICODE_SCRIPT_RANGES[] = {
 /* %-script_ranges */
 { 0x0, 0x40, GrdUnicodeScript::Common },
 { 0x41, 0x5a, GrdUnicodeScript::Latin },

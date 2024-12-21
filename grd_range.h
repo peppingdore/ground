@@ -14,19 +14,19 @@ struct GrdRange {
 	s64   operator*() { return start; }
 };
 
-GrdRange grd_range_from_to(s64 start, s64 end_exclusive) {
+GRD_DEDUP GrdRange grd_range_from_to(s64 start, s64 end_exclusive) {
 	return { start, grd_max(start, end_exclusive) };
 }
 
-GrdRange grd_range(s64 start, s64 count) {
+GRD_DEDUP GrdRange grd_range(s64 start, s64 count) {
 	return { start, grd_max(start, start + count) };
 }
 
-GrdRange grd_range(s64 count) {
+GRD_DEDUP GrdRange grd_range(s64 count) {
 	return { 0, grd_max(0, count) };
 }
 
-GrdRange grd_reverse(GrdRange range) {
+GRD_DEDUP GrdRange grd_reverse(GrdRange range) {
 	if (range.start < range.target) {
 		return { range.target - 1, range.start - 1 };
 	} else {

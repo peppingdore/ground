@@ -8,10 +8,10 @@
 #endif
 
 using GrdOpenFileFlag = u32;
-constexpr GrdOpenFileFlag GRD_FILE_READ       = 1;
-constexpr GrdOpenFileFlag GRD_FILE_WRITE      = 1 << 1;
-constexpr GrdOpenFileFlag GRD_FILE_CREATE_NEW = 1 << 3;
-constexpr GrdOpenFileFlag GRD_FILE_APPEND     = 1 << 4;
+GRD_DEDUP constexpr GrdOpenFileFlag GRD_FILE_READ       = 1;
+GRD_DEDUP constexpr GrdOpenFileFlag GRD_FILE_WRITE      = 1 << 1;
+GRD_DEDUP constexpr GrdOpenFileFlag GRD_FILE_CREATE_NEW = 1 << 3;
+GRD_DEDUP constexpr GrdOpenFileFlag GRD_FILE_APPEND     = 1 << 4;
 
 #if GRD_OS_WINDOWS
 	using GrdNativeFileHandle = HANDLE;
@@ -26,12 +26,12 @@ struct GrdFile {
 };
 
 
-GrdFile grd_file_from_native_handle(GrdNativeFileHandle handle) {
+GRD_DEDUP GrdFile grd_file_from_native_handle(GrdNativeFileHandle handle) {
 	return { .handle = handle };
 }
 
 #if GRD_OS_WINDOWS
-GrdTuple<GrdFile, GrdError*> grd_open_file(GrdUnicodeString path, GrdOpenFileFlag flags = GRD_FILE_READ, u32 unix_perm=0777/*ignored*/) {
+GRD_DEDUP GrdTuple<GrdFile, GrdError*> grd_open_file(GrdUnicodeString path, GrdOpenFileFlag flags = GRD_FILE_READ, u32 unix_perm=0777/*ignored*/) {
 	int windows_flags = 0;
 	if (flags & GRD_FILE_READ) {
 		windows_flags |= GENERIC_READ;
@@ -59,7 +59,7 @@ GrdTuple<GrdFile, GrdError*> grd_open_file(GrdUnicodeString path, GrdOpenFileFla
 	return { grd_file_from_native_handle(handle), NULL };
 }
 
-GrdTuple<s64, GrdError*> grd_os_write_file(GrdFile* file, void* data, s64 size) {
+GRD_DEDUP GrdTuple<s64, GrdError*> grd_os_write_file(GrdFile* file, void* data, s64 size) {
 	DWORD to_write = grd_clamp_u64(0, u32_max, size);
 	DWORD written = 0;
 	BOOL  result = WriteFile(file->handle, data, to_write, &written, NULL);
@@ -70,7 +70,7 @@ GrdTuple<s64, GrdError*> grd_os_write_file(GrdFile* file, void* data, s64 size) 
 }
 
 // Returns 0, NULL if EOF is reached.
-GrdTuple<s64, GrdError*> grd_os_read_file(GrdFile* file, void* buf, s64 size) {
+GRD_DEDUP GrdTuple<s64, GrdError*> grd_os_read_file(GrdFile* file, void* buf, s64 size) {
 	DWORD to_read = grd_clamp_u64(0, u32_max, size);
 	DWORD read;
 	BOOL  result = ReadFile(file->handle, buf, to_read, &read, NULL);
@@ -83,17 +83,17 @@ GrdTuple<s64, GrdError*> grd_os_read_file(GrdFile* file, void* buf, s64 size) {
 	return { read, NULL };
 }
 
-void grd_close_file(GrdFile* file) {
+GRD_DEDUP void grd_close_file(GrdFile* file) {
 	CloseHandle(file->handle);
 }
 
-void grd_fsync(GrdFile* file) {
+GRD_DEDUP void grd_fsync(GrdFile* file) {
 	FlushFileBuffers(file->handle);
 }
 
 #elif GRD_IS_POSIX
 
-GrdTuple<GrdFile, GrdError*> grd_open_file(GrdUnicodeString path, GrdOpenFileFlag flags = GRD_FILE_READ, u32 unix_perm = 0777) {
+GRD_DEDUP GrdTuple<GrdFile, GrdError*> grd_open_file(GrdUnicodeString path, GrdOpenFileFlag flags = GRD_FILE_READ, u32 unix_perm = 0777) {
 	GrdAllocatedString utf8_path = grd_encode_utf8(path);
 	grd_defer { utf8_path.free(); };
 
@@ -122,7 +122,7 @@ GrdTuple<GrdFile, GrdError*> grd_open_file(GrdUnicodeString path, GrdOpenFileFla
 	return { fd, NULL };
 }
 
-GrdTuple<s64, GrdError*> grd_os_write_file(GrdFile* file, void* data, s64 size) {
+GRD_DEDUP GrdTuple<s64, GrdError*> grd_os_write_file(GrdFile* file, void* data, s64 size) {
 	ssize_t result = write(file->handle, data, (u64) size);
 	if (result == -1) {
 		return { -1, grd_posix_error() };
@@ -131,7 +131,7 @@ GrdTuple<s64, GrdError*> grd_os_write_file(GrdFile* file, void* data, s64 size) 
 }
 
 // Returns 0, NULL if EOF is reached.
-GrdTuple<s64, GrdError*> grd_os_read_file(GrdFile* file, void* buf, s64 size) {
+GRD_DEDUP GrdTuple<s64, GrdError*> grd_os_read_file(GrdFile* file, void* buf, s64 size) {
 	ssize_t result = read(file->handle, buf, (u64) size);
 	if (result == -1) {
 		return { -1, grd_posix_error() };
@@ -139,16 +139,16 @@ GrdTuple<s64, GrdError*> grd_os_read_file(GrdFile* file, void* buf, s64 size) {
 	return { result, NULL };
 }
 
-void grd_close_file(GrdFile* file) {
+GRD_DEDUP void grd_close_file(GrdFile* file) {
 	close(file->handle);
 }
 
-void grd_fsync(GrdFile* file) {
+GRD_DEDUP void grd_fsync(GrdFile* file) {
 	fsync(file->handle);
 }
 #endif
 
-GrdError* grd_write_file(GrdFile* file, void* data, s64 size) {
+GRD_DEDUP GrdError* grd_write_file(GrdFile* file, void* data, s64 size) {
 	s64 total_written = 0;
 	while (total_written < size) {
 		auto [written, e] = grd_os_write_file(file, grd_ptr_add(data, total_written), size - total_written);
@@ -160,7 +160,7 @@ GrdError* grd_write_file(GrdFile* file, void* data, s64 size) {
 	return NULL;
 }
 
-GrdTuple<s64, GrdError*> grd_read_file(GrdFile* file, void* buf, s64 size) {
+GRD_DEDUP GrdTuple<s64, GrdError*> grd_read_file(GrdFile* file, void* buf, s64 size) {
 	s64 total_read = 0;
 	while (total_read < size) {
 		auto [read, e] = grd_os_read_file(file, grd_ptr_add(buf, total_read), size - total_read);
@@ -175,7 +175,7 @@ GrdTuple<s64, GrdError*> grd_read_file(GrdFile* file, void* buf, s64 size) {
 	return { total_read, NULL };
 }
 
-GrdWriter grd_file_writer(GrdFile* file) {
+GRD_DEDUP GrdWriter grd_file_writer(GrdFile* file) {
 	GrdWriter w = {
 		.item = file,
 		.write_proc = +[] (void* item, void* data, s64 size) -> GrdError* {
@@ -185,7 +185,7 @@ GrdWriter grd_file_writer(GrdFile* file) {
 	return w;
 }
 
-GrdReader grd_file_reader(GrdFile* file) {
+GRD_DEDUP GrdReader grd_file_reader(GrdFile* file) {
 	GrdReader r = {
 		.item = file,
 		.read_proc = +[] (void* item, void* buf, s64 size) -> GrdTuple<s64, GrdError*> {
@@ -195,7 +195,7 @@ GrdReader grd_file_reader(GrdFile* file) {
 	return r;
 }
 
-GrdTuple<GrdAllocatedString, GrdError*> grd_read_text_at_path(GrdAllocator allocator, GrdUnicodeString path) {
+GRD_DEDUP GrdTuple<GrdAllocatedString, GrdError*> grd_read_text_at_path(GrdAllocator allocator, GrdUnicodeString path) {
 	auto [f, e] = grd_open_file(path);
 	if (e) {
 		return { {}, e };
@@ -207,11 +207,11 @@ GrdTuple<GrdAllocatedString, GrdError*> grd_read_text_at_path(GrdAllocator alloc
 	return { text, NULL };
 }
 
-GrdTuple<GrdAllocatedString, GrdError*> grd_read_text_at_path(GrdUnicodeString path) {
+GRD_DEDUP GrdTuple<GrdAllocatedString, GrdError*> grd_read_text_at_path(GrdUnicodeString path) {
 	return grd_read_text_at_path(c_allocator, path);
 }
 
-GrdError* write_string_to_file(GrdString str, GrdUnicodeString path) {
+GRD_DEDUP GrdError* write_string_to_file(GrdString str, GrdUnicodeString path) {
 	auto [f, e] = grd_open_file(path, GRD_FILE_WRITE | GRD_FILE_CREATE_NEW);
 	if (e) {
 		return e;

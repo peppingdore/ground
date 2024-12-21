@@ -17,7 +17,7 @@ concept GrdCustomFormattable = requires (T a) {
 using GrdTypeFormatTypeErased = void(GrdFormatter*, void*, GrdString);
 
 template <GrdCustomFormattable T>
-auto grd_pick_type_format() {
+GRD_DEDUP auto grd_pick_type_format() {
 	GrdProc<void(GrdFormatter*, T*, GrdString)>* result = +[](GrdFormatter* formatter, T* thing, GrdString spec) {
 		grd_type_format(formatter, thing, spec);
 	};
@@ -25,11 +25,11 @@ auto grd_pick_type_format() {
 }
 
 template <typename T>
-auto grd_pick_type_format() {
+GRD_DEDUP auto grd_pick_type_format() {
 	return (GrdTypeFormatTypeErased*) NULL;
 }
 
-static GrdHashMap<GrdType*, GrdTypeFormatTypeErased*>* GRD_TYPE_FORMAT_PROCS = NULL;
+GRD_DEDUP GrdHashMap<GrdType*, GrdTypeFormatTypeErased*>* GRD_TYPE_FORMAT_PROCS = NULL;
 
 GRD_REFLECTION_REFLECT_HOOK(T) {
 	auto proc = grd_pick_type_format<T>();
@@ -50,7 +50,7 @@ struct GrdCustomMemberFormat {
 	}
 };
 
-GrdCustomMemberFormat grd_make_custom_member_format(auto proc) {
+GRD_DEDUP GrdCustomMemberFormat grd_make_custom_member_format(auto proc) {
 	return { .format_proc = proc };
 }
 
@@ -118,7 +118,7 @@ struct GrdFormatter {
 };
 
 template <GrdStringChar T>
-GrdFormatter grd_make_formatter(GrdArray<T>* b, GrdAllocator allocator) {
+GRD_DEDUP GrdFormatter grd_make_formatter(GrdArray<T>* b, GrdAllocator allocator) {
 	GrdFormatter result;
 	result.builder = b;
 	result.is_unicode_formatter = std::is_same_v<T, char32_t>;
@@ -127,14 +127,14 @@ GrdFormatter grd_make_formatter(GrdArray<T>* b, GrdAllocator allocator) {
 	return result;
 }
 
-void grd_formatter_indent(GrdFormatter* formatter) {
+GRD_DEDUP void grd_formatter_indent(GrdFormatter* formatter) {
 	for (auto i: grd_range(formatter->indentation)) {
 		formatter->grd_append(formatter->indent_text);
 	}
 }
 
 template <GrdStringChar T>
-void grd_formatter_append_indented(GrdFormatter* formatter, GrdSpan<T> str) {
+GRD_DEDUP void grd_formatter_append_indented(GrdFormatter* formatter, GrdSpan<T> str) {
 	s64 index = 0;
 	for (auto line: grd_iterate_lines(str)) {
 		if (index > 0) {
@@ -148,21 +148,21 @@ void grd_formatter_append_indented(GrdFormatter* formatter, GrdSpan<T> str) {
 	}
 }
 
-void grd_format(GrdFormatter* formatter, GrdString str) {
+GRD_DEDUP void grd_format(GrdFormatter* formatter, GrdString str) {
 	grd_formatter_append_indented(formatter, str);
 }
 
-void grd_format(GrdFormatter* formatter, GrdUnicodeString str) {
+GRD_DEDUP void grd_format(GrdFormatter* formatter, GrdUnicodeString str) {
 	grd_formatter_append_indented(formatter, str);
 }
 
-void grd_format(GrdFormatter* formatter, const char* c_str) {
+GRD_DEDUP void grd_format(GrdFormatter* formatter, const char* c_str) {
 	grd_format(formatter, grd_make_string(c_str));
 }
 
-void grd_format_item(GrdFormatter* formatter, GrdType* type, void* thing, GrdString spec);
+GRD_DEDUP void grd_format_item(GrdFormatter* formatter, GrdType* type, void* thing, GrdString spec);
 
-void grd_format_item(GrdFormatter* formatter, GrdAny any, GrdString spec) {
+GRD_DEDUP void grd_format_item(GrdFormatter* formatter, GrdAny any, GrdString spec) {
 	grd_format_item(formatter, any.type, any.ptr, spec);
 }
 
@@ -187,7 +187,7 @@ struct GrdFormatFlag {
 };
 
 template <GrdStringChar Char>
-void format_parser(
+GRD_DEDUP void format_parser(
 	GrdSpan<Char> fmt,
 	GrdSpan<GrdString> short_specs,
 	GrdSpan<GrdFormatFlag> format_flags,
@@ -289,16 +289,16 @@ void format_parser(
 	}
 }
 
-GrdTuple<GrdString, bool> formatter_resolve_spec(GrdFormatter* formatter, GrdUnicodeString spec) {
+GRD_DEDUP GrdTuple<GrdString, bool> formatter_resolve_spec(GrdFormatter* formatter, GrdUnicodeString spec) {
 	return { grd_encode_utf8(spec), true };
 }
 
-GrdTuple<GrdString, bool> formatter_resolve_spec(GrdFormatter* formatter, GrdString spec) {
+GRD_DEDUP GrdTuple<GrdString, bool> formatter_resolve_spec(GrdFormatter* formatter, GrdString spec) {
 	return { spec, false };
 }
 
 template <GrdStringChar T>
-void grd_format_impl(GrdFormatter* formatter, GrdSpan<T> format_str, std::initializer_list<GrdAny> things) {
+GRD_DEDUP void grd_format_impl(GrdFormatter* formatter, GrdSpan<T> format_str, std::initializer_list<GrdAny> things) {
 
 	GrdString short_specs[] = { "p"_b, "P"_b, "h"_b, "H"_b, "b"_b, "B"_b };
 
@@ -351,17 +351,17 @@ void grd_format_impl(GrdFormatter* formatter, GrdSpan<T> format_str, std::initia
 }
 
 template <GrdStringChar T, typename... Args>
-void grd_format(GrdFormatter* formatter, const T* fmt_str, Args... args) {
+GRD_DEDUP void grd_format(GrdFormatter* formatter, const T* fmt_str, Args... args) {
 	grd_format_impl(formatter, grd_make_string(fmt_str), { grd_make_any(&args)... });
 }
 
 template <GrdStringChar T, typename... Args>
-void grd_format(GrdFormatter* formatter, GrdSpan<T> fmt_str, Args... args) {
+GRD_DEDUP void grd_format(GrdFormatter* formatter, GrdSpan<T> fmt_str, Args... args) {
 	grd_format_impl(formatter, fmt_str, { grd_make_any(&args)... });
 }
 
 template <typename... Args>
-void grd_format(GrdFormatter* formatter, Args... args) {
+GRD_DEDUP void grd_format(GrdFormatter* formatter, Args... args) {
 
 	constexpr auto N = sizeof...(args);
 
@@ -437,11 +437,11 @@ struct Struct_Printer {
 	}
 };
 
-Struct_Printer grd_make_struct_printer(GrdFormatter* formatter) {
+GRD_DEDUP Struct_Printer grd_make_struct_printer(GrdFormatter* formatter) {
 	return { .formatter = formatter };
 }
 
-struct GrdArray_Printer {
+struct GrdArrayPrinter {
 	GrdFormatter* formatter;
 	s64        index = 0;
 
@@ -482,11 +482,11 @@ struct GrdArray_Printer {
 	}
 };
 
-GrdArray_Printer grd_make_array_printer(GrdFormatter* formatter) {
+GRD_DEDUP GrdArrayPrinter grd_make_array_printer(GrdFormatter* formatter) {
 	return { .formatter = formatter };
 }
 
-struct Tuple_Printer {
+struct GrdTuplePrinter {
 	GrdFormatter* formatter;
 	s64        index = 0;
 
@@ -516,11 +516,11 @@ struct Tuple_Printer {
 	}
 };
 
-Tuple_Printer grd_make_tuple_printer(GrdFormatter* formatter) {
+GRD_DEDUP GrdTuplePrinter grd_make_tuple_printer(GrdFormatter* formatter) {
 	return { .formatter = formatter };
 }
 
-struct Map_Printer {
+struct GrdMapPrinter {
 	GrdFormatter* formatter;
 	s64        index = 0;
 
@@ -562,12 +562,12 @@ struct Map_Printer {
 	}
 };
 
-Map_Printer grd_make_map_printer(GrdFormatter* formatter) {
+GRD_DEDUP GrdMapPrinter grd_make_map_printer(GrdFormatter* formatter) {
 	return { .formatter = formatter };
 }
 
 // @TODO: add grd prefixes. and remove underscores.
-void format_struct(GrdFormatter* formatter, GrdStructType* type, void* thing) {
+GRD_DEDUP void grd_format_struct(GrdFormatter* formatter, GrdStructType* type, void* thing) {
 	auto printer = grd_make_struct_printer(formatter);
 	printer.head(grd_make_string(type->name));
 	for (auto it: type->members) {
@@ -577,7 +577,7 @@ void format_struct(GrdFormatter* formatter, GrdStructType* type, void* thing) {
 }
 
 template <typename T>
-void format_c_string(GrdFormatter* formatter, T* c_str, GrdString spec) {
+GRD_DEDUP void grd_format_c_string(GrdFormatter* formatter, T* c_str, GrdString spec) {
 	if (c_str == NULL) {
 		grd_format(formatter, "NULL");
 		return;
@@ -611,7 +611,7 @@ void format_c_string(GrdFormatter* formatter, T* c_str, GrdString spec) {
 	}
 }
 
-void format_string(GrdFormatter* formatter, GrdSpanType* type, void* thing, GrdString spec) {
+GRD_DEDUP void grd_format_string(GrdFormatter* formatter, GrdSpanType* type, void* thing, GrdString spec) {
 	bool quote = grd_contains(spec, "quote"_b) || formatter->quote_inner_string;
 	formatter->quote_inner_string = false;
 	if (quote) {
@@ -631,10 +631,10 @@ void format_string(GrdFormatter* formatter, GrdSpanType* type, void* thing, GrdS
 	}
 }
 
-void format_span(GrdFormatter* formatter, GrdSpanType* type, void* thing, GrdString spec) {
+GRD_DEDUP void grd_format_span(GrdFormatter* formatter, GrdSpanType* type, void* thing, GrdString spec) {
 	if (type->inner == grd_reflect_type_of<char>() ||
 		type->inner == grd_reflect_type_of<char32_t>()) {
-		format_string(formatter, type, thing, spec);
+		grd_format_string(formatter, type, thing, spec);
 		return;
 	}
 
@@ -647,7 +647,7 @@ void format_span(GrdFormatter* formatter, GrdSpanType* type, void* thing, GrdStr
 	printer.tail();
 }
 
-void format_tuple(GrdFormatter* formatter, GrdStructType* type, void* thing) {
+GRD_DEDUP void grd_format_tuple(GrdFormatter* formatter, GrdStructType* type, void* thing) {
 	auto printer = grd_make_tuple_printer(formatter);
 	printer.head();
 	for (auto it: type->members) {
@@ -656,7 +656,7 @@ void format_tuple(GrdFormatter* formatter, GrdStructType* type, void* thing) {
 	printer.tail();
 }
 
-void format_map(GrdFormatter* formatter, GrdMapType* type, void* thing) {
+GRD_DEDUP  void grd_format_map(GrdFormatter* formatter, GrdMapType* type, void* thing) {
 	auto printer = grd_make_map_printer(formatter);
 	printer.head(grd_make_string(type->name));
 	for (auto* item: type->iterate(thing)) {
@@ -668,7 +668,7 @@ void format_map(GrdFormatter* formatter, GrdMapType* type, void* thing) {
 }
 
 template <typename T> requires (std::numeric_limits<T>::is_integer)
-void format_integer_primitive(GrdFormatter* formatter, T num, GrdString spec) {
+GRD_DEDUP void grd_format_integer_primitive(GrdFormatter* formatter, T num, GrdString spec) {
 	if (spec == "sz") {
 		if (num >= 1024ULL * 1024 * 1024 * 1024) {
 			grd_format(formatter, "% TB", f64(num) / f64(1024ULL * 1024 * 1024 * 1024));
@@ -701,44 +701,44 @@ void format_integer_primitive(GrdFormatter* formatter, T num, GrdString spec) {
 	grd_format(formatter, grd_as_str(&num_str));
 }
 
-void format_float_primitive(GrdFormatter* formatter, f64 num, GrdString spec) {
+GRD_DEDUP void grd_format_float_primitive(GrdFormatter* formatter, f64 num, GrdString spec) {
 	GrdSmallString num_str = grd_to_string(num);
 	grd_format(formatter, grd_as_str(&num_str));
 }
 
-void format_primitive(GrdFormatter* formatter, GrdPrimitiveType* type, void* thing, GrdString spec) {
+GRD_DEDUP void grd_format_primitive(GrdFormatter* formatter, GrdPrimitiveType* type, void* thing, GrdString spec) {
 
 	switch (type->primitive_kind) {
 		case GrdPrimitiveKind::P_u8:
-			format_integer_primitive(formatter, *(u8*)  thing, spec);
+			grd_format_integer_primitive(formatter, *(u8*)  thing, spec);
 			break;
 		case GrdPrimitiveKind::P_s8:
-			format_integer_primitive(formatter, *(s8*)  thing, spec);
+			grd_format_integer_primitive(formatter, *(s8*)  thing, spec);
 			break;
 		case GrdPrimitiveKind::P_u16:
-			format_integer_primitive(formatter, *(u16*) thing, spec);
+			grd_format_integer_primitive(formatter, *(u16*) thing, spec);
 			break;
 		case GrdPrimitiveKind::P_s16:
-			format_integer_primitive(formatter, *(s16*) thing, spec);
+			grd_format_integer_primitive(formatter, *(s16*) thing, spec);
 			break;
 		case GrdPrimitiveKind::P_u32:
-			format_integer_primitive(formatter, *(u32*) thing, spec);
+			grd_format_integer_primitive(formatter, *(u32*) thing, spec);
 			break;
 		case GrdPrimitiveKind::P_s32:
-			format_integer_primitive(formatter, *(s32*) thing, spec);
+			grd_format_integer_primitive(formatter, *(s32*) thing, spec);
 			break;
 		case GrdPrimitiveKind::P_u64:
-			format_integer_primitive(formatter, *(u64*) thing, spec);
+			grd_format_integer_primitive(formatter, *(u64*) thing, spec);
 			break;
 		case GrdPrimitiveKind::P_s64:
-			format_integer_primitive(formatter, *(s64*) thing, spec);
+			grd_format_integer_primitive(formatter, *(s64*) thing, spec);
 			break;
 
 		case GrdPrimitiveKind::P_f32:
-			format_float_primitive(formatter, *(f32*)  thing, spec);
+			grd_format_float_primitive(formatter, *(f32*)  thing, spec);
 			break;
 		case GrdPrimitiveKind::P_f64:
-			format_float_primitive(formatter, *(f64*)  thing, spec);
+			grd_format_float_primitive(formatter, *(f64*)  thing, spec);
 			break;
 
 		case GrdPrimitiveKind::P_bool: {
@@ -778,7 +778,7 @@ void format_primitive(GrdFormatter* formatter, GrdPrimitiveType* type, void* thi
 	}
 }
 
-bool is_flag_set(void* dst, void* src, u64 size) {
+GRD_DEDUP bool grd_is_flag_set(void* dst, void* src, u64 size) {
 	for (auto i: grd_range(size)) {
 		u8 dst_v = *(u8*) dst;
 		u8 src_v = *(u8*) src;
@@ -790,13 +790,13 @@ bool is_flag_set(void* dst, void* src, u64 size) {
 	return true;
 }
 
-void format_enum(GrdFormatter* formatter, GrdEnumType* type, void* thing) {
+GRD_DEDUP void grd_format_enum(GrdFormatter* formatter, GrdEnumType* type, void* thing) {
 
 	if (type->is_flags) {
 
 		s32  matched = 0;
 		for (auto it: type->values) {
-			if (is_flag_set(thing, &it.value, type->size)) {
+			if (grd_is_flag_set(thing, &it.value, type->size)) {
 				if (matched > 0) {
 					grd_format(formatter, '|');
 				}
@@ -819,7 +819,7 @@ void format_enum(GrdFormatter* formatter, GrdEnumType* type, void* thing) {
 	grd_format(formatter, "%(%)", type->name, grd_make_any(type->base_type, thing));
 }
 
-void format_pointer(GrdFormatter* formatter, GrdPointerType* type, void* thing, GrdString spec) {
+GRD_DEDUP void grd_format_pointer(GrdFormatter* formatter, GrdPointerType* type, void* thing, GrdString spec) {
 	s32  indir_level;
 	auto inner_type = grd_reflect_get_pointer_inner_type_with_indirection_level(type, &indir_level);
 
@@ -879,13 +879,13 @@ void format_pointer(GrdFormatter* formatter, GrdPointerType* type, void* thing, 
 	}
 
 	if (inner_type == grd_reflect_type_of<char>()) {
-		format_c_string(formatter, (char*) ptr, spec);
+		grd_format_c_string(formatter, (char*) ptr, spec);
 	} else if (inner_type == grd_reflect_type_of<wchar_t>()) {
-		format_c_string(formatter, (wchar_t*) ptr, spec);
+		grd_format_c_string(formatter, (wchar_t*) ptr, spec);
 	} else if (inner_type == grd_reflect_type_of<char16_t>()) {
-		format_c_string(formatter, (char16_t*) ptr, spec);
+		grd_format_c_string(formatter, (char16_t*) ptr, spec);
 	} else if (inner_type == grd_reflect_type_of<char32_t>()) {
-		format_c_string(formatter, (char32_t*) ptr, spec);
+		grd_format_c_string(formatter, (char32_t*) ptr, spec);
 	} else {
 		auto inner = grd_make_any(inner_type, ptr);
 
@@ -898,7 +898,7 @@ void format_pointer(GrdFormatter* formatter, GrdPointerType* type, void* thing, 
 	}
 }
 
-void grd_format_function(GrdFormatter* formatter, GrdFunctionType* type, void* thing, GrdString spec) {
+GRD_DEDUP void grd_format_function(GrdFormatter* formatter, GrdFunctionType* type, void* thing, GrdString spec) {
 	grd_format(formatter, "% (*)(", type->return_type->name);
 	for (auto i: grd_range(type->arg_types.count)) {
 		grd_format(formatter, type->arg_types.data[i]->name);
@@ -909,7 +909,7 @@ void grd_format_function(GrdFormatter* formatter, GrdFunctionType* type, void* t
 	grd_format(formatter, ")");
 }
 
-void grd_format_item(GrdFormatter* formatter, GrdType* type, void* thing, GrdString spec) {
+GRD_DEDUP void grd_format_item(GrdFormatter* formatter, GrdType* type, void* thing, GrdString spec) {
 	type = grd_get_real_type(type, thing);
 
 	if (GRD_TYPE_FORMAT_PROCS) {
@@ -930,28 +930,28 @@ void grd_format_item(GrdFormatter* formatter, GrdType* type, void* thing, GrdStr
 		case GrdStructType::KIND: {
 			auto casted = (GrdStructType*) real_type;
 			if (strcmp(casted->subkind, "tuple") == 0) {
-				format_tuple(formatter, casted, thing);
+				grd_format_tuple(formatter, casted, thing);
 			} else {
-				format_struct(formatter, casted, thing);
+				grd_format_struct(formatter, casted, thing);
 			}
 		}
 		break;
 
 		case GrdPrimitiveType::KIND: {
 			auto casted = (GrdPrimitiveType*) real_type;
-			format_primitive(formatter, casted, thing, spec);
+			grd_format_primitive(formatter, casted, thing, spec);
 		}
 		break;
 
 		case GrdEnumType::KIND: {
 			auto casted = (GrdEnumType*) real_type;
-			format_enum(formatter, casted, thing);
+			grd_format_enum(formatter, casted, thing);
 		}
 		break;
 
 		case GrdSpanType::KIND: {
 			auto casted = (GrdArrayType*) real_type;
-			format_span(formatter, casted, thing, spec);
+			grd_format_span(formatter, casted, thing, spec);
 		}
 		break;
 
@@ -964,7 +964,7 @@ void grd_format_item(GrdFormatter* formatter, GrdType* type, void* thing, GrdStr
 				inner_type == grd_reflect_type_of<char32_t>()) {
 				formatter->quote_inner_string = saved_quote_string;
 			}
-			format_pointer(formatter, casted, thing, spec);
+			grd_format_pointer(formatter, casted, thing, spec);
 		}
 		break;
 
@@ -987,77 +987,77 @@ void grd_format_item(GrdFormatter* formatter, GrdType* type, void* thing, GrdStr
 }
 
 template <GrdStringChar T>
-void grd_format(GrdArray<T>* builder, GrdAllocator allocator, auto... args) {
+GRD_DEDUP void grd_format(GrdArray<T>* builder, GrdAllocator allocator, auto... args) {
 	auto formatter = grd_make_formatter(builder, allocator);
 	grd_format(&formatter, args...);
 	formatter.free();
 }
 
 template <GrdStringChar T>
-void grd_format(GrdArray<T>* builder, auto... args) {
+GRD_DEDUP void grd_format(GrdArray<T>* builder, auto... args) {
 	grd_format(builder, c_allocator, args...);
 }
 
-void grd_formatln(GrdFormatter* formatter, auto... args) {
+GRD_DEDUP void grd_formatln(GrdFormatter* formatter, auto... args) {
 	grd_format(formatter, args...);
 	grd_format(formatter, "\n"_b);
 }
 
 template <GrdStringChar T>
-void grd_formatln(GrdArray<T>* builder, GrdAllocator allocator, auto... args) {
+GRD_DEDUP void grd_formatln(GrdArray<T>* builder, GrdAllocator allocator, auto... args) {
 	grd_format(builder, allocator, args...);
 	grd_format(builder, allocator, "\n");
 }
 
 template <GrdStringChar T>
-void grd_formatln(GrdArray<T>* builder, auto... args) {
+GRD_DEDUP void grd_formatln(GrdArray<T>* builder, auto... args) {
 	grd_formatln(builder, c_allocator, args...);
 }
 
-void grd_print_to_stdout(GrdString text) {
+GRD_DEDUP void grd_print_to_stdout(GrdString text) {
 	fwrite(text.data, grd_len(text), 1, stdout);
 }
 
-void grd_print_to_stdout(GrdUnicodeString text) {
+GRD_DEDUP void grd_print_to_stdout(GrdUnicodeString text) {
 	auto utf8 = grd_encode_utf8(text);
 	grd_print_to_stdout(utf8);
 	GrdFree(utf8.data);
 }
 
-void grd_print(auto... args) {
+GRD_DEDUP void grd_print(auto... args) {
 	GrdArray<char32_t> builder;
 	grd_defer { builder.free(); };
 	grd_format(&builder, c_allocator, args...);
 	grd_print_to_stdout(builder);
 }
 
-void grd_println(auto... args) {
+GRD_DEDUP void grd_println(auto... args) {
 	grd_print(args...);
 	grd_print(U"\n"_b);
 }
 
 template <GrdStringChar T = char>
-GrdArray<T> grd_sprint(GrdAllocator allocator, auto... args) {
+GRD_DEDUP GrdArray<T> grd_sprint(GrdAllocator allocator, auto... args) {
 	GrdArray<T> builder = { .allocator = allocator };
 	grd_format(&builder, allocator, args...);
 	return builder;
 }
 
 template <GrdStringChar T = char>
-GrdArray<T> grd_sprint(auto... args) {
+GRD_DEDUP GrdArray<T> grd_sprint(auto... args) {
 	return grd_sprint(c_allocator, args...);
 }
 
-GrdAllocatedUnicodeString grd_sprint_unicode(GrdAllocator allocator, auto... args) {
+GRD_DEDUP GrdAllocatedUnicodeString grd_sprint_unicode(GrdAllocator allocator, auto... args) {
 	return grd_sprint<char32_t>(allocator, args...);
 }
 
-GrdAllocatedUnicodeString grd_sprint_unicode(auto... args) {
+GRD_DEDUP GrdAllocatedUnicodeString grd_sprint_unicode(auto... args) {
 	return grd_sprint<char32_t>(c_allocator, args...);
 }
 
 
-void grd_format_fixed_array_as_c_string(GrdFormatter* formatter, GrdAny thing) {
+GRD_DEDUP void grd_format_fixed_array_as_c_string(GrdFormatter* formatter, GrdAny thing) {
 	if (thing.type->kind == GrdArrayType::KIND) {
 		auto casted = (GrdArrayType*) thing.type;
 		if (strcmp(casted->subkind, "fixed_array") == 0) {
@@ -1082,7 +1082,7 @@ void grd_format_fixed_array_as_c_string(GrdFormatter* formatter, GrdAny thing) {
 }
 
 template <typename T>
-void grd_type_format(GrdFormatter* formatter, GrdOptional<T>* opt, GrdString spec) {
+GRD_DEDUP void grd_type_format(GrdFormatter* formatter, GrdOptional<T>* opt, GrdString spec) {
 	if (opt->has_value) {
 		grd_format(formatter, "GrdOptional{%}", opt->value);
 	} else {
@@ -1090,11 +1090,11 @@ void grd_type_format(GrdFormatter* formatter, GrdOptional<T>* opt, GrdString spe
 	}
 }
 
-void grd_type_format(GrdFormatter* formatter, GrdCodeLoc* loc, GrdString spec) {
+GRD_DEDUP void grd_type_format(GrdFormatter* formatter, GrdCodeLoc* loc, GrdString spec) {
 	grd_format(formatter, "%: %", grd_make_string(loc->file), loc->line);
 }
 
-void grd_type_format(GrdFormatter* formatter, GrdSmallString* str, GrdString spec) {
+GRD_DEDUP void grd_type_format(GrdFormatter* formatter, GrdSmallString* str, GrdString spec) {
 	grd_format(formatter, grd_as_str(str));
 }
 

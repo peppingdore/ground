@@ -28,7 +28,7 @@ struct GrdArray: GrdSpan<T> {
 };
 
 template <typename T>
-T* grd_reserve(GrdArray<T>* arr, s64 length, s64 index = -1, GrdCodeLoc loc = grd_caller_loc()) {
+GRD_DEDUP T* grd_reserve(GrdArray<T>* arr, s64 length, s64 index = -1, GrdCodeLoc loc = grd_caller_loc()) {
 	if (index < 0) {
 		index += grd_len(*arr) + 1;
 	}
@@ -68,14 +68,14 @@ T* grd_reserve(GrdArray<T>* arr, s64 length, s64 index = -1, GrdCodeLoc loc = gr
 }
 
 template <typename T>
-T* grd_add(GrdArray<T>* arr, std::type_identity_t<T> item, s64 index = -1, GrdCodeLoc loc = grd_caller_loc()) {
+GRD_DEDUP T* grd_add(GrdArray<T>* arr, std::type_identity_t<T> item, s64 index = -1, GrdCodeLoc loc = grd_caller_loc()) {
 	T* ptr = grd_reserve(arr, 1, index, loc);
 	*ptr = item;
 	return ptr;
 }
 
 template <typename T>
-T* grd_add(GrdArray<T>* arr, T* src, s64 length, s64 index = -1, GrdCodeLoc loc = grd_caller_loc()) {
+GRD_DEDUP T* grd_add(GrdArray<T>* arr, T* src, s64 length, s64 index = -1, GrdCodeLoc loc = grd_caller_loc()) {
 	T* ptr = grd_reserve(arr, length, index, loc);
 	for (auto i: grd_range(length)) {
 		ptr[i] = src[i];
@@ -84,40 +84,40 @@ T* grd_add(GrdArray<T>* arr, T* src, s64 length, s64 index = -1, GrdCodeLoc loc 
 }
 
 template <typename T>
-T* grd_add(GrdArray<T>* arr, GrdSpan<T> src, s64 index = -1, GrdCodeLoc loc = grd_caller_loc()) {
+GRD_DEDUP T* grd_add(GrdArray<T>* arr, GrdSpan<T> src, s64 index = -1, GrdCodeLoc loc = grd_caller_loc()) {
 	return grd_add(arr, src.data, src.count, index, loc);
 }
 
 // add initializer list
 template <typename T>
-T* grd_add(GrdArray<T>* arr, std::initializer_list<std::type_identity_t<T>> list, s64 index = -1, GrdCodeLoc loc = grd_caller_loc()) {
+GRD_DEDUP T* grd_add(GrdArray<T>* arr, std::initializer_list<std::type_identity_t<T>> list, s64 index = -1, GrdCodeLoc loc = grd_caller_loc()) {
 	return grd_add(arr, (T*) list.begin(), list.size(), index, loc);
 }
 
 template <typename T, s64 N>
-T* grd_add(GrdArray<T>* arr, const T (&src)[N], s64 index = -1, GrdCodeLoc loc = grd_caller_loc()) {
+GRD_DEDUP T* grd_add(GrdArray<T>* arr, const T (&src)[N], s64 index = -1, GrdCodeLoc loc = grd_caller_loc()) {
 	return grd_add(arr, (T*) src, N, index, loc);	
 }
 
 template <typename T>
-void grd_clear(GrdArray<T>* arr, GrdCodeLoc loc = grd_caller_loc()) {
+GRD_DEDUP void grd_clear(GrdArray<T>* arr, GrdCodeLoc loc = grd_caller_loc()) {
 	arr->count = 0;
 }
 
 template <typename T>
-GrdArray<T> grd_copy_array(GrdAllocator allocator, GrdSpan<T> src, GrdCodeLoc loc = grd_caller_loc()) {
+GRD_DEDUP GrdArray<T> grd_copy_array(GrdAllocator allocator, GrdSpan<T> src, GrdCodeLoc loc = grd_caller_loc()) {
 	GrdArray<T> result = { .allocator = allocator };
 	grd_add(&result, src, -1, loc);
 	return result;
 }
 
 template <typename T>
-GrdArray<T> grd_copy_array(GrdSpan<T> src, GrdCodeLoc loc = grd_caller_loc()) {
+GRD_DEDUP GrdArray<T> grd_copy_array(GrdSpan<T> src, GrdCodeLoc loc = grd_caller_loc()) {
 	return grd_copy_array(c_allocator, src, loc);
 }
 
 template <typename T>
-GrdArray<T> grd_to_array(GrdAllocator allocator, GrdGenerator<T>&& generator) {
+GRD_DEDUP GrdArray<T> grd_to_array(GrdAllocator allocator, GrdGenerator<T>&& generator) {
 	GrdArray<T> arr = { .allocator = allocator };
 	for (auto it: generator) {
 		grd_add(&arr, it);
@@ -126,7 +126,7 @@ GrdArray<T> grd_to_array(GrdAllocator allocator, GrdGenerator<T>&& generator) {
 }
 
 template <typename T>
-GrdArray<T> grd_to_array(GrdGenerator<T>&& generator) {
+GRD_DEDUP GrdArray<T> grd_to_array(GrdGenerator<T>&& generator) {
 	return grd_to_array(c_allocator, std::move(generator));
 }
 
@@ -136,12 +136,12 @@ struct GrdArrayType: GrdSpanType {
 };
 
 template <typename T>
-GrdArrayType* grd_reflect_create_type(GrdArray<T>* x) {
+GRD_DEDUP GrdArrayType* grd_reflect_create_type(GrdArray<T>* x) {
 	return grd_reflect_add_type_named<GrdArray<T>, GrdArrayType>("");
 }
 
 template <typename T>
-void grd_reflect_type(GrdArray<T>* x, GrdArrayType* type) {
+GRD_DEDUP void grd_reflect_type(GrdArray<T>* x, GrdArrayType* type) {
 	type->inner = grd_reflect_type_of<T>();
 	type->name = grd_heap_sprintf("GrdArray<%s>", type->inner->name);
 	type->subkind = "array";
@@ -161,7 +161,7 @@ void grd_reflect_type(GrdArray<T>* x, GrdArrayType* type) {
 }
 
 template <typename T, typename X>
-GrdArray<T> grd_join(GrdAllocator allocator, GrdSpan<T> a, GrdSpan<X> b) {
+GRD_DEDUP GrdArray<T> grd_join(GrdAllocator allocator, GrdSpan<T> a, GrdSpan<X> b) {
 	GrdArray<T> result = { .allocator = allocator };
 	for (auto i: grd_range(grd_len(a))) {
 		grd_add(&result, a[i]);
@@ -173,6 +173,6 @@ GrdArray<T> grd_join(GrdAllocator allocator, GrdSpan<T> a, GrdSpan<X> b) {
 }
 
 template <typename T, typename X>
-GrdArray<T> grd_join(GrdSpan<T> a, GrdSpan<X> b) {
+GRD_DEDUP GrdArray<T> grd_join(GrdSpan<T> a, GrdSpan<X> b) {
 	return grd_join(c_allocator, a, b);
 }

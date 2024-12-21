@@ -8,7 +8,7 @@ struct GrdOneDimRegion {
 };
 
 // Regions must not have spaces between them!
-void grd_one_dim_patch(s64 regions_count, auto get_region, auto resize, auto insert, auto remove, s64 insert_start, s64 insert_length) {
+GRD_DEDUP void grd_one_dim_patch(s64 regions_count, auto get_region, auto resize, auto insert, auto remove, s64 insert_start, s64 insert_length) {
 	if (insert_length < 0) {
 		return;
 	}

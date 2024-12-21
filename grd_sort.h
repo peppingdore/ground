@@ -4,9 +4,7 @@
 #include "grd_span.h"
 #include "grd_range.h"
 
-GRD_API(void grd_quick_sort(void* data, s64 start, s64 end, bool (*less)(void*, s64, s64), void (*swap)(void*, s64, s64)))
-#if GRD_IMPL
-{
+GRD_DEDUP void grd_quick_sort(void* data, s64 start, s64 end, bool (*less)(void*, s64, s64), void (*swap)(void*, s64, s64)) {
 	if ((end - start) < 2) {
 		return;
 	}
@@ -26,11 +24,8 @@ GRD_API(void grd_quick_sort(void* data, s64 start, s64 end, bool (*less)(void*, 
 	grd_quick_sort(data, start, left, less, swap);
 	grd_quick_sort(data, left + 1, end, less, swap);
 }
-#endif
 
-GRD_API(bool grd_is_sorted(void* data, s64 start, s64 length, bool (*less)(void*, s64, s64)))
-#if GRD_IMPL
-{
+GRD_DEDUP bool grd_is_sorted(void* data, s64 start, s64 length, bool (*less)(void*, s64, s64)) {
 	for (auto i: grd_range(length - 1)) {
 		if (less(data, i + 1, i)) {
 			return false;
@@ -38,9 +33,8 @@ GRD_API(bool grd_is_sorted(void* data, s64 start, s64 length, bool (*less)(void*
 	}
 	return true;
 }
-#endif
 
-void grd_quick_sort(auto arr, s64 start, s64 end, auto less, auto swap) {
+GRD_DEDUP void grd_quick_sort(auto arr, s64 start, s64 end, auto less, auto swap) {
 	struct Data {
 		decltype(arr)&  arr;
 		decltype(less)& less;
@@ -61,11 +55,11 @@ void grd_quick_sort(auto arr, s64 start, s64 end, auto less, auto swap) {
 	);
 }
 
-void grd_sort(auto arr, auto less, auto swap) {
+GRD_DEDUP void grd_sort(auto arr, auto less, auto swap) {
 	grd_quick_sort(arr, 0, grd_len(arr), less, swap);
 }
 
-void grd_sort(auto arr, auto less) {
+GRD_DEDUP void grd_sort(auto arr, auto less) {
 	auto swap = [&](auto _, s64 a, s64 b) {
 		auto temp = arr[a];
 		arr[a] = arr[b];
@@ -74,14 +68,14 @@ void grd_sort(auto arr, auto less) {
 	grd_sort(arr, less, swap);
 }
 
-void grd_sort(auto arr) {
+GRD_DEDUP void grd_sort(auto arr) {
 	auto less = [&] (auto _, s64 a, s64 b) {
 		return arr[a] < arr[b];
 	};
 	grd_sort(arr, less);
 }
 
-bool grd_is_sorted(auto arr, s64 start, s64 length, auto less) {
+GRD_DEDUP bool grd_is_sorted(auto arr, s64 start, s64 length, auto less) {
 	struct Data {
 		decltype(arr)&  arr;
 		decltype(less)& less;
@@ -97,11 +91,11 @@ bool grd_is_sorted(auto arr, s64 start, s64 length, auto less) {
 	);
 }
 
-bool grd_is_sorted(auto arr, auto less) {
+GRD_DEDUP bool grd_is_sorted(auto arr, auto less) {
 	return grd_is_sorted(arr, 0, grd_len(arr), less);
 }
 
-bool grd_is_sorted(auto arr) {
+GRD_DEDUP bool grd_is_sorted(auto arr) {
 	auto less = [&] (auto _, s64 a, s64 b) {
 		return arr[a] < arr[b];
 	};

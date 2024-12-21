@@ -28,7 +28,7 @@ struct GrdLogger {
 	GrdLogLevel    pass_level = GrdLogLevel::Trace;
 };
 
-void grd_default_logger_proc(GrdLogger* logger, GrdLogInfo info, GrdUnicodeString text) {
+GRD_DEDUP void grd_default_logger_proc(GrdLogger* logger, GrdLogInfo info, GrdUnicodeString text) {
 	auto unicode_path = grd_copy_unicode_string(grd_make_string(info.loc.file));
 	auto base = grd_path_basename(unicode_path);
 	auto formatted = grd_sprint("%:% %", base, info.loc.line, text);
@@ -37,31 +37,31 @@ void grd_default_logger_proc(GrdLogger* logger, GrdLogInfo info, GrdUnicodeStrin
 	unicode_path.free();
 }
 
-GrdLogger* grd_make_default_logger() {
+GRD_DEDUP GrdLogger* grd_make_default_logger() {
 	auto logger = grd_make<GrdLogger>();
 	logger->proc = grd_default_logger_proc;
 	return logger;
 }
 
-void grd_void_logger_proc(GrdLogger* logger, GrdLogInfo info, GrdUnicodeString text) {
+GRD_DEDUP void grd_void_logger_proc(GrdLogger* logger, GrdLogInfo info, GrdUnicodeString text) {
 
 }
 
-GrdLogger* grd_make_void_logger() {
+GRD_DEDUP GrdLogger* grd_make_void_logger() {
 	auto logger = grd_make<GrdLogger>();
 	logger->proc = grd_void_logger_proc;
 	return logger;
 }
 
-inline GrdLogger*(*grd_make_new_logger)() = grd_make_default_logger;
-inline thread_local GrdLogger* __grd_thread_logger = NULL;
+GRD_DEDUP GrdLogger*(*grd_make_new_logger)() = grd_make_default_logger;
+GRD_DEDUP thread_local GrdLogger* __grd_thread_logger = NULL;
 
-inline GrdLogger* set_thread_logger(GrdLogger* logger) {
+GRD_DEDUP GrdLogger* set_thread_logger(GrdLogger* logger) {
 	grd_swap(logger, __grd_thread_logger);
 	return logger;
 }
 
-inline GrdLogger* grd_get_logger() {
+GRD_DEDUP GrdLogger* grd_get_logger() {
 	if (!__grd_thread_logger) {
 		__grd_thread_logger = grd_make_new_logger();
 	}
@@ -72,28 +72,28 @@ inline GrdLogger* grd_get_logger() {
 // Using CamelCase instead of snake_case here to avoid intersecting
 //   with math log() function.
 
-inline void GrdLogAtLogger(GrdLogger* logger, GrdLogInfo info, GrdUnicodeString text) {
+GRD_DEDUP void GrdLogAtLogger(GrdLogger* logger, GrdLogInfo info, GrdUnicodeString text) {
 	if (info.level > logger->pass_level) {
 		return;
 	}
 	logger->proc(logger, info, text);
 }
 
-inline void GrdLogAtLogger(GrdLogger* logger, GrdLogInfo info, auto... args) {
+GRD_DEDUP void GrdLogAtLogger(GrdLogger* logger, GrdLogInfo info, auto... args) {
 	auto str = grd_sprint_unicode(logger->allocator, args...);
 	GrdLogAtLogger(logger, info, (GrdUnicodeString) str);
 	str.free();
 }
 
-inline void GrdLogWithInfo(GrdLogInfo info, auto... args) {
+GRD_DEDUP void GrdLogWithInfo(GrdLogInfo info, auto... args) {
 	GrdLogAtLogger(grd_get_logger(), info, args...);
 }
 
-inline void GrdLog(GrdCodeLoc loc, auto... args) {
+GRD_DEDUP void GrdLog(GrdCodeLoc loc, auto... args) {
 	GrdLogWithInfo({ .loc = loc, }, args...);
 }
 
-inline void GrdLogTrace(GrdCodeLoc loc, auto... args) {
+GRD_DEDUP void GrdLogTrace(GrdCodeLoc loc, auto... args) {
 	GrdLogWithInfo({ .loc = loc, .level = GrdLogLevel::Trace }, args...);
 }
 

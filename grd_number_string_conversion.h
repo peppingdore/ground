@@ -19,15 +19,15 @@ struct GrdSmallString {
 };
 static_assert(sizeof(GrdSmallString) == 128);
 
-s64 grd_len(GrdSmallString x) {
+GRD_DEDUP s64 grd_len(GrdSmallString x) {
 	return x.length;
 }
 
-GrdString grd_as_str(GrdSmallString* x) {
+GRD_DEDUP GrdString grd_as_str(GrdSmallString* x) {
 	return { x->buf, x->length };
 }
 
-void grd_append(GrdSmallString* res, char c) {
+GRD_DEDUP void grd_append(GrdSmallString* res, char c) {
 	if (res->length >= grd_static_array_count(res->buf)) {
 		return;
 	}
@@ -35,14 +35,14 @@ void grd_append(GrdSmallString* res, char c) {
 	res->length += 1;
 }
 
-void grd_append(GrdSmallString* res, const char* str) {
+GRD_DEDUP void grd_append(GrdSmallString* res, const char* str) {
 	auto length = strlen(str);
 	for (auto i: grd_range(length)) {
 		grd_append(res, str[i]);
 	}
 }
 
-inline void grd_print_integer_number_to_char_buffer_reversed(auto num, int base, bool uppercase, char* buf, auto* cursor) {
+GRD_DEDUP void grd_print_integer_number_to_char_buffer_reversed(auto num, int base, bool uppercase, char* buf, auto* cursor) {
 	if (num == 0) {
 		buf[*cursor] = '0';
 		*cursor += 1;
@@ -61,7 +61,7 @@ inline void grd_print_integer_number_to_char_buffer_reversed(auto num, int base,
 	}
 }
 
-inline void print_integer_number_to_char_buffer(auto number, int base, bool uppercase, char* buffer, auto* cursor) {
+GRD_DEDUP void print_integer_number_to_char_buffer(auto number, int base, bool uppercase, char* buffer, auto* cursor) {
 	auto start_position = *cursor;
 	grd_print_integer_number_to_char_buffer_reversed(number, base, uppercase, buffer, cursor);
 	grd_reverse(buffer + start_position, *cursor - start_position);
@@ -74,7 +74,7 @@ struct IntegerStringParams {
 };
 
 template <typename T> requires (std::numeric_limits<T>::is_integer)
-inline GrdSmallString grd_to_string(T num, IntegerStringParams p = {}) {
+GRD_DEDUP GrdSmallString grd_to_string(T num, IntegerStringParams p = {}) {
 	static_assert(sizeof(T) <= 64 / 8);
 
 	p.base = grd_clamp_s32(2, 16, p.base);
@@ -100,7 +100,7 @@ inline GrdSmallString grd_to_string(T num, IntegerStringParams p = {}) {
 }
 
 template <typename T> requires (std::is_floating_point_v<T>)
-inline GrdSmallString grd_to_string(T num, int max_decimal_digits = 99999999) {
+GRD_DEDUP GrdSmallString grd_to_string(T num, int max_decimal_digits = 99999999) {
 	// Using implementation from:
 	// https://blog.benoitblanchon.fr/lightweight-float-to-string/
 
@@ -279,7 +279,7 @@ inline GrdSmallString grd_to_string(T num, int max_decimal_digits = 99999999) {
 	return res;
 }
 
-inline GrdSmallString grd_to_string(bool b) {
+GRD_DEDUP GrdSmallString grd_to_string(bool b) {
 	GrdSmallString res;
 	grd_append(&res, b ? "true" : "false");
 	return res;
@@ -300,7 +300,7 @@ struct GrdParseIntegerParams {
 
 // If number's base is not 10 than it's threated as unsigned.
 template <typename T, GrdStringChar Char> requires (std::numeric_limits<T>::is_integer)
-inline bool grd_parse_integer(GrdSpan<Char> str, T* result, GrdParseIntegerParams params = {}) {
+GRD_DEDUP bool grd_parse_integer(GrdSpan<Char> str, T* result, GrdParseIntegerParams params = {}) {
 	static_assert(sizeof(T) == 1 || sizeof(T) == 2 || sizeof(T) == 4 || sizeof(T) == 8, "Integer size is not supported");
 
 	constexpr bool is_signed = std::numeric_limits<T>::is_signed;
@@ -528,7 +528,7 @@ struct Float_Parsing_Params {
 };
 
 template <GrdStringChar Char>
-inline bool grd_parse_float(GrdSpan<Char> str, f64* result, Float_Parsing_Params params = {}) {
+GRD_DEDUP bool grd_parse_float(GrdSpan<Char> str, f64* result, Float_Parsing_Params params = {}) {
 	if (grd_len(str) <= 0) {
 		return false;
 	}
@@ -787,7 +787,7 @@ inline bool grd_parse_float(GrdSpan<Char> str, f64* result, Float_Parsing_Params
 	return true;
 }
 
-inline bool grd_parse_float(auto str, f32* result, Float_Parsing_Params params = {}) {
+GRD_DEDUP bool grd_parse_float(auto str, f32* result, Float_Parsing_Params params = {}) {
 	f64 num;
 	bool success = grd_parse_float(str, &num, params);
 	if (success) {

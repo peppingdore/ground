@@ -4,8 +4,8 @@
 #include "grd_allocator.h"
 #include "grd_reflect.h"
 
-constexpr GrdHash64 HASH_MAP_HASH_EMPTY = 0;
-constexpr GrdHash64 HASH_MAP_SLOT_HASH_FIRST_OCCUPIED = 1;
+GRD_DEDUP constexpr GrdHash64 HASH_MAP_HASH_EMPTY = 0;
+GRD_DEDUP constexpr GrdHash64 HASH_MAP_SLOT_HASH_FIRST_OCCUPIED = 1;
 
 template <typename K, typename V>
 struct GrdHashMapEntry {
@@ -48,12 +48,12 @@ struct GrdHashMap {
 };
 
 template <typename K, typename V>
-s64 grd_hash_map_get_home(GrdHashMap<K, V>* map, GrdHashMapEntry<K, V>* e) {
+GRD_DEDUP s64 grd_hash_map_get_home(GrdHashMap<K, V>* map, GrdHashMapEntry<K, V>* e) {
 	assert(map->capacity > 0);
 	return e->normalized_hash % map->capacity;
 }
 
-GrdHash64 grd_hash_map_normalize_hash(GrdHash64 hash) {
+GRD_DEDUP GrdHash64 grd_hash_map_normalize_hash(GrdHash64 hash) {
 	if (hash < HASH_MAP_SLOT_HASH_FIRST_OCCUPIED) {
 		return HASH_MAP_SLOT_HASH_FIRST_OCCUPIED;
 	}
@@ -61,31 +61,31 @@ GrdHash64 grd_hash_map_normalize_hash(GrdHash64 hash) {
 }
 
 template <typename K>
-GrdHash64 grd_hash_key(K key) {
+GRD_DEDUP GrdHash64 grd_hash_key(K key) {
 	auto h = grd_hash64(key);
 	return grd_hash_map_normalize_hash(h);
 }
 
-s64 grd_hash_map_distance_from_home(s64 home, s64 slot, s64 capacity) {
+GRD_DEDUP s64 grd_hash_map_distance_from_home(s64 home, s64 slot, s64 capacity) {
 	if (slot < home) {
 		return slot + (capacity - home);
 	}
 	return slot - home;
 }
 
-s64 grd_hash_map_next_index_wraparound(s64 idx, s64 capacity) {
+GRD_DEDUP s64 grd_hash_map_next_index_wraparound(s64 idx, s64 capacity) {
 	return (idx + 1) % capacity;
 }
 
 template <typename K, typename V>
-void grd_hash_map_clear_entries_hashes(GrdHashMapEntry<K, V>* entries, s64 capacity) {
+GRD_DEDUP void grd_hash_map_clear_entries_hashes(GrdHashMapEntry<K, V>* entries, s64 capacity) {
 	for (auto i: grd_range(capacity)) {
 		entries[i].normalized_hash = HASH_MAP_HASH_EMPTY;
 	}
 }
 
 template <typename K, typename V>
-GrdHashMapEntry<K, V>* grd_put_entry(GrdHashMap<K, V>* map, K key) {
+GRD_DEDUP GrdHashMapEntry<K, V>* grd_put_entry(GrdHashMap<K, V>* map, K key) {
 	if (!map->data) {
 		if (map->capacity <= 4) {
 			map->capacity = 16;
@@ -163,7 +163,7 @@ GrdHashMapEntry<K, V>* grd_put_entry(GrdHashMap<K, V>* map, K key) {
 }
 
 template <typename K, typename V>
-GrdHashMapEntry<K, V>* grd_get_entry(GrdHashMap<K, V>* map, std::type_identity_t<K> key) {
+GRD_DEDUP GrdHashMapEntry<K, V>* grd_get_entry(GrdHashMap<K, V>* map, std::type_identity_t<K> key) {
 	if (!map->data) {
 		return NULL;
 	}
@@ -194,7 +194,7 @@ GrdHashMapEntry<K, V>* grd_get_entry(GrdHashMap<K, V>* map, std::type_identity_t
 }
 
 template <typename K, typename V>
-GrdHashMapEntry<K, V>* grd_remove(GrdHashMap<K, V>* map, std::type_identity_t<K> key) {
+GRD_DEDUP GrdHashMapEntry<K, V>* grd_remove(GrdHashMap<K, V>* map, std::type_identity_t<K> key) {
 	if (!map->data) {
 		return NULL;
 	}
@@ -239,19 +239,19 @@ GrdHashMapEntry<K, V>* grd_remove(GrdHashMap<K, V>* map, std::type_identity_t<K>
 }
 
 template <typename K, typename V>
-V* grd_put(GrdHashMap<K, V>* map, std::type_identity_t<K> key) {
+GRD_DEDUP V* grd_put(GrdHashMap<K, V>* map, std::type_identity_t<K> key) {
 	return &grd_put_entry(map, key)->value;
 }
 
 template <typename K, typename V>
-V* grd_put(GrdHashMap<K, V>* map, std::type_identity_t<K> key, std::type_identity_t<V> value) {
+GRD_DEDUP V* grd_put(GrdHashMap<K, V>* map, std::type_identity_t<K> key, std::type_identity_t<V> value) {
 	V* result = grd_put(map, key);
 	*result = value;
 	return result;
 }
 
 template <typename K, typename V>
-V* grd_get(GrdHashMap<K, V>* map, std::type_identity_t<K> key) {
+GRD_DEDUP V* grd_get(GrdHashMap<K, V>* map, std::type_identity_t<K> key) {
 	auto* e = grd_get_entry(map, key);
 	if (!e) {
 		return NULL;
@@ -260,7 +260,7 @@ V* grd_get(GrdHashMap<K, V>* map, std::type_identity_t<K> key) {
 }
 
 template <typename K, typename V>
-s64 grd_len(GrdHashMap<K, V> map) {
+GRD_DEDUP s64 grd_len(GrdHashMap<K, V> map) {
 	return map.count;
 }
 
@@ -276,12 +276,12 @@ struct GrdHashMapType: GrdMapType {
 };
 
 template <typename K, typename V>
-GrdHashMapType* grd_reflect_create_type(GrdHashMap<K, V>* x) {
+GRD_DEDUP GrdHashMapType* grd_reflect_create_type(GrdHashMap<K, V>* x) {
 	return grd_reflect_add_type_named<GrdHashMap<K, V>, GrdHashMapType>("");
 }
 
 template <typename K, typename V>
-void grd_reflect_type(GrdHashMap<K, V>* x, GrdHashMapType* type) {
+GRD_DEDUP void grd_reflect_type(GrdHashMap<K, V>* x, GrdHashMapType* type) {
 	type->key   = grd_reflect_type_of<K>();
 	type->value = grd_reflect_type_of<V>();
 	type->name  = grd_heap_sprintf("GrdHashMap<%s, %s>", type->key->name, type->value->name);

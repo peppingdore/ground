@@ -18,7 +18,7 @@ struct GrdStopwatch {
 	s64 last_us;
 };
 
-s64 grd_get_current_nanos(GrdStopwatch* w) {
+GRD_DEDUP s64 grd_get_current_nanos(GrdStopwatch* w) {
 #if GRD_OS_WINDOWS
 	LARGE_INTEGER counter;
 	QueryPerformanceCounter(&counter);
@@ -38,7 +38,7 @@ s64 grd_get_current_nanos(GrdStopwatch* w) {
 #endif
 }
 
-s64 grd_nanos_elapsed_s64(GrdStopwatch* w) {
+GRD_DEDUP s64 grd_nanos_elapsed_s64(GrdStopwatch* w) {
 	s64 new_time = grd_get_current_nanos(w);
 	s64 delta = new_time - w->last_us;
 
@@ -48,27 +48,27 @@ s64 grd_nanos_elapsed_s64(GrdStopwatch* w) {
 	return delta;
 }
 
-s64 grd_millis_elapsed_s64(GrdStopwatch* w) {
+GRD_DEDUP s64 grd_millis_elapsed_s64(GrdStopwatch* w) {
 	return grd_nanos_elapsed_s64(w) / 1000;
 }
 
-s64 grd_seconds_elapsed_s64(GrdStopwatch* w) {
+GRD_DEDUP s64 grd_seconds_elapsed_s64(GrdStopwatch* w) {
 	return grd_millis_elapsed_s64(w) / 1000;
 }
 
-f64 grd_millis_elapsed_f64(GrdStopwatch* w) {
+GRD_DEDUP f64 grd_millis_elapsed_f64(GrdStopwatch* w) {
 	return f64(grd_nanos_elapsed_s64(w)) / 1000.0;
 }
 
-f64 grd_seconds_elapsed_f64(GrdStopwatch* w) {
+GRD_DEDUP f64 grd_seconds_elapsed_f64(GrdStopwatch* w) {
 	return grd_millis_elapsed_f64(w) / 1000.0;
 }
 
-void grd_reset(GrdStopwatch* w) {
+GRD_DEDUP void grd_reset(GrdStopwatch* w) {
 	w->last_us = grd_get_current_nanos(w);
 }
 
-GrdStopwatch grd_make_stopwatch() {
+GRD_DEDUP GrdStopwatch grd_make_stopwatch() {
 	GrdStopwatch w;
 #if GRD_OS_WINDOWS
 	LARGE_INTEGER freq_li;

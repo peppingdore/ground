@@ -13,7 +13,7 @@ struct GrdCodeLoc {
 	}
 };
 
-constexpr GrdCodeLoc grd_make_code_loc(s32 line, const char* file) {
+GRD_DEDUP constexpr GrdCodeLoc grd_make_code_loc(s32 line, const char* file) {
 	return {
 		.line = line,
 		.file = (char*) file,
@@ -24,7 +24,7 @@ constexpr GrdCodeLoc grd_make_code_loc(s32 line, const char* file) {
 	#define grd_caller_loc() grd_make_code_loc(__builtin_LINE(), __builtin_FILE())
 #else
 	#include <source_location>
-	constexpr GrdCodeLoc grd_make_code_loc(const std::source_location cpp_loc) {
+	GRD_DEDUP constexpr GrdCodeLoc grd_make_code_loc(const std::source_location cpp_loc) {
 		return {
 			.line = (s32) cpp_loc.line(),
 			.file = (char*) cpp_loc.file_name()

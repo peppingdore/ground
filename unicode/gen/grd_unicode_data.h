@@ -167,10 +167,10 @@ GRD_REFLECT(GrdUnicodeDecompositionTag) {
 /* %-end */
 };
 
-const unsigned int GRD_UNICODE_CATEGORY_MASK  = /* %-category_mask */0xf8000/* %-end */;
-const unsigned int GRD_UNICODE_CATEGORY_SHIFT = /* %-category_shift */15/* %-end */;
-const unsigned int GRD_UNICODE_BIDI_CATEGORY_MASK  = /* %-bidi_category_mask */0x1f00000/* %-end */;
-const unsigned int GRD_UNICODE_BIDI_CATEGORY_SHIFT = /* %-bidi_category_shift */20/* %-end */;
+GRD_DEDUP const unsigned int GRD_UNICODE_CATEGORY_MASK  = /* %-category_mask */0xf8000/* %-end */;
+GRD_DEDUP const unsigned int GRD_UNICODE_CATEGORY_SHIFT = /* %-category_shift */15/* %-end */;
+GRD_DEDUP const unsigned int GRD_UNICODE_BIDI_CATEGORY_MASK  = /* %-bidi_category_mask */0x1f00000/* %-end */;
+GRD_DEDUP const unsigned int GRD_UNICODE_BIDI_CATEGORY_SHIFT = /* %-bidi_category_shift */20/* %-end */;
 
 struct GrdUnicodeCodepointRange {
 	unsigned int first_codepoint;
@@ -183,7 +183,7 @@ GRD_REFLECT(GrdUnicodeCodepointRange) {
 	GRD_MEMBER(codepoint_table_offset);
 }
 
-const GrdUnicodeCodepointRange GRD_UNICODE_UNIFORM_CODEPOINT_RANGES[] = {
+GRD_DEDUP const GrdUnicodeCodepointRange GRD_UNICODE_UNIFORM_CODEPOINT_RANGES[] = {
 /* %-uniform_ranges */
 { 0x3400, 0x4dbf, 46422 },
 { 0x4e00, 0x9fff, 46423 },
@@ -206,7 +206,7 @@ const GrdUnicodeCodepointRange GRD_UNICODE_UNIFORM_CODEPOINT_RANGES[] = {
 /* %-end */
 };
 
-const GrdUnicodeCodepointRange GRD_UNICODE_NONUNIFORM_CODEPOINT_RANGES[] = {
+GRD_DEDUP const GrdUnicodeCodepointRange GRD_UNICODE_NONUNIFORM_CODEPOINT_RANGES[] = {
 /* %-non_uniform_ranges */
 { 0x0, 0x33ff, 0 },
 { 0x4dc0, 0x4dff, 13312 },
@@ -225,7 +225,7 @@ const GrdUnicodeCodepointRange GRD_UNICODE_NONUNIFORM_CODEPOINT_RANGES[] = {
 /* %-end */
 };
 
-const char* GRD_UNICODE_DIGIT_VALUES[] = {
+GRD_DEDUP const char* GRD_UNICODE_DIGIT_VALUES[] = {
 /* %-digit_values */
 "",
 "0",
@@ -241,7 +241,7 @@ const char* GRD_UNICODE_DIGIT_VALUES[] = {
 /* %-end */
 };
 
-const char* GRD_UNICODE_NUMERIC_VALUES[] = {
+GRD_DEDUP const char* GRD_UNICODE_NUMERIC_VALUES[] = {
 /* %-numeric_values */
 "",
 "0",
@@ -396,7 +396,7 @@ const char* GRD_UNICODE_NUMERIC_VALUES[] = {
 /* %-end */
 };
 
-const int GRD_UNICODE_OFFSETS_INTO_PACKED_CODEPOINTS[] = {
+GRD_DEDUP const int GRD_UNICODE_OFFSETS_INTO_PACKED_CODEPOINTS[] = {
 /* %-offsets_into_packed */
 0x0,
 0x1,
@@ -81789,7 +81789,7 @@ struct GrdUnicodeCodepoint {
 	int                         titlecase_mapping = 0;
 };
 
-bool grd_decode_unicode_codepoint(char32_t codepoint, int table_index, GrdUnicodeCodepoint* out_codepoint) {
+GRD_DEDUP bool grd_decode_unicode_codepoint(char32_t codepoint, int table_index, GrdUnicodeCodepoint* out_codepoint) {
 	int offset = GRD_UNICODE_OFFSETS_INTO_PACKED_CODEPOINTS[table_index];
 	if (offset == -1) {
 		return false;
@@ -81840,7 +81840,7 @@ bool grd_decode_unicode_codepoint(char32_t codepoint, int table_index, GrdUnicod
 	return true;
 }
 
-bool grd_lookup_unicode_codepoint(char32_t codepoint, GrdUnicodeCodepoint* out_codepoint) {
+GRD_DEDUP bool grd_lookup_unicode_codepoint(char32_t codepoint, GrdUnicodeCodepoint* out_codepoint) {
 	for (auto range: GRD_UNICODE_NONUNIFORM_CODEPOINT_RANGES) {
 		if (codepoint >= range.first_codepoint && codepoint <= range.last_codepoint) {
 			int table_index = range.codepoint_table_offset + (codepoint - range.first_codepoint);

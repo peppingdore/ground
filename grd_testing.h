@@ -44,9 +44,9 @@ struct GrdTester {
 	bool               skip_cases = false;
 	bool               whitelist_mode = false;
 };
-inline GrdTester tester;
+GRD_DEDUP GrdTester tester;
 
-void grd_tester_write_result_line(const char* str) {
+GRD_DEDUP void grd_tester_write_result_line(const char* str) {
 	if (!tester.write_test_results) {
 		return;
 	}
@@ -55,14 +55,14 @@ void grd_tester_write_result_line(const char* str) {
 	fflush(stderr);
 }
 
-void grd_tester_write_result_int(s64 num) {
+GRD_DEDUP void grd_tester_write_result_int(s64 num) {
 	if (!tester.write_test_results) {
 		return;
 	}
 	fprintf(stderr, "%lli\n", num);
 }
 
-void grd_tester_write_result_str(const char* str) {
+GRD_DEDUP void grd_tester_write_result_str(const char* str) {
 	s64 line_count = 1;
 	const char* ptr = str;
 	while (*ptr != '\0') {
@@ -75,12 +75,12 @@ void grd_tester_write_result_str(const char* str) {
 	grd_tester_write_result_line(str);
 }
 
-void grd_tester_write_result_loc(GrdCodeLoc loc) {
+GRD_DEDUP void grd_tester_write_result_loc(GrdCodeLoc loc) {
 	grd_tester_write_result_str(loc.file);
 	grd_tester_write_result_int(loc.line);
 }
 
-void grd_run_test(GrdTestCase* test) {
+GRD_DEDUP void grd_run_test(GrdTestCase* test) {
 	auto node = tester.first_ignore_test;
 	while (node) {
 		if (strcmp(node->str, test->name) == 0) {
@@ -113,7 +113,7 @@ void grd_run_test(GrdTestCase* test) {
 	printf("%s - %s\n", test->name, test->expect_failed > 0 ? "failed" : "success");
 }
 
-void grd_register_test_case(void(*proc)(), const char* name, s64 idx) {
+GRD_DEDUP void grd_register_test_case(void(*proc)(), const char* name, s64 idx) {
 	GrdTestCase* test = new GrdTestCase();
 	test->proc = proc;
 	test->name = name;
@@ -133,7 +133,7 @@ void grd_register_test_case(void(*proc)(), const char* name, s64 idx) {
 	}
 }
 
-void grd_tester_print_summary() {
+GRD_DEDUP void grd_tester_print_summary() {
 	// print failed tests. use ascii colors
 	printf("\n\n");
 	auto test = tester.first_case;
@@ -227,7 +227,7 @@ int main(int argc, char* argv[]) {
 	return 0;
 }
 
-void grd_test_expect(bool cond, const char* cond_str, const char* message, GrdCodeLoc loc = grd_caller_loc()) {
+GRD_DEDUP void grd_test_expect(bool cond, const char* cond_str, const char* message, GrdCodeLoc loc = grd_caller_loc()) {
 	grd_tester_write_result_line("TESTER_EXPECT");
 	if (cond) {
 		tester.current_test->expect_succeeded += 1;
@@ -272,13 +272,13 @@ void grd_test_expect(bool cond, const char* cond_str, const char* message, GrdCo
 	}
 }
 
-void grd_test_expect(bool cond, const char* cond_str, GrdCodeLoc loc = grd_caller_loc()) {
+GRD_DEDUP void grd_test_expect(bool cond, const char* cond_str, GrdCodeLoc loc = grd_caller_loc()) {
 	char* str = grd_heap_sprintf("Expected '%s'", cond_str);
 	grd_test_expect(cond, cond_str, str, loc);
 	free(str);
 }
 
-void grd_tester_scope_push(GrdCodeLoc loc) {
+GRD_DEDUP void grd_tester_scope_push(GrdCodeLoc loc) {
 	auto scope_node = new GrdTestScopeNode();
 	scope_node->loc = loc;
 	if (!tester.scope) {
@@ -289,7 +289,7 @@ void grd_tester_scope_push(GrdCodeLoc loc) {
 	}
 }
 
-void grd_tester_scope_pop() {
+GRD_DEDUP void grd_tester_scope_pop() {
 	if (tester.scope) {
 		tester.scope = tester.scope->next;
 	}
@@ -297,9 +297,9 @@ void grd_tester_scope_pop() {
 
 #define GRD_TEST_CASE(name)\
 GRD_BUILD_RUN("if 'ctx' in globals() and getattr(ctx, 'test', None): ctx.test.get_case(\"" #name "\")");\
-void grd_test_##name ();\
-int grd_register_test_##name = []() { grd_register_test_case(&grd_test_##name, #name, __COUNTER__); return 0; }();\
-inline void grd_test_##name()
+GRD_DEDUP grd_test_##name ();\
+GRD_DEDUP int grd_register_test_##name = []() { grd_register_test_case(&grd_test_##name, #name, __COUNTER__); return 0; }();\
+GRD_DEDUP void grd_test_##name()
 
 #define GRD_EXPECT_BASIC(cond, ...) grd_test_expect(cond, #cond, ## __VA_ARGS__);
 // #include "grd_format.h" for if you want to use macros below.

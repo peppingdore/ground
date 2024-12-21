@@ -47,7 +47,7 @@ struct GrdcAstOperator {
 	}
 };
 
-GrdcAstOperator GRDC_AST_BINARY_OPERATORS_UNSORTED[] = { 
+GRD_DEDUP GrdcAstOperator GRDC_AST_BINARY_OPERATORS_UNSORTED[] = { 
 	{ U","_b, 10, GRDC_AST_OP_FLAG_LEFT_ASSOC },
 	{ U"="_b, 11, 0 },
 	{ U"|="_b, 11, GRDC_AST_OP_FLAG_MOD_ASSIGN },
@@ -81,7 +81,7 @@ GrdcAstOperator GRDC_AST_BINARY_OPERATORS_UNSORTED[] = {
 	{ U"%"_b, 22, GRDC_AST_OP_FLAG_LEFT_ASSOC | GRDC_AST_OP_FLAG_INT | GRDC_AST_OP_FLAG_PREP },
 };
 
-GrdcAstOperator GRDC_AST_PREFIX_UNARY_OPERATORS_UNSORTED[] = {
+GRD_DEDUP GrdcAstOperator GRDC_AST_PREFIX_UNARY_OPERATORS_UNSORTED[] = {
 	{ U"!"_b, 30, GRDC_AST_OP_FLAG_PREFIX | GRDC_AST_OP_FLAG_PREP },
 	{ U"~"_b, 30, GRDC_AST_OP_FLAG_PREFIX | GRDC_AST_OP_FLAG_PREP },
 	{ U"+"_b, 30, GRDC_AST_OP_FLAG_PREFIX | GRDC_AST_OP_FLAG_PREP },
@@ -92,12 +92,12 @@ GrdcAstOperator GRDC_AST_PREFIX_UNARY_OPERATORS_UNSORTED[] = {
 	{ U"&"_b, 30, GRDC_AST_OP_FLAG_PREFIX },
 };
 
-GrdcAstOperator GRDC_AST_POSTFIX_UNARY_OPERATORS_UNSORTED[] = {
+GRD_DEDUP GrdcAstOperator GRDC_AST_POSTFIX_UNARY_OPERATORS_UNSORTED[] = {
 	{ U"++"_b, 40, GRDC_AST_OP_FLAG_POSTFIX },
 	{ U"--"_b, 40, GRDC_AST_OP_FLAG_POSTFIX },
 };
 
-GrdcAstOperator* grdc_find_binary_operator(GrdUnicodeString op, u64 req_flags) {
+GRD_DEDUP GrdcAstOperator* grdc_find_binary_operator(GrdUnicodeString op, u64 req_flags) {
 	for (auto& it: GRDC_AST_BINARY_OPERATORS_UNSORTED) {
 		if (op == it.op && (req_flags & it.flags) == req_flags) {
 			return &it;
@@ -106,7 +106,7 @@ GrdcAstOperator* grdc_find_binary_operator(GrdUnicodeString op, u64 req_flags) {
 	return NULL;
 }
 
-GrdcAstOperator* grdc_find_prefix_unary_operator(GrdUnicodeString op, u64 req_flags) {
+GRD_DEDUP GrdcAstOperator* grdc_find_prefix_unary_operator(GrdUnicodeString op, u64 req_flags) {
 	for (auto& it: GRDC_AST_PREFIX_UNARY_OPERATORS_UNSORTED) {
 		if (op == it.op && (req_flags & it.flags) == req_flags) {
 			return &it;
@@ -115,7 +115,7 @@ GrdcAstOperator* grdc_find_prefix_unary_operator(GrdUnicodeString op, u64 req_fl
 	return NULL;
 }
 
-GrdcAstOperator* grdc_find_postfix_unary_operator(GrdUnicodeString op, u64 req_flags) {
+GRD_DEDUP GrdcAstOperator* grdc_find_postfix_unary_operator(GrdUnicodeString op, u64 req_flags) {
 	for (auto& it: GRDC_AST_POSTFIX_UNARY_OPERATORS_UNSORTED) {
 		if (op == it.op && (req_flags & it.flags) == req_flags) {
 			return &it;
@@ -323,8 +323,8 @@ struct GrdcPrep {
 struct GrdcPrepTokenError;
 struct GrdcPrepDetailedError;
 
-void grd_type_format(GrdFormatter* f, GrdcPrepTokenError* e, GrdString spec);
-void grd_type_format(GrdFormatter* f, GrdcPrepDetailedError* e, GrdString spec);
+GRD_DEDUP void grd_type_format(GrdFormatter* f, GrdcPrepTokenError* e, GrdString spec);
+GRD_DEDUP void grd_type_format(GrdFormatter* f, GrdcPrepDetailedError* e, GrdString spec);
 
 struct GrdcPrepTokenError: GrdError {
 	GrdcPrep*  prep = NULL;
@@ -337,9 +337,9 @@ struct GrdcPrepTokenError: GrdError {
 	}
 };
 
-GrdcToken* grdc_file_tok(GrdcToken* tok);
+GRD_DEDUP GrdcToken* grdc_file_tok(GrdcToken* tok);
 
-GrdcPrepTokenError* grdc_make_prep_file_error(GrdcPrep* p, GrdcToken* tok, auto... args) {
+GRD_DEDUP GrdcPrepTokenError* grdc_make_prep_file_error(GrdcPrep* p, GrdcToken* tok, auto... args) {
 	auto msg = grd_sprint(p->allocator, args...);
 	auto e = grd_make_error<GrdcPrepTokenError>(msg);
 	e->prep = p;
@@ -347,7 +347,7 @@ GrdcPrepTokenError* grdc_make_prep_file_error(GrdcPrep* p, GrdcToken* tok, auto.
 	return e;
 }
 
-s64 grdc_map_index(GrdSpan<PrepFileMapping> mappings, s64 index) {
+GRD_DEDUP s64 grdc_map_index(GrdSpan<PrepFileMapping> mappings, s64 index) {
 	for (auto it: mappings) {
 		if (index >= it.start && index < it.start + it.length) {
 			return index - it.start + it.real_start;
@@ -356,13 +356,13 @@ s64 grdc_map_index(GrdSpan<PrepFileMapping> mappings, s64 index) {
 	return mappings[-1].real_start + mappings[-1].length;
 }
 
-s64 grdc_og_file_index(GrdcPrepFileSource* source, s64 index) {
+GRD_DEDUP s64 grdc_og_file_index(GrdcPrepFileSource* source, s64 index) {
 	index = grdc_map_index(source->comment_mappings, index);
 	index = grdc_map_index(source->splice_mappings, index);
 	return index;
 }
 
-s64 grdc_get_residual_lines_above(GrdUnicodeString src, s64 anchor, s64 lines_count) {
+GRD_DEDUP s64 grdc_get_residual_lines_above(GrdUnicodeString src, s64 anchor, s64 lines_count) {
 	s64 count = 0;
 	for (auto i: grd_reverse(grd_range(anchor))) {
 		if (grd_is_line_break(src[i])) {
@@ -375,7 +375,7 @@ s64 grdc_get_residual_lines_above(GrdUnicodeString src, s64 anchor, s64 lines_co
 	return 0;
 }
 
-s64 grdc_get_residual_lines_below(GrdUnicodeString src, s64 anchor, s64 lines_count) {
+GRD_DEDUP s64 grdc_get_residual_lines_below(GrdUnicodeString src, s64 anchor, s64 lines_count) {
 	s64 count = 0;
 	for (auto i: grd_range_from_to(anchor, grd_len(src))) {
 		if (grd_is_line_break(src[i])) {
@@ -388,9 +388,9 @@ s64 grdc_get_residual_lines_below(GrdUnicodeString src, s64 anchor, s64 lines_co
 	return grd_len(src);
 }
 
-GrdUnicodeString grdc_tok_str(GrdcToken* tok);
+GRD_DEDUP GrdUnicodeString grdc_tok_str(GrdcToken* tok);
 
-void grdc_print_file_range_highlighted(GrdFormatter* f, GrdcPrepFileSource* file, s64 h_start, s64 h_end, s64 color) {
+GRD_DEDUP void grdc_print_file_range_highlighted(GrdFormatter* f, GrdcPrepFileSource* file, s64 h_start, s64 h_end, s64 color) {
 	s64 mapped_start = grdc_og_file_index(file, h_start);
 	s64 mapped_end = grdc_og_file_index(file, h_end);
 	s64 start = grdc_get_residual_lines_above(file->og_src, mapped_start, 3);
@@ -425,13 +425,13 @@ void grdc_print_file_range_highlighted(GrdFormatter* f, GrdcPrepFileSource* file
 	grd_formatln(f);
 }
 
-void grdc_print_prep_token_error(GrdFormatter* f, GrdcToken* tok, s64 color) {
+GRD_DEDUP void grdc_print_prep_token_error(GrdFormatter* f, GrdcToken* tok, s64 color) {
 	assert(tok->src_kind == GRDC_PREP_TOKEN_SOURCE_FILE_SOURCE);
 	auto file = tok->file_source;
 	grdc_print_file_range_highlighted(f, file, tok->file_start, tok->file_end, color);
 }
 
-void grdc_print_single_error_token(GrdFormatter* f, GrdcToken* tok) {
+GRD_DEDUP void grdc_print_single_error_token(GrdFormatter* f, GrdcToken* tok) {
 	switch (tok->src_kind) {
 		case GRDC_PREP_TOKEN_SOURCE_FILE_SOURCE: {
 			grd_formatln(f, "  at file: %", tok->file_source->fullpath);
@@ -465,7 +465,7 @@ void grdc_print_single_error_token(GrdFormatter* f, GrdcToken* tok) {
 	}
 }
 
-void grdc_print_debug_tok(GrdcToken* tok) {
+GRD_DEDUP void grdc_print_debug_tok(GrdcToken* tok) {
 	grd_println("tok: %, \"%\"", tok->kind, grdc_tok_str(tok));
 }
 
@@ -488,7 +488,7 @@ struct GrdcTokenDumper {
 	GrdArray<GrdcTokenDumperFile> files;
 };
 
-void grdc_print_token_dumper(GrdFormatter* f, GrdcTokenDumper* dumper) {
+GRD_DEDUP void grdc_print_token_dumper(GrdFormatter* f, GrdcTokenDumper* dumper) {
 	for (auto& it: dumper->files) {
 		grd_formatln(f, "File: %", it.file->file->fullpath);
 		auto parent = it.file->parent;
@@ -507,7 +507,7 @@ void grdc_print_token_dumper(GrdFormatter* f, GrdcTokenDumper* dumper) {
 	}
 }
 
-void grdc_dump_file_range(GrdcTokenDumper* dumper, GrdcIncludedFile* file, s64 start, s64 end, s64 color) {
+GRD_DEDUP void grdc_dump_file_range(GrdcTokenDumper* dumper, GrdcIncludedFile* file, s64 start, s64 end, s64 color) {
 	// grd_println("grdc_dump_file_range(): %, (%, %)", file->fullpath, start, end);
 	GrdcTokenDumperFile* df = NULL;
 	for (auto& it: dumper->files) {
@@ -554,14 +554,14 @@ void grdc_dump_file_range(GrdcTokenDumper* dumper, GrdcIncludedFile* file, s64 s
 	grd_add(&dfr->ranges, { start, end });
 }
 
-GrdcMacroExp* grdc_get_root_macro_exp(GrdcMacroExp* exp) {
+GRD_DEDUP GrdcMacroExp* grdc_get_root_macro_exp(GrdcMacroExp* exp) {
 	while (exp->parent) {
 		exp = exp->parent;
 	}
 	return exp;
 }
 
-void grdc_dump_token(GrdcTokenDumper* dumper, GrdcToken* tok, s64 color) {
+GRD_DEDUP void grdc_dump_token(GrdcTokenDumper* dumper, GrdcToken* tok, s64 color) {
 	switch (tok->src_kind) {
 		// case GRDC_PREP_TOKEN_SOURCE_FILE_SOURCE:{
 		// 	grdc_dump_file_range(dumper, tok->file_source, tok->file_start, tok->file_end, color);
@@ -634,7 +634,7 @@ struct GrdcDetailedPrinter {
 	bool                 expand_site = false;
 };
 
-bool grdc_do_token_sources_match(GrdcToken* a, GrdcToken* b) {
+GRD_DEDUP bool grdc_do_token_sources_match(GrdcToken* a, GrdcToken* b) {
 	if (a->src_kind != b->src_kind) {
 		return false;
 	}
@@ -667,14 +667,14 @@ bool grdc_do_token_sources_match(GrdcToken* a, GrdcToken* b) {
 	}
 }
 
-GrdcDetailedPrinter* grdc_make_detailed_printer(GrdSpan<GrdcToken*> tokens, bool expand_site) {
+GRD_DEDUP GrdcDetailedPrinter* grdc_make_detailed_printer(GrdSpan<GrdcToken*> tokens, bool expand_site) {
 	auto dp = grd_make<GrdcDetailedPrinter>();
 	dp->tokens = tokens;
 	dp->expand_site = expand_site;
 	return dp;
 }
 
-s64 grdc_get_residual_tokens(GrdSpan<GrdcToken*> tokens, s64 cursor, s64 dir) {
+GRD_DEDUP s64 grdc_get_residual_tokens(GrdSpan<GrdcToken*> tokens, s64 cursor, s64 dir) {
 	s64 lines = 0;
 	bool fwd = dir >= 0;
 	dir = fwd ? 1 : -1;
@@ -689,7 +689,7 @@ s64 grdc_get_residual_tokens(GrdSpan<GrdcToken*> tokens, s64 cursor, s64 dir) {
 	return fwd ? grd_len(tokens) : 0;
 }
 
-void grdc_do_detailed_print(GrdFormatter* f, GrdcDetailedPrinter* dp) {
+GRD_DEDUP void grdc_do_detailed_print(GrdFormatter* f, GrdcDetailedPrinter* dp) {
 	if (grd_len(dp->spans) == 0) {
 		grd_formatln(f, "Empty DP");
 	}
@@ -846,14 +846,14 @@ void grdc_do_detailed_print(GrdFormatter* f, GrdcDetailedPrinter* dp) {
 	}	
 }
 
-void grdc_print_include_site(GrdFormatter* f, GrdcIncludedFile* inc) {
+GRD_DEDUP void grdc_print_include_site(GrdFormatter* f, GrdcIncludedFile* inc) {
 	while (inc) {
 		grd_formatln(f, "%", inc->file->fullpath);
 		inc = inc->parent;
 	}
 }
 
-void grdc_print_dp_site(GrdFormatter* f, GrdcToken* tok) {
+GRD_DEDUP void grdc_print_dp_site(GrdFormatter* f, GrdcToken* tok) {
 	switch (tok->src_kind) {
 		case GRDC_PREP_TOKEN_SOURCE_FILE_SOURCE: {
 			auto dp = grdc_make_detailed_printer(tok->file_source->tokens, false);
@@ -904,22 +904,22 @@ struct GrdcPrepDetailedError: GrdError {
 	}
 };
 
-GrdcPrepDetailedError* grdc_make_prep_dp_error(GrdcPrep* p, GrdCodeLoc loc, auto... args) {
+GRD_DEDUP GrdcPrepDetailedError* grdc_make_prep_dp_error(GrdcPrep* p, GrdCodeLoc loc, auto... args) {
 	auto msg = grd_sprint(args...);
 	auto e = grd_make_error<GrdcPrepDetailedError>(msg, loc);
 	return e;
 }
 
-void grdc_add_dp(GrdcPrepDetailedError* e, GrdcDetailedPrinter* dp) {
+GRD_DEDUP void grdc_add_dp(GrdcPrepDetailedError* e, GrdcDetailedPrinter* dp) {
 	grd_add(&e->nodes, { dp });
 }
 
-void grdc_add_message(GrdcPrepDetailedError* e, auto... args) {
+GRD_DEDUP void grdc_add_message(GrdcPrepDetailedError* e, auto... args) {
 	auto msg = grd_sprint(args...);
 	grd_add(&e->nodes, { msg });
 }
 
-void grdc_print_token_spans(GrdcTokenDumper* dumper, GrdSpan<GrdcTokenSpan> spans) {
+GRD_DEDUP void grdc_print_token_spans(GrdcTokenDumper* dumper, GrdSpan<GrdcTokenSpan> spans) {
 	for (auto it: spans) {
 		for (auto tok: it.tokens) {
 			grdc_dump_token(dumper, tok, it.color);
@@ -929,7 +929,7 @@ void grdc_print_token_spans(GrdcTokenDumper* dumper, GrdSpan<GrdcTokenSpan> span
 
 
 
-void grdc_print_prep_error(GrdFormatter* f, GrdError* e) {
+GRD_DEDUP void grdc_print_prep_error(GrdFormatter* f, GrdError* e) {
 	grd_formatln(f);
 	grd_formatln(f, "Error: %", e->text);
 	if (auto x = grd_reflect_cast<GrdcPrepTokenError>(e)) {
@@ -951,22 +951,22 @@ void grdc_print_prep_error(GrdFormatter* f, GrdError* e) {
 	}
 }
 
-void grd_type_format(GrdFormatter* f, GrdcPrepTokenError* e, GrdString spec) {
+GRD_DEDUP void grd_type_format(GrdFormatter* f, GrdcPrepTokenError* e, GrdString spec) {
 	grdc_print_prep_error(f, e);
 }
 
-void grd_type_format(GrdFormatter* f, GrdcPrepDetailedError* e, GrdString spec) {
+GRD_DEDUP void grd_type_format(GrdFormatter* f, GrdcPrepDetailedError* e, GrdString spec) {
 	grdc_print_prep_error(f, e);
 }
 
-void grdc_print_prep_error(GrdError* e) {
+GRD_DEDUP void grdc_print_prep_error(GrdError* e) {
 	GrdAllocatedUnicodeString str;
 	auto f = grd_make_formatter(&str, c_allocator);
 	grdc_print_prep_error(&f, e);
 	grd_print(str);
 }
 
-GrdcToken* grdc_make_token(GrdcPrep* p, GrdcPrepTokenKind kind, GrdcPrepTokenSourceKind src_kind) {
+GRD_DEDUP GrdcToken* grdc_make_token(GrdcPrep* p, GrdcPrepTokenKind kind, GrdcPrepTokenSourceKind src_kind) {
 	auto* tok = grd_make<GrdcToken>(p->arena);
 	tok->kind = kind;
 	tok->custom_str.allocator = null_allocator;
@@ -974,7 +974,7 @@ GrdcToken* grdc_make_token(GrdcPrep* p, GrdcPrepTokenKind kind, GrdcPrepTokenSou
 	return tok;
 }
 
-GrdcToken* grdc_make_file_token(GrdcPrep* p, GrdcPrepTokenKind kind, GrdcPrepFileSource* file, s64 file_start, s64 file_end) {
+GRD_DEDUP GrdcToken* grdc_make_file_token(GrdcPrep* p, GrdcPrepTokenKind kind, GrdcPrepFileSource* file, s64 file_start, s64 file_end) {
 	auto tok = grdc_make_token(p, kind, GRDC_PREP_TOKEN_SOURCE_FILE_SOURCE);
 	tok->file_source = file;
 	tok->file_start = file_start;
@@ -982,12 +982,12 @@ GrdcToken* grdc_make_file_token(GrdcPrep* p, GrdcPrepTokenKind kind, GrdcPrepFil
 	return tok;
 }
 
-void grdc_prep_use_custom_str(GrdcPrep* p, GrdcToken* tok) {
+GRD_DEDUP void grdc_prep_use_custom_str(GrdcPrep* p, GrdcToken* tok) {
 	tok->flags |= GRDC_PREP_TOKEN_FLAG_CUSTOM_STR;
 	tok->custom_str.allocator = p->allocator;
 }
 
-void grdc_prep_push_mapping(GrdArray<PrepFileMapping>* mappings, GrdcPrep* p, GrdcPrepFileSource* file, s64* cursor, s64 end, s64 rm_len, s64* removed_len, s64* i) {
+GRD_DEDUP void grdc_prep_push_mapping(GrdArray<PrepFileMapping>* mappings, GrdcPrep* p, GrdcPrepFileSource* file, s64* cursor, s64 end, s64 rm_len, s64* removed_len, s64* i) {
 	PrepFileMapping mapping;
 	mapping.start = *cursor - *removed_len;
 	mapping.real_start = *cursor;
@@ -1001,7 +1001,7 @@ void grdc_prep_push_mapping(GrdArray<PrepFileMapping>* mappings, GrdcPrep* p, Gr
 	grd_remove(&file->src, end, rm_len);
 }
 
-void grdc_prep_remove_file_splices(GrdcPrep* p, GrdcPrepFileSource* file) {
+GRD_DEDUP void grdc_prep_remove_file_splices(GrdcPrep* p, GrdcPrepFileSource* file) {
 	s64 cursor = 0;
 	s64 removed_len = 0;
 	for (s64 i = 0; i < grd_len(file->src); i++) {
@@ -1015,7 +1015,7 @@ void grdc_prep_remove_file_splices(GrdcPrep* p, GrdcPrepFileSource* file) {
 	grdc_prep_push_mapping(&file->splice_mappings, p, file, &cursor, grd_len(file->src), 0, &removed_len, NULL);
 }
 
-void grdc_prep_remove_comments(GrdcPrep* p, GrdcPrepFileSource* file) {
+GRD_DEDUP void grdc_prep_remove_comments(GrdcPrep* p, GrdcPrepFileSource* file) {
 	s64 cursor = 0;
 	s64 removed_len = 0;
 	for (s64 i = 0; i < grd_len(file->src); i++) {
@@ -1057,7 +1057,7 @@ void grdc_prep_remove_comments(GrdcPrep* p, GrdcPrepFileSource* file) {
 	grdc_prep_push_mapping(&file->comment_mappings, p, file, &cursor, grd_len(file->src), 0, &removed_len, NULL);
 }
 
-s64 grdc_prep_maybe_number_tok(GrdUnicodeString src, s64 start) {
+GRD_DEDUP s64 grdc_prep_maybe_number_tok(GrdUnicodeString src, s64 start) {
 	bool got_dec_digit = false;
 	for (s64 i = start; i < grd_len(src); i++) {
 		if (i == start && (src[i] == '.')) {
@@ -1100,7 +1100,7 @@ s64 grdc_prep_maybe_number_tok(GrdUnicodeString src, s64 start) {
 	return grd_len(src);
 }
 
-s64 grdc_prep_maybe_string_tok(GrdUnicodeString src, s64 start) {
+GRD_DEDUP s64 grdc_prep_maybe_string_tok(GrdUnicodeString src, s64 start) {
 	for (s64 i = start; i < grd_len(src); i++) {
 		if (i == start) {
 			if (src[i] != '"') {
@@ -1119,15 +1119,15 @@ s64 grdc_prep_maybe_string_tok(GrdUnicodeString src, s64 start) {
 	return 0;
 }
 
-s64 grdc_prep_is_valid_ident_symbol(char32_t c) {
+GRD_DEDUP s64 grdc_prep_is_valid_ident_symbol(char32_t c) {
 	return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c == '_' || c >= '0' && c <= '9' || c == '$';
 }
 
-s64 grdc_prep_is_valid_first_ident_symbol(char32_t c) {
+GRD_DEDUP s64 grdc_prep_is_valid_first_ident_symbol(char32_t c) {
 	return grdc_prep_is_valid_ident_symbol(c) && !(c >= '0' && c <= '9');
 }
 
-bool grdc_prep_is_punct(char32_t c) {
+GRD_DEDUP bool grdc_prep_is_punct(char32_t c) {
 	for (auto x: {',',';','/','.','-','=','(',')','?', '!', ':','+','*','-','<','>', '[', ']', '&', '#'}) {
 		if (c == x) {
 			return true;
@@ -1136,7 +1136,7 @@ bool grdc_prep_is_punct(char32_t c) {
 	return false;
 }
 
-s64 grdc_prep_maybe_ident(GrdUnicodeString src, s64 start) {
+GRD_DEDUP s64 grdc_prep_maybe_ident(GrdUnicodeString src, s64 start) {
 	for (s64 i = start; i < grd_len(src); i++) {
 		if (i == start) {
 			if (!grdc_prep_is_valid_first_ident_symbol(src[i])) {
@@ -1154,7 +1154,7 @@ s64 grdc_prep_maybe_ident(GrdUnicodeString src, s64 start) {
 	return start < grd_len(src) ? grd_len(src) : 0;
 }
 
-GrdTuple<s64, GrdcPrepTokenKind> grdc_get_lang_token_end_at(GrdUnicodeString src, s64 cursor) {
+GRD_DEDUP GrdTuple<s64, GrdcPrepTokenKind> grdc_get_lang_token_end_at(GrdUnicodeString src, s64 cursor) {
 	if (cursor >= grd_len(src)) {
 		return { 0 };
 	}
@@ -1179,7 +1179,7 @@ GrdTuple<s64, GrdcPrepTokenKind> grdc_get_lang_token_end_at(GrdUnicodeString src
 	return { 0 };
 }
 
-GrdTuple<s64, GrdcPrepTokenKind> grdc_get_token_end_at(GrdUnicodeString src, s64 cursor) {
+GRD_DEDUP GrdTuple<s64, GrdcPrepTokenKind> grdc_get_token_end_at(GrdUnicodeString src, s64 cursor) {
 	assert(cursor < grd_len(src));
 	if (src[cursor] == '#') {
 		if (grd_starts_with(src[{cursor, {}}], "##")) {
@@ -1201,7 +1201,7 @@ GrdTuple<s64, GrdcPrepTokenKind> grdc_get_token_end_at(GrdUnicodeString src, s64
 	return { cursor + 1, GRDC_PREP_TOKEN_KIND_OTHER };
 }
 
-GrdUnicodeString grdc_tok_str(GrdcToken* tok) {
+GRD_DEDUP GrdUnicodeString grdc_tok_str(GrdcToken* tok) {
 	if (tok->kind == GRDC_PREP_TOKEN_KIND_LINE_BREAK) {
 		return U"\n"_b;
 	}
@@ -1230,17 +1230,17 @@ GrdUnicodeString grdc_tok_str(GrdcToken* tok) {
 	return {};
 }
 
-GrdUnicodeString grdc_tok_str_content(GrdcToken* tok) {
+GRD_DEDUP GrdUnicodeString grdc_tok_str_content(GrdcToken* tok) {
 	assert(tok->kind == GRDC_PREP_TOKEN_KIND_STRING);
 	return grdc_tok_str(tok)[{1, -1}];
 }
 
-void grdc_push_source_file_token(GrdcPrepFileSource* file, GrdcToken* tok) {
+GRD_DEDUP void grdc_push_source_file_token(GrdcPrepFileSource* file, GrdcToken* tok) {
 	tok->file_tok_idx = grd_len(file->tokens);
 	grd_add(&file->tokens, tok);
 }
 
-GrdError* grdc_tokenize(GrdcPrep* p, GrdcPrepFileSource* file) {
+GRD_DEDUP GrdError* grdc_tokenize(GrdcPrep* p, GrdcPrepFileSource* file) {
 	if (file->is_tokenized) {
 		return NULL;
 	}
@@ -1272,11 +1272,11 @@ GrdError* grdc_tokenize(GrdcPrep* p, GrdcPrepFileSource* file) {
 	return NULL;
 }
 
-GrdUnicodeString grdc_prep_default_resolve_fullpath_hook(GrdcPrep* p, GrdUnicodeString path, bool global) {
+GRD_DEDUP GrdUnicodeString grdc_prep_default_resolve_fullpath_hook(GrdcPrep* p, GrdUnicodeString path, bool global) {
 	return path;
 }
 
-GrdcPrepFileSource* grdc_make_mem_prep_file(GrdcPrep* p, GrdUnicodeString src, GrdUnicodeString fullpath) {
+GRD_DEDUP GrdcPrepFileSource* grdc_make_mem_prep_file(GrdcPrep* p, GrdUnicodeString src, GrdUnicodeString fullpath) {
 	auto* file = grd_make<GrdcPrepFileSource>(p->allocator);
 	file->og_src = src;
 	file->fullpath = fullpath;
@@ -1286,7 +1286,7 @@ GrdcPrepFileSource* grdc_make_mem_prep_file(GrdcPrep* p, GrdUnicodeString src, G
 	return file;
 }
 
-GrdcPrepFileSource* grdc_prep_default_load_file_hook(GrdcPrep* p, GrdUnicodeString fullpath) {
+GRD_DEDUP GrdcPrepFileSource* grdc_prep_default_load_file_hook(GrdcPrep* p, GrdUnicodeString fullpath) {
 	auto [text, e] = grd_read_text_at_path(p->allocator, fullpath);
 	if (e) {
 		return NULL;
@@ -1296,7 +1296,7 @@ GrdcPrepFileSource* grdc_prep_default_load_file_hook(GrdcPrep* p, GrdUnicodeStri
 	return grdc_make_mem_prep_file(p, utf32, fullpath);
 }
 
-GrdcPrep* grdc_make_prep(GrdAllocator allocator = c_allocator) {
+GRD_DEDUP GrdcPrep* grdc_make_prep(GrdAllocator allocator = c_allocator) {
 	allocator = grd_make_sub_allocator(allocator);
 	auto p = grd_make<GrdcPrep>(allocator);
 	p->allocator = allocator;
@@ -1310,7 +1310,7 @@ GrdcPrep* grdc_make_prep(GrdAllocator allocator = c_allocator) {
 }
 
 // String is allocated separately from GrdcPrep.
-GrdAllocatedUnicodeString grdc_prep_str(GrdcPrep* p) {
+GRD_DEDUP GrdAllocatedUnicodeString grdc_prep_str(GrdcPrep* p) {
 	GrdAllocatedUnicodeString str;
 	for (auto it: p->tokens) {
 		grd_append(&str, grdc_tok_str(it));
@@ -1318,7 +1318,7 @@ GrdAllocatedUnicodeString grdc_prep_str(GrdcPrep* p) {
 	return str;
 }
 
-s64 grdc_skip_spaces(GrdSpan<GrdcToken*> tokens, s64 cursor) {
+GRD_DEDUP s64 grdc_skip_spaces(GrdSpan<GrdcToken*> tokens, s64 cursor) {
 	while (cursor < grd_len(tokens)) {
 		if (tokens[cursor]->kind != GRDC_PREP_TOKEN_KIND_SPACE) {
 			return cursor;
@@ -1328,7 +1328,7 @@ s64 grdc_skip_spaces(GrdSpan<GrdcToken*> tokens, s64 cursor) {
 	return grd_len(tokens);
 }
 
-s64 grdc_skip_spaces_and_line_breaks(GrdSpan<GrdcToken*> tokens, s64 cursor) {
+GRD_DEDUP s64 grdc_skip_spaces_and_line_breaks(GrdSpan<GrdcToken*> tokens, s64 cursor) {
 	while (cursor < grd_len(tokens)) {
 		if (tokens[cursor]->kind != GRDC_PREP_TOKEN_KIND_SPACE && tokens[cursor]->kind != GRDC_PREP_TOKEN_KIND_LINE_BREAK) {
 			return cursor;
@@ -1338,11 +1338,11 @@ s64 grdc_skip_spaces_and_line_breaks(GrdSpan<GrdcToken*> tokens, s64 cursor) {
 	return grd_len(tokens);
 }
 
-bool grdc_is_prep_macro_variadic(GrdcPrepMacro* macro) {
+GRD_DEDUP bool grdc_is_prep_macro_variadic(GrdcPrepMacro* macro) {
 	return grd_len(macro->arg_defs) > 0 && grdc_tok_str(macro->arg_defs[-1]) == "...";
 }
 
-s64 grdc_find_macro_arg_def_tok_idx(GrdcPrepMacro* macro, GrdUnicodeString name) {
+GRD_DEDUP s64 grdc_find_macro_arg_def_tok_idx(GrdcPrepMacro* macro, GrdUnicodeString name) {
 	if (name == "__VA_ARGS__") {
 		if (grdc_is_prep_macro_variadic(macro)) {
 			return grd_len(macro->arg_defs) - 1;
@@ -1357,9 +1357,9 @@ s64 grdc_find_macro_arg_def_tok_idx(GrdcPrepMacro* macro, GrdUnicodeString name)
 	return -1;
 }
 
-GrdError* grdc_preprocess_file(GrdcPrep* p, GrdcPrepFileSource* file);
+GRD_DEDUP GrdError* grdc_preprocess_file(GrdcPrep* p, GrdcPrepFileSource* file);
 
-bool grdc_does_include_stack_contain_file(GrdcPrep* p, GrdcPrepFileSource* file) {
+GRD_DEDUP bool grdc_does_include_stack_contain_file(GrdcPrep* p, GrdcPrepFileSource* file) {
 	auto entry = p->include_site;
 	while (entry) {
 		if (entry->file == file) {
@@ -1370,7 +1370,7 @@ bool grdc_does_include_stack_contain_file(GrdcPrep* p, GrdcPrepFileSource* file)
 	return false;
 }
 
-void grdc_grdc_prep_stringize_tok(GrdcToken* dst, GrdcToken* arg) {
+GRD_DEDUP void grdc_grdc_prep_stringize_tok(GrdcToken* dst, GrdcToken* arg) {
 	// @TODO: escape.
 	grd_add(&dst->custom_str, grdc_tok_str(arg));
 }
@@ -1405,25 +1405,26 @@ struct GrdcTokenSlice {
 	}
 };
 
-s64 grd_len(GrdcTokenSlice slice) {
+GRD_DEDUP s64 grd_len(GrdcTokenSlice slice) {
 	return slice.end - slice.start;
 }
 
-GrdcTokenSlice grdc_make_tok_slice(GrdSpan<GrdcToken*> tokens, s64 start, s64 end) {
+GRD_DEDUP GrdcTokenSlice grdc_make_tok_slice(GrdSpan<GrdcToken*> tokens, s64 start, s64 end) {
 	assert(grd_len(tokens) > 0);
 	return { .tokens = tokens, .start = start, .end = end };
 }
 
-GrdcTokenSlice grdc_make_tok_slice(GrdSpan<GrdcToken*> tokens) {
+GRD_DEDUP GrdcTokenSlice grdc_make_tok_slice(GrdSpan<GrdcToken*> tokens) {
 	return grdc_make_tok_slice(tokens, 0, grd_len(tokens));
 }
 
-GrdTuple<GrdError*, GrdArray<GrdcPrepMacroArg>> grdc_parse_macro_args(GrdcPrep* p, GrdcPrepMacro* macro, GrdcTokenSlice tokens, s64* cursor, GrdcToken* paren_tok) {
+GRD_DEDUP GrdTuple<GrdError*, GrdArray<GrdcPrepMacroArg>> grdc_parse_macro_args(GrdcPrep* p, GrdcPrepMacro* macro, GrdcTokenSlice tokens, s64* cursor, GrdcToken* paren_tok) {
 	GrdArray<GrdcPrepMacroArg> args = { .capacity = grd_len(macro->arg_defs), .allocator = p->allocator };
 	s64 paren_level = 0;
 	s64 arg_start = -1;
 	*cursor = grdc_skip_spaces_and_line_breaks(tokens.span(), *cursor);
 	if (grdc_tok_str(tokens[*cursor]) != "(") {
+		// Practically untriggerable, because if we don't detect opening brace before, this doesn't get called.
 		return { grdc_make_prep_file_error(p, tokens[*cursor], "Expected '(' at the start of macro arguments") };
 	}
 	arg_start = *cursor + 1;
@@ -1485,7 +1486,7 @@ GrdTuple<GrdError*, GrdArray<GrdcPrepMacroArg>> grdc_parse_macro_args(GrdcPrep* 
 	return { NULL, args };
 }
 
-bool grdc_does_macro_stack_contain_macro(GrdcPrep* p, GrdcPrepMacro* macro) {
+GRD_DEDUP bool grdc_does_macro_stack_contain_macro(GrdcPrep* p, GrdcPrepMacro* macro) {
 	auto entry = p->macro_exp;
 	while (entry) {
 		if (entry->macro == macro) {
@@ -1496,7 +1497,7 @@ bool grdc_does_macro_stack_contain_macro(GrdcPrep* p, GrdcPrepMacro* macro) {
 	return false;
 }
 
-GrdcPrepMacro* grdc_find_macro(GrdcPrep* p, GrdUnicodeString name) {
+GRD_DEDUP GrdcPrepMacro* grdc_find_macro(GrdcPrep* p, GrdUnicodeString name) {
 	for (auto it: p->macros) {
 		if (grdc_tok_str(it->name) == name) {
 			return it;
@@ -1505,7 +1506,7 @@ GrdcPrepMacro* grdc_find_macro(GrdcPrep* p, GrdUnicodeString name) {
 	return NULL;
 }
 
-GrdOptional<GrdcTokenSlice> grdc_get_arg_tokens(GrdcPrepMacro* macro, GrdSpan<GrdcToken*> tokens, GrdSpan<GrdcPrepMacroArg> args, GrdUnicodeString name) {
+GRD_DEDUP GrdOptional<GrdcTokenSlice> grdc_get_arg_tokens(GrdcPrepMacro* macro, GrdSpan<GrdcToken*> tokens, GrdSpan<GrdcPrepMacroArg> args, GrdUnicodeString name) {
 	auto def_idx = grdc_find_macro_arg_def_tok_idx(macro, name);
 	if (def_idx == -1) {
 		return {};
@@ -1522,11 +1523,11 @@ GrdOptional<GrdcTokenSlice> grdc_get_arg_tokens(GrdcPrepMacro* macro, GrdSpan<Gr
 	}
 }
 
-GrdSpan<GrdcToken*> grdc_get_macro_exp_body(GrdcMacroExp* exp) {
+GRD_DEDUP GrdSpan<GrdcToken*> grdc_get_macro_exp_body(GrdcMacroExp* exp) {
 	return exp->after_rescan;
 }
 
-GrdTuple<GrdError*, GrdcMacroExp*> grdc_maybe_expand_macro(GrdcPrep* p, GrdcTokenSlice tokens, s64* out_cursor) {
+GRD_DEDUP GrdTuple<GrdError*, GrdcMacroExp*> grdc_maybe_expand_macro(GrdcPrep* p, GrdcTokenSlice tokens, s64* out_cursor) {
 	s64 cursor = *out_cursor;
 	if (cursor >= grd_len(tokens) || 
 		(tokens[cursor]->kind != GRDC_PREP_TOKEN_KIND_IDENT &&
@@ -1753,8 +1754,8 @@ GrdTuple<GrdError*, GrdcMacroExp*> grdc_maybe_expand_macro(GrdcPrep* p, GrdcToke
 	return { NULL, exp };
 }
 
-GrdTuple<GrdError*, s64> grdc_prep_eval_expr(GrdcPrep* p, GrdcTokenSlice tokens, s64* cursor, s64 min_prec);
-GrdTuple<GrdError*, s64> grdc_prep_eval_leaf(GrdcPrep* p, GrdcTokenSlice tokens, s64* cursor) {
+GRD_DEDUP GrdTuple<GrdError*, s64> grdc_prep_eval_expr(GrdcPrep* p, GrdcTokenSlice tokens, s64* cursor, s64 min_prec);
+GRD_DEDUP GrdTuple<GrdError*, s64> grdc_prep_eval_leaf(GrdcPrep* p, GrdcTokenSlice tokens, s64* cursor) {
 	*cursor = grdc_skip_spaces(tokens.span(), *cursor + 1);
 	auto tok = tokens[*cursor];
 	auto tok_str = grdc_tok_str(tok);
@@ -1798,7 +1799,7 @@ GrdTuple<GrdError*, s64> grdc_prep_eval_leaf(GrdcPrep* p, GrdcTokenSlice tokens,
 	return { grdc_make_prep_file_error(p, tok, "Expected preprocessor expression") };
 }
 
-GrdTuple<GrdError*, s64> grdc_prep_eval_expr(GrdcPrep* p, GrdcTokenSlice tokens, s64* cursor, s64 min_prec) {
+GRD_DEDUP GrdTuple<GrdError*, s64> grdc_prep_eval_expr(GrdcPrep* p, GrdcTokenSlice tokens, s64* cursor, s64 min_prec) {
 	auto [e, v] = grdc_prep_eval_leaf(p, tokens, cursor);
 	if (e) {
 		return { e };
@@ -1871,7 +1872,7 @@ GrdTuple<GrdError*, s64> grdc_prep_eval_expr(GrdcPrep* p, GrdcTokenSlice tokens,
 	return { NULL, v };
 }
 
-GrdTuple<GrdError*, s64> grdc_prep_eval_condition(GrdcPrep* p, GrdcTokenSlice tokens, s64* cursor) {
+GRD_DEDUP GrdTuple<GrdError*, s64> grdc_prep_eval_condition(GrdcPrep* p, GrdcTokenSlice tokens, s64* cursor) {
 	s64 start = *cursor;
 	while (*cursor < grd_len(tokens)) {
 		auto tok = tokens[*cursor];
@@ -1904,7 +1905,7 @@ GrdTuple<GrdError*, s64> grdc_prep_eval_condition(GrdcPrep* p, GrdcTokenSlice to
 	return grdc_prep_eval_expr(p, grdc_make_tok_slice(res_tokens), &expr_cursor, 0);
 }
 
-bool grdc_prep_is_conditioned_out(GrdcPrep* p) {
+GRD_DEDUP bool grdc_prep_is_conditioned_out(GrdcPrep* p) {
 	for (auto it: p->if_stack) {
 		if (it.current_block != it.taken_block) {
 			return true;
@@ -1913,7 +1914,7 @@ bool grdc_prep_is_conditioned_out(GrdcPrep* p) {
 	return false;
 }
 
-GrdError* grdc_handle_prep_directive(GrdcPrep* p, GrdcTokenSlice tokens, s64* cursor) {
+GRD_DEDUP GrdError* grdc_handle_prep_directive(GrdcPrep* p, GrdcTokenSlice tokens, s64* cursor) {
 	// Make sure only spaces preceed '#'.
 	for (auto i: grd_reverse(grd_range_from_to(0, *cursor))) {
 		if (tokens[i]->kind == GRDC_PREP_TOKEN_KIND_SPACE) {
@@ -2220,7 +2221,7 @@ GrdError* grdc_handle_prep_directive(GrdcPrep* p, GrdcTokenSlice tokens, s64* cu
 	return grdc_make_prep_file_error(p, directive_tok, "Unknown preprocessor directive '%'", grdc_tok_str(directive_tok));
 }
 
-GrdError* grdc_preprocess_file(GrdcPrep* p, GrdcPrepFileSource* source_file) {
+GRD_DEDUP GrdError* grdc_preprocess_file(GrdcPrep* p, GrdcPrepFileSource* source_file) {
 	auto e = grdc_tokenize(p, source_file);
 	if (e) {
 		return e;
@@ -2276,14 +2277,14 @@ GrdError* grdc_preprocess_file(GrdcPrep* p, GrdcPrepFileSource* source_file) {
 	return NULL;
 }
 
-GrdTuple<GrdError*, GrdcPrep*> grdc_preprocess(GrdUnicodeString str) {
+GRD_DEDUP GrdTuple<GrdError*, GrdcPrep*> grdc_preprocess(GrdUnicodeString str) {
 	auto p = grdc_make_prep();
 	auto file = grdc_make_mem_prep_file(p, str, U"<root_file>"_b);
 	auto e = grdc_preprocess_file(p, file);
 	return { e, p };
 }
 
-GrdTuple<GrdError*, GrdcPrep*, GrdUnicodeString> grdc_preprocess_to_string(GrdUnicodeString str) {
+GRD_DEDUP GrdTuple<GrdError*, GrdcPrep*, GrdUnicodeString> grdc_preprocess_to_string(GrdUnicodeString str) {
 	auto [e, p] = grdc_preprocess(str);
 	if (e) {
 		return { e };

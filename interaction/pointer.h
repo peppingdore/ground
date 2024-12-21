@@ -87,7 +87,7 @@ struct GrdOsPointerIdMapper {
 	}
 };
 
-u64 grd_map_os_pointer_id(GrdOsPointerIdMapper* mapper, u64 os_id) {
+GRD_DEDUP u64 grd_map_os_pointer_id(GrdOsPointerIdMapper* mapper, u64 os_id) {
 	auto* found = grd_get(&mapper->map, os_id);
 	if (found) {
 		return *found;
@@ -100,6 +100,6 @@ u64 grd_map_os_pointer_id(GrdOsPointerIdMapper* mapper, u64 os_id) {
 	return result;
 }
 
-u64 grd_map_os_mouse_to_pointer_id(GrdOsPointerIdMapper* mapper) {
+GRD_DEDUP u64 grd_map_os_mouse_to_pointer_id(GrdOsPointerIdMapper* mapper) {
 	return 0;
 }

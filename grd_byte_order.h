@@ -8,10 +8,10 @@ enum GrdByteOrder {
 	GRD_BYTE_ORDER_BIG_ENDIAN    = 1,
 };
 
-void grd_swap_endianness(void* data, u64 size) {
+GRD_DEDUP void grd_swap_endianness(void* data, u64 size) {
 	grd_reverse((u8*) data, size);
 }
 
-void grd_swap_endianness(auto* x) {
+GRD_DEDUP void grd_swap_endianness(auto* x) {
 	grd_swap_endianness(x, sizeof(*x));
 }

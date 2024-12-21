@@ -62,10 +62,13 @@ GrdArray<s64> expected_lines;
 GrdArray<s64> lines_got;
 
 GrdError* count_error_in(GrdTuple<GrdError*, GrdcPrep*> x, GrdUnicodeString expected, GrdCodeLoc loc = grd_caller_loc()) {
-	grd_tester_scope_push(loc);
+	grd_tester_scope_push(grd_current_loc());
 	auto e = expect_error(x, expected, loc);
-	if (auto x = grd_reflect_cast<GrdcPrepDetailedError>(e)) {
-		
+	if (e) {
+		if (auto x = grd_reflect_cast<GrdcPrepDetailedError>(e)) {
+			
+		}
+		grd_add(&lines_got, e->loc.line);
 	}
 	grd_tester_scope_pop();
 	return e;
@@ -96,7 +99,7 @@ GRD_TEST_CASE(trigger_every_error_setup) {
 }
 
 GRD_TEST_CASE(trigger_errors) {
-	
+	count_error_in(simple_prep(U"#define MACRO(a)\n MACRO"_b, {}), U"Expected '(' at the start of macro arguments"_b);
 }
 
 GRD_TEST_CASE(trigger_every_error_results) {

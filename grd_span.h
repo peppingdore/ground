@@ -70,29 +70,29 @@ struct GrdSpan {
 };
 
 template <typename T, s64 N>
-GrdSpan<T> grd_make_span(const T (&arr)[N]) {
+GRD_DEDUP GrdSpan<T> grd_make_span(const T (&arr)[N]) {
 	return { (T*) arr, N };
 }
 
 template <typename T>
-GrdSpan<T> grd_make_span(std::initializer_list<T> list) {
+GRD_DEDUP GrdSpan<T> grd_make_span(std::initializer_list<T> list) {
 	return { (T*) list.begin(), (s64) list.size() };
 }
 
 template <typename T>
-s64 grd_len(GrdSpan<T> span) {
+GRD_DEDUP s64 grd_len(GrdSpan<T> span) {
 	return span.count;
 }
 
 template <typename T>
-T grd_pop(GrdSpan<T>* span) {
+GRD_DEDUP T grd_pop(GrdSpan<T>* span) {
 	assert(span->count > 0);
 	span->count -= 1;
 	return span->data[span->count];
 }
 
 template <typename T>
-s64 grd_index_of(GrdSpan<T> span, T item) {
+GRD_DEDUP s64 grd_index_of(GrdSpan<T> span, T item) {
 	for (auto i: grd_range(grd_len(span))) {
 		if (span[i] == item) {
 			return i;
@@ -102,7 +102,7 @@ s64 grd_index_of(GrdSpan<T> span, T item) {
 }
 
 template <typename T, typename U>
-s64 grd_index_of(GrdSpan<T> span, GrdSpan<U> item) {
+GRD_DEDUP s64 grd_index_of(GrdSpan<T> span, GrdSpan<U> item) {
 	if (grd_len(item) > grd_len(span)) {
 		return -1;
 	}
@@ -115,7 +115,7 @@ s64 grd_index_of(GrdSpan<T> span, GrdSpan<U> item) {
 }
 
 template <typename T>
-s64 grd_index_of_fast(GrdSpan<T> span, T* ptr) {
+GRD_DEDUP s64 grd_index_of_fast(GrdSpan<T> span, T* ptr) {
 	if (ptr >= span.data && ptr < span.data + span.count) {
 		return ptr - span.data;
 	}
@@ -123,14 +123,14 @@ s64 grd_index_of_fast(GrdSpan<T> span, T* ptr) {
 }
 
 template <typename T>
-void grd_remove(GrdSpan<T>* arr, s64 index, s64 remove_count = 1) {
+GRD_DEDUP void grd_remove(GrdSpan<T>* arr, s64 index, s64 remove_count = 1) {
 	assert(remove_count <= (grd_len(*arr) - index));
 	arr->count -= remove_count;
 	memmove(arr->data + index, arr->data + index + remove_count, (grd_len(*arr) - index) * sizeof(T));
 }
 
 template <typename T>
-bool grd_find_and_remove(GrdSpan<T>* arr, T item) {
+GRD_DEDUP bool grd_find_and_remove(GrdSpan<T>* arr, T item) {
 	s64 index = grd_index_of(*arr, item);
 	if (index == -1) {
 		return false;
@@ -140,7 +140,7 @@ bool grd_find_and_remove(GrdSpan<T>* arr, T item) {
 }
 
 template <typename T>
-bool grd_find_and_remove(GrdSpan<T>* arr, GrdSpan<T> item) {
+GRD_DEDUP bool grd_find_and_remove(GrdSpan<T>* arr, GrdSpan<T> item) {
 	s64 index = grd_index_of(arr, item);
 	if (index == -1) {
 		return false;
@@ -150,17 +150,17 @@ bool grd_find_and_remove(GrdSpan<T>* arr, GrdSpan<T> item) {
 }
 
 template <typename T>
-bool grd_contains(GrdSpan<T> span, auto item) {
+GRD_DEDUP bool grd_contains(GrdSpan<T> span, auto item) {
 	return grd_index_of(span, item) != -1;
 }
 
 template <typename T>
-s64 grd_len(std::initializer_list<T> list) {
+GRD_DEDUP s64 grd_len(std::initializer_list<T> list) {
 	return list.size();
 }
 
 template <typename T>
-s64 grd_index_of(std::initializer_list<T> list, auto item) {
+GRD_DEDUP s64 grd_index_of(std::initializer_list<T> list, auto item) {
 	for (auto i: grd_range(grd_len(list))) {
 		if (list.begin()[i] == item) {
 			return i;
@@ -170,12 +170,12 @@ s64 grd_index_of(std::initializer_list<T> list, auto item) {
 }
 
 template <typename T>
-bool grd_contains(std::initializer_list<T> list, auto item) {
+GRD_DEDUP bool grd_contains(std::initializer_list<T> list, auto item) {
 	return grd_index_of(list, item) != -1;
 }
 
 template <typename T>
-s64 grd_count_occurances(GrdSpan<T> src, GrdSpan<T> entry) {
+GRD_DEDUP s64 grd_count_occurances(GrdSpan<T> src, GrdSpan<T> entry) {
 	s64 cnt = 0;
 	for (s64 i = 0; i < grd_len(src) - grd_len(entry); i++) {
 		if (grd_starts_with(src[{i, {}}], entry)) {
@@ -187,7 +187,7 @@ s64 grd_count_occurances(GrdSpan<T> src, GrdSpan<T> entry) {
 }
 
 template <typename T>
-void grd_type_hash(GrdHasher* hasher, GrdSpan<T> array) {
+GRD_DEDUP void grd_type_hash(GrdHasher* hasher, GrdSpan<T> array) {
 	grd_update(hasher, array.count);
 	for (auto item: array) {
 		grd_update(hasher, item);
@@ -195,12 +195,12 @@ void grd_type_hash(GrdHasher* hasher, GrdSpan<T> array) {
 }
 
 template <typename T>
-GrdSpanType* grd_reflect_create_type(GrdSpan<T>* x) {
+GRD_DEDUP GrdSpanType* grd_reflect_create_type(GrdSpan<T>* x) {
 	return grd_reflect_add_type_named<GrdSpan<T>, GrdSpanType>("");
 }
 
 template <typename T>
-void grd_reflect_type(GrdSpan<T>* x, GrdSpanType* type) {
+GRD_DEDUP void grd_reflect_type(GrdSpan<T>* x, GrdSpanType* type) {
 	type->inner = grd_reflect_type_of<T>();
 	type->name = grd_heap_sprintf("GrdSpan<%s>", type->inner->name);
 	type->subkind = "span";
@@ -216,6 +216,6 @@ void grd_reflect_type(GrdSpan<T>* x, GrdSpanType* type) {
 }
 
 template <typename T>
-void grd_reverse(GrdSpan<T> span) {
+GRD_DEDUP void grd_reverse(GrdSpan<T> span) {
 	grd_reverse(span.data, span.count);
 }

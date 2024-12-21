@@ -23,21 +23,21 @@ struct GrdDecomposedMemberFunctionType {
 };
 
 template <typename ReturnType, typename... Args>
-GrdDecomposedFunctionType<ReturnType(Args...)> grd_decompose_function_type( ReturnType (*) (Args...)) {
+GRD_DEDUP GrdDecomposedFunctionType<ReturnType(Args...)> grd_decompose_function_type( ReturnType (*) (Args...)) {
 	return {};
 }
 
 template <typename Class, typename ReturnType, typename... Args>
-GrdDecomposedMemberFunctionType<Class, ReturnType, Args...> grd_decompose_member_function_type(ReturnType(Class::*)(Args...)) {
+GRD_DEDUP GrdDecomposedMemberFunctionType<Class, ReturnType, Args...> grd_decompose_member_function_type(ReturnType(Class::*)(Args...)) {
 	return {};
 }
 
 template <typename Class, typename ReturnType, typename... Args>
-GrdDecomposedMemberFunctionType<Class, ReturnType, Args...> grd_decompose_member_function_type(ReturnType(Class::*)(Args...) const) {
+GRD_DEDUP GrdDecomposedMemberFunctionType<Class, ReturnType, Args...> grd_decompose_member_function_type(ReturnType(Class::*)(Args...) const) {
 	return {};
 }
 
-auto grd_decompose_function_type(auto lambda) -> decltype(auto) {
+GRD_DEDUP auto grd_decompose_function_type(auto lambda) -> decltype(auto) {
 	using Decomposed = decltype(grd_decompose_member_function_type(&lambda.operator())());
 	return typename Decomposed::RawFunctionType();
 }
@@ -59,7 +59,7 @@ struct GrdFunction {
 	static_assert(sizeof...(T) == 0, "Use function type syntax, not <R, Args...>, but <R(Args...)");
 };
 
-constexpr u64 SMALL_LAMBDA_STORAGE_SIZE = 24; // 24 + lambda flattened_proc ptr (8) = 32 bytes.
+GRD_DEDUP constexpr u64 SMALL_LAMBDA_STORAGE_SIZE = 24; // 24 + lambda flattened_proc ptr (8) = 32 bytes.
 
 // We tradeoff readibility for struct size.
 template <typename ReturnType, typename... ArgsTypes>
@@ -150,7 +150,7 @@ struct GrdFunction<ReturnType(ArgsTypes...)> {
 
 
 template <typename ReturnType, typename... ArgsTypes>
-auto grd_make_function(ReturnType (*function_ptr)(ArgsTypes...)) {
+GRD_DEDUP auto grd_make_function(ReturnType (*function_ptr)(ArgsTypes...)) {
 	GrdFunction<ReturnType(ArgsTypes...)> result;
 	result.kind = GrdFunctionKind::Function_Pointer;
 	result.function_ptr.ptr = function_ptr;
@@ -158,12 +158,12 @@ auto grd_make_function(ReturnType (*function_ptr)(ArgsTypes...)) {
 }
 
 // Assert that we do not use heap allocator.
-auto grd_make_no_heap_function(auto lambda, GrdCodeLoc loc = grd_caller_loc()) {
+GRD_DEDUP auto grd_make_no_heap_function(auto lambda, GrdCodeLoc loc = grd_caller_loc()) {
 	static_assert(sizeof(lambda) <= SMALL_LAMBDA_STORAGE_SIZE);
 	return grd_make_function(lambda, loc);
 }
 
-auto grd_make_function(auto lambda, GrdCodeLoc loc = grd_caller_loc()) {
+GRD_DEDUP auto grd_make_function(auto lambda, GrdCodeLoc loc = grd_caller_loc()) {
 	using Lambda_Type = decltype(lambda);
 
 	// static_assert(std::is_same_v<std::invoke_result_t<Lambda_Type, ArgsTypes...>, ReturnType>, "Lambda return type is incorrect");
@@ -300,7 +300,7 @@ concept GrdCallable = requires(Candidate f, FunctionType signature_type) {
 	{ grd_call_with_tuple(f, std::declval<typename D::ArgsTupleType>()) } -> std::same_as<typename D::ReturnType>;
 };
 
-auto grd_call_with_tuple(auto f, auto tuple) {
+GRD_DEDUP auto grd_call_with_tuple(auto f, auto tuple) {
 	auto impl = []
 		<s64... Indices>
 		(auto f, auto tuple, std::integer_sequence<s64, Indices...>) {

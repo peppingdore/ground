@@ -19,7 +19,7 @@ struct GrdThread {
 };
 
 template <typename... Args>
-GrdThread grd_start_thread(auto* proc, Args ...args) {
+GRD_DEDUP GrdThread grd_start_thread(auto* proc, Args ...args) {
 	auto args_tuple = grd_make_tuple(args...);
 
     GrdThread thread;

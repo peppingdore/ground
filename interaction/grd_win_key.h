@@ -6,7 +6,7 @@
 GRD_BUILD_RUN("params.add_lib('user32.lib')");
 
 // stolen from: https://stackoverflow.com/questions/15966642/how-do-you-tell-lshift-apart-from-rshift-in-wm-keydown-events
-WPARAM grd_map_windows_left_and_right_keys(WPARAM wParam, LPARAM lParam) {
+GRD_DEDUP WPARAM grd_map_windows_left_and_right_keys(WPARAM wParam, LPARAM lParam) {
 	UINT   scancode = (lParam & 0x00ff0000) >> 16;
 	int    extended = (lParam & 0x01000000) != 0;
 	switch (wParam) {
@@ -17,7 +17,7 @@ WPARAM grd_map_windows_left_and_right_keys(WPARAM wParam, LPARAM lParam) {
 	return wParam;
 }
 
-GrdKey grd_map_windows_key(WPARAM wParam, LPARAM lParam) {
+GRD_DEDUP GrdKey grd_map_windows_key(WPARAM wParam, LPARAM lParam) {
 	wParam = grd_map_windows_left_and_right_keys(wParam, lParam);
 
 	#define GRD_KEY_BINDING(from, to) case from: return GrdKey:: to;

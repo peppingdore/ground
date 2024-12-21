@@ -21,7 +21,7 @@ static_assert(
 );
 static_assert(!grd_does_type_have_padding<GrdSpinlock>());
 
-void grd_lock(GrdSpinlock* x) {
+GRD_DEDUP void grd_lock(GrdSpinlock* x) {
 	assert(grd_is_aligned(x, sizeof(GrdSpinlock)));
 	auto loaded = grd_atomic_load(x);
 	auto thread_id = grd_current_thread_id();
@@ -45,7 +45,7 @@ void grd_lock(GrdSpinlock* x) {
 	}
 }
 
-void grd_unlock(GrdSpinlock* x) {
+GRD_DEDUP void grd_unlock(GrdSpinlock* x) {
 	assert(grd_is_aligned(x, sizeof(GrdSpinlock)));
 	auto prev = grd_atomic_load(x);
 	assert(prev.lock_count >= 1);

@@ -11,7 +11,7 @@ struct GrdSubAllocator {
 	GrdHashMap<void*, GrdEmptyStruct> map;
 };
 
-GrdAllocatorProcResult grd_sub_allocator_proc(void* allocator_data, GrdAllocatorProcParams p) {
+GRD_DEDUP GrdAllocatorProcResult grd_sub_allocator_proc(void* allocator_data, GrdAllocatorProcParams p) {
 	auto x = (GrdSubAllocator*) allocator_data;
 	switch (p.verb) {
 		case GRD_ALLOCATOR_VERB_ALLOC: {
@@ -47,7 +47,7 @@ GrdAllocatorProcResult grd_sub_allocator_proc(void* allocator_data, GrdAllocator
 	}
 }
 
-GrdAllocator grd_make_sub_allocator(GrdAllocator parent) {
+GRD_DEDUP GrdAllocator grd_make_sub_allocator(GrdAllocator parent) {
 	auto x = grd_make<GrdSubAllocator>(parent);
 	x->parent = parent;
 	x->map.allocator = parent;

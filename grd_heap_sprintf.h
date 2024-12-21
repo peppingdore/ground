@@ -7,7 +7,7 @@
 #include <stdlib.h>
 
 template <typename... Args>
-char* grd_heap_sprintf(const char* format, Args... args) {
+GRD_DEDUP char* grd_heap_sprintf(const char* format, Args... args) {
 	char buf[256];
 	int written = snprintf(buf, sizeof(buf), format, args...);
 	if (written < 0) {
@@ -28,7 +28,7 @@ char* grd_heap_sprintf(const char* format, Args... args) {
 	return str;
 }
 
-char* grd_heap_join(const char* start, const char* joiner, const char* end, auto... args) {
+GRD_DEDUP char* grd_heap_join(const char* start, const char* joiner, const char* end, auto... args) {
 	char buf[512];
 	int  cursor = 0;
 
