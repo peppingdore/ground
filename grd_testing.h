@@ -297,7 +297,7 @@ GRD_DEDUP void grd_tester_scope_pop() {
 
 #define GRD_TEST_CASE(name)\
 GRD_BUILD_RUN("if 'ctx' in globals() and getattr(ctx, 'test', None): ctx.test.get_case(\"" #name "\")");\
-GRD_DEDUP grd_test_##name ();\
+GRD_DEDUP void grd_test_##name ();\
 GRD_DEDUP int grd_register_test_##name = []() { grd_register_test_case(&grd_test_##name, #name, __COUNTER__); return 0; }();\
 GRD_DEDUP void grd_test_##name()
 
