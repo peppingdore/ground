@@ -2,6 +2,7 @@ b_lib
 __pycache__
 build_temp
 single_file_compilation_tests
+build_tests
 .vs
 .vscode
 *.pdb
