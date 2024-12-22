@@ -81,27 +81,6 @@ GRD_DEDUP void grd_tester_write_result_loc(GrdCodeLoc loc) {
 }
 
 GRD_DEDUP void grd_run_test(GrdTestCase* test) {
-	auto node = tester.first_ignore_test;
-	while (node) {
-		if (strcmp(node->str, test->name) == 0) {
-			return;
-		}
-		node = node->next;
-	}
-	if (tester.whitelist_mode) {
-		node = tester.first_whitelist_test;
-		bool found = false;
-		while (node) {
-			if (strcmp(node->str, test->name) == 0) {
-				found = true;
-				break;
-			}
-			node = node->next;
-		}
-		if (!found) {
-			return;
-		}
-	}
 	fflush(stdout);
 	grd_tester_write_result_line("TESTER_TEST_START");
 	grd_tester_write_result_str(test->name);
@@ -165,6 +144,28 @@ GRD_DEDUP void grd_tester_print_summary() {
 	printf("%lld/%lld passed tests - %.2f %s\n", successful_tests, failed_tests + successful_tests, percentage * 100.0, "%"); 
 }
 
+void grd_remove_test(const char* name) {
+	auto dst = &tester.first_case;
+	while (*dst) {
+		if (strcmp((*dst)->name, name) == 0) {
+			*dst = (*dst)->next;
+			continue;
+		}
+		dst = &(*dst)->next;
+	}
+}
+
+GrdTestCase* grd_find_test(const char* name) {
+	auto src = tester.first_case;
+	while (src) {
+		if (strcmp(src->name, name) == 0) {
+			return src;
+		}
+		src = src->next;
+	}
+	return NULL;
+}
+
 int main(int argc, char* argv[]) {
 	for (int i = 0; i < argc; i++) {
 		if (strcmp(argv[i], "--write_test_results_to_stderr") == 0) {
@@ -213,6 +214,26 @@ int main(int argc, char* argv[]) {
 		}
 	}
 	fflush(stdout);
+
+	auto node = tester.first_ignore_test;
+	while (node) {
+		grd_remove_test(node->str);
+		node = node->next;
+	}
+	if (tester.whitelist_mode) {
+		GrdTestCase* start = NULL;
+		GrdTestCase** dst = &start;
+		node = tester.first_whitelist_test;
+		while (node) {
+			auto test = grd_find_test(node->str);
+			if (test) {
+				*dst = test;
+				dst = &test->next;
+			}
+			node = node->next;
+		}
+		tester.first_case = start;
+	}
 
 	grd_tester_write_result_line("TESTER_OUTPUT_START");
 	grd_tester_write_result_int(1); // Version.
