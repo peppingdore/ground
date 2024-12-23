@@ -178,3 +178,31 @@ template <typename T, typename X>
 GRD_DEDUP GrdArray<T> grd_join(GrdSpan<T> a, GrdSpan<X> b) {
 	return grd_join(c_allocator, a, b);
 }
+
+template <typename T>
+GRD_DEDUP GrdArray<T> grd_concat(GrdAllocator allocator, std::initializer_list<GrdSpan<T>> list) {
+	GrdArray<T> result = { .allocator = allocator };
+	result.capacity = 0;
+	for (auto& it: list) {
+		result.capacity += grd_len(it);
+	}
+	for (auto& it: list) {
+		grd_add(&result, it);
+	}
+	return result;
+}
+
+template <typename T>
+GRD_DEDUP GrdArray<T> grd_concat(std::initializer_list<GrdSpan<T>> list) {
+	return grd_concat(c_allocator, list);
+}
+
+template <typename T>
+GRD_DEDUP GrdArray<T> grd_concat(GrdAllocator allocator, GrdSpan<T> a, GrdSpan<T> b) {
+	return grd_concat(allocator, { a, b });
+}
+
+template <typename T>
+GRD_DEDUP GrdArray<T> grd_concat(GrdSpan<T> a, GrdSpan<T> b) {
+	return grd_concat(c_allocator, { a, b });
+}
