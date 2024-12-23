@@ -167,6 +167,7 @@ GrdTestCase* grd_find_test(const char* name) {
 }
 
 int main(int argc, char* argv[]) {
+	grd_store_cmdline_args(argc, argv);
 	for (int i = 0; i < argc; i++) {
 		if (strcmp(argv[i], "--write_test_results_to_stderr") == 0) {
 			tester.write_test_results = true;
