@@ -209,7 +209,6 @@ GRD_TEST_CASE(if_cond_complex) {
 	expect_str(simple_prep(U"#if (1 + 2 == 4)\n42\n#else\n99\n#endif\n"_b, {}), U"\n99\n\n"_b);
 	expect_error(simple_prep(U"#if (1 +)\n42\n#endif\n"_b, {}), U"Expected preprocessor expression"_b);
 }
-// @TODO: write tests based on: https://mailund.dk/posts/macro-metaprogramming/
 
 GRD_TEST_CASE(errors) {
 	expect_error(simple_prep(U"#define"_b, {}), U"Expected an identifier after #define"_b);
@@ -218,3 +217,55 @@ GRD_TEST_CASE(errors) {
 	expect_error(simple_prep(U"#if (1"_b, {}), U"Expected ')' in preprocessor expression"_b);
 	expect_error(simple_prep(U"#if (1  "_b, {}), U"Expected ')' in preprocessor expression"_b);
 }
+
+GRD_TEST_CASE(function_like_macro_2) {
+    expect_str(simple_prep(U"#define ADD(a, b) (a + b)\nADD(1, 2)"_b, {}), U"\n(1 + 2)\n"_b);
+}
+
+GRD_TEST_CASE(stringizing_2) {
+    expect_str(simple_prep(U"#define STR(a) #a\nSTR(hello)"_b, {}), U"\n\"hello\"\n"_b);
+}
+
+GRD_TEST_CASE(detect_parentheses) {
+	auto base = UR"CODE(
+#define CHECK_N(x, n, ...) n
+#define CHECK(...) CHECK_N(__VA_ARGS__, 0,)
+#define PROBE(x) x, 1,
+#define IS_PAREN(x) CHECK(IS_PAREN_PROBE x)
+#define IS_PAREN_PROBE(...) PROBE(~)
+)CODE"_b;
+
+    expect_str(simple_prep(grd_concat(base, U"#define TEST IS_PAREN(())\nTEST"_b), {}), U"\n\n\n\n\n\n\n1\n"_b);
+    expect_str(simple_prep(grd_concat(base, U"#define TEST IS_PAREN(xxx)\nTEST"_b), {}), U"\n\n\n\n\n\n\n0\n"_b);
+}
+
+// https://mailund.dk/posts/macro-metaprogramming/
+// @TODO.
+GRD_TEST_CASE(mailmund_dk_posts_meta_programming) {
+	expect_str(simple_prep(UR"CODE(
+#define s(x) #x
+#define bar(x) 2 * x
+#define foo(f, x) s(f(x))
+foo(bar, 42)
+)CODE"_b, {}), U"\n\n\n\n\"bar(42)\"\n"_b);
+
+	expect_str(simple_prep(UR"CODE(
+#define baz() bar
+baz()
+)CODE"_b, {}), U"\n\nbar\n"_b);
+
+	expect_str(simple_prep(UR"CODE(
+#define s(x) #x
+#define bar(x) 2 * x
+#define baz() bar
+#define foo(f, x) #f s(f) #x s(x)
+foo(baz(), 42)
+)CODE"_b, {}), U"\n\n\n\n\"baz()\" \"bar\" \"42\" \"42\"\n"_b);
+}
+
+
+// #define s(x) #x
+// #define bar(x) 2 * x
+// #define baz() bar
+// #define foo(f, x) #f s(f) #x s(x)
+// foo(baz(), 42)
