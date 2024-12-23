@@ -7,25 +7,35 @@
 struct GrdLogger;
 
 enum class GrdLogLevel: u32 {
-	Error       = 0,
+	None        = 0,
+	Error       = 50,
 	Important   = 100,
 	Warning     = Important,
 	Verbose     = 200,
 	Debug       = 300,
 	Trace       = 400,
 };
+GRD_REFLECT(GrdLogLevel) {
+	GRD_ENUM_VALUE(None);
+	GRD_ENUM_VALUE(Error);
+	GRD_ENUM_VALUE(Important);
+	GRD_ENUM_VALUE(Warning);
+	GRD_ENUM_VALUE(Verbose);
+	GRD_ENUM_VALUE(Debug);
+	GRD_ENUM_VALUE(Trace);
+}
 
 struct GrdLogInfo {
-	GrdCodeLoc  loc = grd_caller_loc();
+	GrdCodeLoc  loc   = grd_caller_loc();
 	GrdLogLevel level = GrdLogLevel::Verbose;
 };
 
-using GrdLogger_Proc = void (*) (GrdLogger*, GrdLogInfo, GrdUnicodeString);
+using GrdLoggerProc = void (*) (GrdLogger*, GrdLogInfo, GrdUnicodeString);
 
 struct GrdLogger {
 	GrdAllocator   allocator = c_allocator;
-	GrdLogger_Proc proc = NULL;
-	GrdLogLevel    pass_level = GrdLogLevel::Trace;
+	GrdLoggerProc  proc = NULL;
+	GrdLogLevel    pass_level = GrdLogLevel::Warning;
 };
 
 GRD_DEDUP void grd_default_logger_proc(GrdLogger* logger, GrdLogInfo info, GrdUnicodeString text) {
@@ -37,9 +47,52 @@ GRD_DEDUP void grd_default_logger_proc(GrdLogger* logger, GrdLogInfo info, GrdUn
 	unicode_path.free();
 }
 
+GRD_DEDUP GrdOptional<GrdLogLevel> grd_get_cmd_line_log_level() {
+	const char* log_level_val = NULL;
+	for (auto i: grd_range(GRD_ARGC)) {
+		if (strcmp(GRD_ARGV[i], "--grd_log_level") == 0) {
+			if (i + 1 < GRD_ARGC) {
+				log_level_val = GRD_ARGV[i + 1];
+			}
+			break;
+		}
+	}
+	if (!log_level_val) {
+		return {};
+	}
+	auto x = grd_reflect_type_of<GrdLogLevel>();
+	if (!x) {
+		return {};
+	}
+	auto tp = grd_type_as<GrdEnumType>(x);
+	for (auto it: tp->values) {
+		// compare case independently.
+		auto a = it.name;
+		auto b = log_level_val;
+		bool match = false;
+		while (*a && *b) {
+			if (tolower(*a) != tolower(*b)) {
+				break;
+			}
+			a += 1;
+			b += 1;
+			if (*a == '\0' && *b == '\0') {
+				match = true;
+			}
+		}
+		if (match) {
+			return GrdLogLevel(it.value.u32_value);
+		}
+	}
+	return {};
+}
+
 GRD_DEDUP GrdLogger* grd_make_default_logger() {
 	auto logger = grd_make<GrdLogger>();
 	logger->proc = grd_default_logger_proc;
+	if (auto [level, found] = grd_get_cmd_line_log_level(); found) {
+		logger->pass_level = level;
+	}
 	return logger;
 }
 
@@ -55,15 +108,32 @@ GRD_DEDUP GrdLogger* grd_make_void_logger() {
 
 GRD_DEDUP GrdLogger*(*grd_make_new_logger)() = grd_make_default_logger;
 GRD_DEDUP thread_local GrdLogger* __grd_thread_logger = NULL;
+GRD_DEDUP thread_local GrdLogger* __grd_program_logger = NULL;
+GRD_DEDUP              bool       __grd_threads_pickup_program_logger = false;
 
-GRD_DEDUP GrdLogger* set_thread_logger(GrdLogger* logger) {
-	grd_swap(logger, __grd_thread_logger);
-	return logger;
+GRD_DEDUP void grd_set_thread_logger(GrdLogger* logger) {
+	__grd_thread_logger = logger;
+}
+
+GRD_DEDUP void grd_set_program_logger(GrdLogger* logger) {
+	__grd_program_logger = logger;
+}
+
+GRD_DEDUP GrdLogger* grd_get_program_logger() {
+	if (!__grd_program_logger) {
+		__grd_program_logger = grd_make_new_logger();
+	}
+	return __grd_program_logger;
+}
+
+GRD_DEDUP void grd_set_program_logger_to_all_threads(GrdLogger* logger) {
+	grd_atomic_store(&__grd_threads_pickup_program_logger, true);
+	grd_set_program_logger(logger);
 }
 
 GRD_DEDUP GrdLogger* grd_get_logger() {
-	if (!__grd_thread_logger) {
-		__grd_thread_logger = grd_make_new_logger();
+	if (!__grd_thread_logger || grd_atomic_load(&__grd_threads_pickup_program_logger)) {
+		__grd_thread_logger = grd_get_program_logger();
 	}
 	return __grd_thread_logger;
 }
@@ -95,6 +165,14 @@ GRD_DEDUP void GrdLog(GrdCodeLoc loc, auto... args) {
 
 GRD_DEDUP void GrdLogTrace(GrdCodeLoc loc, auto... args) {
 	GrdLogWithInfo({ .loc = loc, .level = GrdLogLevel::Trace }, args...);
+}
+
+GRD_DEDUP bool grd_can_log(GrdLogger* logger, GrdLogLevel level) {
+	return logger->pass_level >= level;
+}
+
+GRD_DEDUP bool grd_can_log(GrdLogLevel level) {
+	return grd_can_log(grd_get_logger(), level);
 }
 
 // We can't use loc = grd_caller_loc() if we have parameter pack.
