@@ -60,11 +60,6 @@ struct GrdType {
 	GrdTypeKind    kind    = 0;
 	u32            size    = 0;
 	GrdTypeId      id      = 0;
-
-	template <typename T>
-	T* as() {
-		return kind == T::KIND ? (T*) this : NULL;
-	}
 };
 
 struct GrdAny {
@@ -502,6 +497,17 @@ GRD_DEDUP GrdAny grd_make_any(T& thing) {
 	return grd_make_any(&thing);
 }
 
+template <typename T>
+GRD_DEDUP T* grd_type_as(GrdType* tp) {
+	if (!tp) {
+		return NULL;
+	}
+	if (tp->kind != T::KIND) {
+		return NULL;
+	}
+	return (T*) tp;
+}
+
 GRD_DEDUP const char* grd_resolve_type_name_alias(const char* name) {
 	if (strcmp(name, "int") == 0) return "s32";
 	if (strcmp(name, "long") == 0) return "s32";
@@ -608,7 +614,7 @@ GRD_DEDUP void grd_reflect_flatten_struct_members(GrdType* type, s32 offset, Grd
 	}
 	auto t = (GrdStructType*) type;
 	if (member.kind == GRD_STRUCT_MEMBER_KIND_BASE) {
-		if (auto member_type = member.type->as<GrdStructType>()) {
+		if (auto member_type = grd_type_as<GrdStructType>(member.type)) {
 			for (auto it: member_type->unflattened_members) {
 				grd_reflect_flatten_struct_members(type, offset + it.offset, it);
 			}
@@ -649,12 +655,12 @@ GRD_DEDUP void grd_reflect_add_tag(GrdType* type, auto value) {
 	*copied = value;
 	auto tag = grd_make_any(copied);
 
-	if (auto casted = type->as<GrdStructType>()) {
+	if (auto casted = grd_type_as<GrdStructType>(type)) {
 		if (casted->unflattened_members.count > 0) {
 			auto* member = &casted->unflattened_members.data[casted->unflattened_members.count - 1];
 			member->tags.add(tag);
 		}
-	} else if (auto casted = type->as<GrdEnumType>()) {
+	} else if (auto casted = grd_type_as<GrdEnumType>(type)) {
 		if (casted->values.count > 0) {
 			auto* val = &casted->values.data[casted->values.count - 1];
 			val->tags.add(tag);
