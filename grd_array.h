@@ -3,14 +3,16 @@
 #include "grd_span.h"
 #include "grd_allocator.h"
 
+// Lazily allocated array, if array data is not yet allocated,
+//  max(|capacity|, X(some sane value)) is used as a size of the first allocation.
 template <typename T>
 struct GrdArray: GrdSpan<T> {
 	using GrdSpan<T>::data;
 	using GrdSpan<T>::count;
 
-	s64          capacity  = 0;
+	s64             capacity  = 0;
 	GrdAllocator    allocator = c_allocator;
-	GrdCodeLoc loc       = grd_caller_loc();
+	GrdCodeLoc      loc       = grd_caller_loc();
 
 	GrdArray copy(GrdAllocator cp_allocator = c_allocator, GrdCodeLoc loc = grd_caller_loc()) {
 		GrdArray result = { .allocator = cp_allocator };
