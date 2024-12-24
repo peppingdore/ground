@@ -260,7 +260,7 @@ baz()
 #define baz() bar
 #define foo(f, x) #f s(f) #x s(x)
 foo(baz(), 42)
-)CODE"_b, {}), U"\n\n\n\n\"baz()\" \"bar\" \"42\" \"42\"\n"_b);
+)CODE"_b, {}), U"\n\n\n\n\n\"baz()\" \"bar\" \"42\" \"42\"\n"_b);
 }
 
 

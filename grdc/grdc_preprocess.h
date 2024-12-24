@@ -1768,7 +1768,6 @@ GRD_DEDUP GrdTuple<GrdError*, GrdcMacroExp*> grdc_maybe_expand_macro(GrdcPrep* p
 			}
 			if (sub_exp) {
 				grd_add(&exp->after_rescan, grdc_get_macro_exp_body(sub_exp));
-				rescan_cursor += 1;
 				continue;
 			}
 		}
