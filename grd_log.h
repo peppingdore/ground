@@ -14,6 +14,7 @@ enum class GrdLogLevel: u32 {
 	Verbose     = 200,
 	Debug       = 300,
 	Trace       = 400,
+	All         = 1000000,
 };
 GRD_REFLECT(GrdLogLevel) {
 	GRD_ENUM_VALUE(None);
@@ -23,6 +24,7 @@ GRD_REFLECT(GrdLogLevel) {
 	GRD_ENUM_VALUE(Verbose);
 	GRD_ENUM_VALUE(Debug);
 	GRD_ENUM_VALUE(Trace);
+	GRD_ENUM_VALUE(All);
 }
 
 struct GrdLogInfo {
