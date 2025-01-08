@@ -52,6 +52,7 @@
 #endif
 
 #define GRD_DEDUP inline
+#define GRD_DEF inline auto 
 
 #define GRD_IMPL 1
 #if GRD_IMPL
