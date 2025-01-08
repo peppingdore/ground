@@ -115,15 +115,28 @@ template <typename T>
 struct IsGrdGeneratorType<GrdGenerator<T>>: std::true_type {};
 
 template <typename T>
-concept HasGrdGeneratorIterator = requires (T t) {
+concept GrdHasMemberGeneratorIterator = requires (T t) {
 	requires IsGrdGeneratorType<decltype(t.iterate())>::value;
 };
 
-GRD_DEDUP auto begin(HasGrdGeneratorIterator auto t) {
+template <typename T>
+concept GrdHasGlobalGeneratorIterator = requires (T t) {
+	requires IsGrdGeneratorType<decltype(grd_iterate(t))>::value;
+};
+
+GRD_DEDUP auto begin(GrdHasMemberGeneratorIterator auto t) {
 	return t.iterate();
 }
 
-GRD_DEDUP int end(HasGrdGeneratorIterator auto t) {
+GRD_DEDUP int end(GrdHasMemberGeneratorIterator auto t) {
+	return 0;
+}
+
+GRD_DEDUP auto begin(GrdHasGlobalGeneratorIterator auto t) {
+	return grd_iterate(t);
+}
+
+GRD_DEDUP int end(GrdHasGlobalGeneratorIterator auto t) {
 	return 0;
 }
 
