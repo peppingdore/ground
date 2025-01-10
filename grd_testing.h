@@ -229,6 +229,7 @@ int main(int argc, char* argv[]) {
 			auto test = grd_find_test(node->str);
 			if (test) {
 				*dst = test;
+				test->next = NULL;
 				dst = &test->next;
 			}
 			node = node->next;
