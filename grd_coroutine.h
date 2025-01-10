@@ -145,3 +145,9 @@ GRD_DEDUP auto grd_map(auto iter, auto func) -> GrdGenerator<decltype(func(*iter
 		co_yield func(it);
 	}
 }
+
+GRD_DEDUP auto grd_map(auto iter, auto func) -> GrdGenerator<decltype(func(*begin(iter)))> {
+	for (auto it: iter) {
+		co_yield func(it);
+	}
+}
