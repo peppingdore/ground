@@ -277,6 +277,11 @@ struct GrdcTokenSlice {
 		GrdcTokenSlice grdc_make_token_slice(GrdcTokenSet* set, s64 start, s64 end);
 		return grdc_make_token_slice(set, start + a, start + b);
 	}
+
+	// @TODO: remove, used only for debugging.
+	GRD_DEF operator==(auto& rhs) -> bool {
+		return set == rhs.set && start == rhs.start && end == rhs.end;
+	}
 };
 
 GRD_DEDUP s64 grd_len(GrdcTokenSlice slice) {
@@ -317,20 +322,10 @@ GRD_DEDUP GrdcTokenSetParentBuilder grdc_make_token_set_parent_builder(GrdAlloca
 	return b;
 }
 
-GRD_DEF grdc_add_tokens(GrdcTokenSetParentBuilder* b, GrdcTokenSlice slice) {
-	// if (grd_len(b->slices) > 0) {
-	// 	auto last = b->slices[-1];
-	// 	if (last.set == slice.set && last.end == slice.start) {
-	// 		last.end = slice.end;
-	// 		return;
-	// 	}
-	// }
-	grd_add(&b->slices, slice);
-}
-
 struct GrdcTokenSetIndexer {
 	GrdcTokenSlice root_slice;
 	s64            slice_start = -1;
+	s64            slice_len = 0;
 	GrdcTokenSlice slice;
 
 	GRD_DEF operator[](s64 idx) {
@@ -382,20 +377,20 @@ GrdcToken* GrdcTokenSlice::operator[](s64 idx) {
 	return (*set)[-1];
 }
 
-GRD_DEDUP GrdTuple<bool, GrdcTokenSlice, s64> grdc_find_containing_token_slice(GrdcTokenSlice slice, s64 slice_start, s64 idx) {
+GRD_DEDUP GrdTuple<bool, GrdcTokenSlice, s64, s64> grdc_find_containing_token_slice(GrdcTokenSlice slice, s64 slice_start, s64 idx, s64 end_border) {
 	if (!slice.set->is_parent) {
-		return { true, slice, slice_start };
+		return { true, slice, slice_start, end_border };
 	}
 	s64 cursor = slice_start - slice.start;
 	for (auto it: slice.set->children) {
 		if (idx >= cursor && idx < cursor + grd_len(it)) {
 			if (idx >= slice_start && idx < slice_start + grd_len(slice)) {
-				return grdc_find_containing_token_slice(it, cursor, idx);
+				return grdc_find_containing_token_slice(it, cursor, idx, grd_min_s64(end_border, cursor + grd_len(it)));
 			}
 		}
 		cursor += grd_len(it);
 	}
-	return { false, NULL, 0 };
+	return { false, NULL, 0, 0 };
 }
 
 GRD_DEDUP GrdcToken* grdc_index(GrdcTokenSetIndexer* indexer, s64 idx) {
@@ -404,15 +399,17 @@ GRD_DEDUP GrdcToken* grdc_index(GrdcTokenSetIndexer* indexer, s64 idx) {
 	}
 	if (indexer->slice_start == -1 ||
 	    idx < indexer->slice_start ||
-	    idx >= indexer->slice_start + grd_len(indexer->slice)
+	    idx >= indexer->slice_start + indexer->slice_len
 	) {
+		// GrdLogTrace("reindex");
 		indexer->slice_start = -1;
-		auto [did_find, slice, slice_start] = grdc_find_containing_token_slice(indexer->root_slice, 0, idx);
+		auto [did_find, slice, slice_start, end_border] = grdc_find_containing_token_slice(indexer->root_slice, 0, idx, grd_len(indexer->root_slice));
 		if (!did_find) {
 			return NULL;
 		}
 		indexer->slice = slice;
 		indexer->slice_start = slice_start;
+		indexer->slice_len = end_border - slice_start;
 	}
 	assert(!indexer->slice.set->is_parent);
 	return indexer->slice.set->tokens[idx - indexer->slice_start + indexer->slice.start];
@@ -437,7 +434,15 @@ GRD_DEDUP s64 grd_len(GrdcTokenSet* set) {
 	return set->count;
 }
 
+GRD_DEDUP GrdUnicodeString grdc_tok_str(GrdcToken* tok);
+
 GRD_DEDUP GrdcTokenSlice grdc_make_parent_token_set(GrdcTokenSetParentBuilder* b) {
+	GrdLogTrace("grdc_make_parent_token_set");
+	for (auto s: b->slices) {
+		for (auto tok: s) {
+			GrdLogTrace("    tok: %", grdc_tok_str(tok));
+		}
+	}
 	auto set = grd_make<GrdcTokenSet>();
 	set->is_parent = true;
 	set->children = b->slices;
@@ -448,6 +453,17 @@ GRD_DEDUP GrdcTokenSlice grdc_make_parent_token_set(GrdcTokenSetParentBuilder* b
 	b->slices = { .allocator = null_allocator }; // Make sure we crash if we try to write into |children| after.
 	auto slice = grdc_make_token_slice(set);
 	set->base_indexer = grdc_make_token_set_indexer(slice);
+	GrdLogTrace("again");
+	for (auto s: set->children) {
+		GrdLogTrace("  child: %, %, %", (void*) s.set, s.start, s.end);
+		for (auto tok: s) {
+			GrdLogTrace("    tok: %", grdc_tok_str(tok));
+		}
+	}
+	GrdLogTrace("slice: ");
+	for (auto tok: slice) {
+		GrdLogTrace("  tok: %", grdc_tok_str(tok));
+	}
 	return slice;
 }
 
@@ -464,6 +480,52 @@ GRD_DEDUP GrdcTokenSlice grdc_make_token_set(GrdcTokenSetBuilder* b) {
 	b->tokens = { .allocator = null_allocator }; // Make sure we crash if we try to write into |tokens| after.
 	set->base_indexer = grdc_make_token_set_indexer(grdc_make_token_slice(set, 0, grd_len(set)));
 	return grdc_make_token_slice(set);
+}
+
+GRD_DEF grdc_add_tokens(GrdcTokenSetParentBuilder* b, GrdcTokenSlice slice) {
+	GrdLogTrace("before: ");
+	for (auto s: b->slices) {
+		for (auto tok: s) {
+			GrdLogTrace("  tok: %", grdc_tok_str(tok));
+		}
+	}
+	GrdLogTrace("adding: ");
+	for (auto tok: slice) {
+		GrdLogTrace("  tok: %", grdc_tok_str(tok));
+	}
+	grd_defer { 
+		GrdLogTrace("after: ");
+		for (auto s: b->slices) {
+			for (auto tok: s) {
+				GrdLogTrace("  tok: %", grdc_tok_str(tok));
+			}
+		}
+	};
+	if (grd_len(b->slices) > 0) {
+		auto last = &b->slices[-1];
+		if (last->set == slice.set && slice.start >= last->start && slice.start <= last->end) {
+			if (slice.end >= last->start) {
+				GrdLogTrace("TRIGGER!");
+		// 		GrdUnicodeString grdc_tok_str(GrdcToken* x);
+		// 		auto cp = b->slices.copy(b->slices.allocator);
+		// 		GrdLogTrace("Toks before: %", grd_to_array(grd_map(grdc_make_parent_token_set(b), grd_lambda(x, grdc_tok_str(x)))));
+		// 		b->slices = cp;
+		// 		grd_assert(b->slices == cp);
+		// 		last = &b->slices[-1];
+		// 		GrdLogTrace("DIFF: %, %", grd_len(b->slices), grd_len(cp));
+		// 		GrdLogTrace("Extending last slice: %, %", last->start, last->end);
+		// 		GrdLogTrace("  set %, %", last->set, slice.set);
+		// 		GrdLogTrace("  with: %, %", slice.start, slice.end);
+				last->end = grd_max_s64(last->end, slice.end);
+		// 		GrdLogTrace("  to: %, %", last->start, last->end);
+		// 		cp = b->slices.copy();
+		// 		GrdLogTrace("Toks after: %", grd_to_array(grd_map(grdc_make_parent_token_set(b), grd_lambda(x, grdc_tok_str(x)))));
+		// 		b->slices = cp;
+				return;
+			}
+		}
+	}
+	grd_add(&b->slices, slice);
 }
 
 struct GrdcIncludedFile {
@@ -599,8 +661,6 @@ GRD_DEDUP s64 grdc_get_residual_lines_below(GrdUnicodeString src, s64 anchor, s6
 	}
 	return grd_len(src);
 }
-
-GRD_DEDUP GrdUnicodeString grdc_tok_str(GrdcToken* tok);
 
 GRD_DEDUP void grdc_print_file_range_highlighted(GrdFormatter* f, GrdcPrepFileSource* file, s64 h_start, s64 h_end, s64 color) {
 	s64 mapped_start = grdc_og_file_index(file, h_start);
