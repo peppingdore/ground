@@ -7,11 +7,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+struct GrdTestScopeNode;
+
 struct GrdTestFailedExpect {
 	GrdTestFailedExpect* next = NULL;
 	const char*          cond_str = NULL;
 	const char*          message = NULL;
-	GrdCodeLoc           loc;
+	GrdTestScopeNode*    scope = NULL;
 };
 
 struct GrdTestCase {
@@ -26,7 +28,7 @@ struct GrdTestCase {
 
 struct GrdTestScopeNode {
 	GrdTestScopeNode* next = NULL;
-	GrdCodeLoc   loc;
+	GrdCodeLoc        loc;
 };
 
 struct GrdTestStringNode {
@@ -112,6 +114,24 @@ GRD_DEDUP void grd_register_test_case(void(*proc)(), const char* name, s64 idx) 
 	}
 }
 
+GRD_DEDUP GrdTestScopeNode* grd_tester_copy_scope(GrdTestScopeNode* scope) {
+	GrdTestScopeNode* root = NULL;
+	GrdTestScopeNode* dst = NULL;
+	while (scope) {
+		auto node = grd_make<GrdTestScopeNode>();
+		*node = *scope;
+		if (dst) {
+			dst->next = node;
+		}
+		if (!root) {
+			root = dst;
+		}
+		dst = node;
+		scope = scope->next;
+	}
+	return root;
+}
+
 GRD_DEDUP void grd_tester_print_summary() {
 	// print failed tests. use ascii colors
 	printf("\n\n");
@@ -126,7 +146,11 @@ GRD_DEDUP void grd_tester_print_summary() {
 			while (expect) {
 				printf("  %s\n", expect->cond_str);
 				printf("  %s\n", expect->message);
-				printf("  %s:%d\n", expect->loc.file, expect->loc.line);
+				auto scope = expect->scope;
+				while (scope) {
+					printf("  %s:%d\n", scope->loc.file, scope->loc.line);
+					scope = scope->next;
+				}
 				expect = expect->next;
 			}
 		}
@@ -250,7 +274,21 @@ int main(int argc, char* argv[]) {
 	return 0;
 }
 
+GRD_DEDUP void grd_tester_scope_push(GrdCodeLoc loc) {
+	auto scope_node = new GrdTestScopeNode();
+	scope_node->loc = loc;
+	scope_node->next = tester.scope;
+	tester.scope = scope_node;
+}
+
+GRD_DEDUP void grd_tester_scope_pop() {
+	if (tester.scope) {
+		tester.scope = tester.scope->next;
+	}
+}
+
 GRD_DEDUP void grd_test_expect(bool cond, const char* cond_str, const char* message, GrdCodeLoc loc = grd_caller_loc()) {
+	grd_tester_scope_push(loc);
 	grd_tester_write_result_line("TESTER_EXPECT");
 	if (cond) {
 		tester.current_test->expect_succeeded += 1;
@@ -266,12 +304,11 @@ GRD_DEDUP void grd_test_expect(bool cond, const char* cond_str, const char* mess
 			dst = &(*dst)->next;
 		}
 		*dst = new GrdTestFailedExpect();
-		(*dst)->loc = loc;
+		(*dst)->scope = grd_tester_copy_scope(tester.scope);
 		(*dst)->cond_str = cond_str;
 		(*dst)->message = message;
 		grd_tester_write_result_int(0);
 	}
-
 	grd_tester_write_result_str(cond_str);
 	grd_tester_write_result_str(message);
 	int scope_count = 0;
@@ -293,29 +330,13 @@ GRD_DEDUP void grd_test_expect(bool cond, const char* cond_str, const char* mess
 	if (!cond) {
 		printf("   %s: %d\n", loc.file, loc.line);
 	}
+	grd_tester_scope_pop();
 }
 
 GRD_DEDUP void grd_test_expect(bool cond, const char* cond_str, GrdCodeLoc loc = grd_caller_loc()) {
 	char* str = grd_heap_sprintf("Expected '%s'", cond_str);
 	grd_test_expect(cond, cond_str, str, loc);
 	free(str);
-}
-
-GRD_DEDUP void grd_tester_scope_push(GrdCodeLoc loc) {
-	auto scope_node = new GrdTestScopeNode();
-	scope_node->loc = loc;
-	if (!tester.scope) {
-		tester.scope = scope_node;
-	} else {
-		scope_node->next = tester.scope;
-		tester.scope = scope_node;
-	}
-}
-
-GRD_DEDUP void grd_tester_scope_pop() {
-	if (tester.scope) {
-		tester.scope = tester.scope->next;
-	}
 }
 
 #define GRD_TEST_CASE(name)\
