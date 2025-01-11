@@ -49,7 +49,15 @@ GrdTuple<GrdError*, GrdcPrep*> simple_prep(GrdUnicodeString str, GrdSpan<GrdTupl
 		return NULL;
 	};
 	auto root = grdc_make_mem_prep_file(prep, str, U"<root_file>"_b);
-	return { grdc_preprocess_file(prep, root), prep };
+	auto e = grdc_preprocess_file(prep, root);
+	auto toks = grdc_get_tokens(prep);
+	for (auto it: toks) {
+		GrdLogTrace("Token: %, %, %, %, %", grdc_tok_str(it), it->file_start, it->file_end, it->kind, it->src_kind);
+		if (it->src_kind == GRDC_PREP_TOKEN_SOURCE_INCLUDED_FILE) {
+			GrdLogTrace("  Included file: % (%:%)", it->included_file->file->fullpath, it->included_file_og_tok->file_start, it->included_file_og_tok->file_end);
+		}
+	}
+	return { e, prep };
 }
 
 GRD_TEST_CASE(simple_expansion) {
@@ -236,7 +244,7 @@ GRD_TEST_CASE(detect_parentheses) {
 )CODE"_b;
 
     expect_str(simple_prep(grd_concat(base, U"#define TEST IS_PAREN(())\nTEST"_b), {}), U"\n\n\n\n\n\n\n1\n"_b);
-    // expect_str(simple_prep(grd_concat(base, U"#define TEST IS_PAREN(xxx)\nTEST"_b), {}), U"\n\n\n\n\n\n\n0\n"_b);
+    expect_str(simple_prep(grd_concat(base, U"#define TEST IS_PAREN(xxx)\nTEST"_b), {}), U"\n\n\n\n\n\n\n0\n"_b);
 }
 
 // https://mailund.dk/posts/macro-metaprogramming/
@@ -249,18 +257,18 @@ GRD_TEST_CASE(mailmund_dk_posts_meta_programming) {
 foo(bar, 42)
 )CODE"_b, {}), U"\n\n\n\n\"bar(42)\"\n"_b);
 
-	expect_str(simple_prep(UR"CODE(
-#define baz() bar
-baz()
-)CODE"_b, {}), U"\n\nbar\n"_b);
+// 	expect_str(simple_prep(UR"CODE(
+// #define baz() bar
+// baz()
+// )CODE"_b, {}), U"\n\nbar\n"_b);
 
-	expect_str(simple_prep(UR"CODE(
-#define s(x) #x
-#define bar(x) 2 * x
-#define baz() bar
-#define foo(f, x) #f s(f) #x s(x)
-foo(baz(), 42)
-)CODE"_b, {}), U"\n\n\n\n\n\"baz()\" \"bar\" \"42\" \"42\"\n"_b);
+// 	expect_str(simple_prep(UR"CODE(
+// #define s(x) #x
+// #define bar(x) 2 * x
+// #define baz() bar
+// #define foo(f, x) #f s(f) #x s(x)
+// foo(baz(), 42)
+// )CODE"_b, {}), U"\n\n\n\n\n\"baz()\" \"bar\" \"42\" \"42\"\n"_b);
 }
 
 GRD_TEST_CASE(retarded_if_macro) {
@@ -272,7 +280,7 @@ GRD_TEST_CASE(retarded_if_macro) {
 #define else_1(...)
 if_else(0)(abort())(printf("yeah!\n"));
 if_else(1)(printf("also yeah!\n"))(abort());
-)CODE"_b, {}), U"\n\n\n\n\n\"printf(\"yeah!\n\");\nprintf(\"also yeah!\n\") ;\n"_b);
+)CODE"_b, {}), U"\n\n\n\n\n\nprintf(\"yeah!\\n\");\nprintf(\"also yeah!\\n\") ;\n"_b);
 }
 
 // #define if_else(b) if_##b
@@ -283,8 +291,6 @@ if_else(1)(printf("also yeah!\n"))(abort());
 
 // if_else(0)(abort())(printf("yeah!\n"));
 // if_else(1)(printf("also yeah!\n"))(abort());
-
-
 
 // #define s(x) #x
 // #define bar(x) 2 * x

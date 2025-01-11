@@ -1451,7 +1451,6 @@ GRD_DEDUP GrdUnicodeString grdc_tok_str_content(GrdcToken* tok) {
 }
 
 GRD_DEDUP void grdc_push_source_file_token(GrdcPrepFileSource* file, GrdcToken* tok) {
-	tok->file_tok_idx = grd_len(file->tokens);
 	grdc_add_token(&file->tokens_builder, tok);
 }
 
@@ -1474,7 +1473,8 @@ GRD_DEDUP GrdError* grdc_tokenize(GrdcPrep* p, GrdcPrepFileSource* file) {
 		grdc_push_source_file_token(file, tok);
 		cursor = tok_end;
 	}
-	if (grd_len(file->tokens) == 0 || file->tokens[-1]->kind != GRDC_PREP_TOKEN_KIND_LINE_BREAK) {
+	// Accessing tokens_builder this way seems like a @Hack.
+	if (grd_len(file->tokens_builder.tokens) == 0 || file->tokens_builder.tokens[-1]->kind != GRDC_PREP_TOKEN_KIND_LINE_BREAK) {
 		auto tok = grdc_make_file_token(p, GRDC_PREP_TOKEN_KIND_LINE_BREAK, file, grd_len(file->src), grd_len(file->src));
 		tok->flags |= GRDC_PREP_TOKEN_FLAG_FILE_MISSING_TRAILING_LINE_BREAK;
 		grdc_push_source_file_token(file, tok);
@@ -1482,9 +1482,13 @@ GRD_DEDUP GrdError* grdc_tokenize(GrdcPrep* p, GrdcPrepFileSource* file) {
 	auto eof = grdc_make_file_token(p, GRDC_PREP_TOKEN_KIND_EOF, file, grd_len(file->src), grd_len(file->src));
 	grdc_push_source_file_token(file, eof);
 	file->tokens = grdc_make_token_set(&file->tokens_builder);
+	s64 idx = 0;
 	for (auto it: file->tokens) {
-		// print tokens.
-		// GrdLogTrace("Token: %, %, %, %", grdc_tok_str(it), it->file_start, it->file_end, it->kind);
+		it->file_tok_idx = idx;
+		idx += 1;
+	}
+	for (auto it: file->tokens) {
+		GrdLogTrace("FToken: %, %, %, %", grdc_tok_str(it), it->file_start, it->file_end, it->kind);
 	}
 	return NULL;
 }
@@ -1953,7 +1957,7 @@ GRD_DEDUP GrdTuple<GrdError*, GrdcMacroExp*> grdc_maybe_expand_macro(GrdcPrep* p
 				}
 				auto set = grdc_make_token_set(&concat_builder);
 				grdc_add_tokens(&after_concat_builder, set);
-				idx += 1;
+				idx = concat_idx + 1;
 				grd_println("lhs_residue: %", grd_to_array(grd_map(lhs_residue, grd_lambda(x, grdc_tok_str(x)))));
 				grd_println("lhs: %", grd_to_array(grd_map(lhs, grd_lambda(x, grdc_tok_str(x)))));
 				grd_println("rhs_residue: %", grd_to_array(grd_map(rhs_residue, grd_lambda(x, grdc_tok_str(x)))));
@@ -2335,23 +2339,28 @@ GRD_DEDUP GrdError* grdc_handle_prep_directive(GrdcPrep* p, GrdcTokenSlice token
 		}
 
 		auto path_toks = grdc_make_parent_token_set(&path_toks_builder);
+		GrdLogTrace("path_toks: %", grdc_tok_arr_str(path_toks));
 		// @TODO: free path_toks?
 
 		// Remove preceeding and trailing spaces.
 		s64 path_start = 0;
 		s64 path_end = grd_len(path_toks);
+		GrdLogTrace("start: % - %", path_start, path_end);
 		for (s64 i = 0; i < grd_len(path_toks); i++) {
 			if (path_toks[i]->kind != GRDC_PREP_TOKEN_KIND_SPACE) {
 				path_start = i;
 				break;
 			}
+			GrdLogTrace(" skip start tok: %", grdc_tok_str(path_toks[i]));
 		}
 		for (s64 i = grd_len(path_toks) - 1; i >= 0; i--) {
 			if (path_toks[i]->kind != GRDC_PREP_TOKEN_KIND_SPACE) {
-				path_end = i;
+				path_end = i + 1;
 				break;
 			}
+			GrdLogTrace(" skip end tok: %", grdc_tok_str(path_toks[i]));
 		}
+		GrdLogTrace("end: % - %", path_start, path_end);
 		if (path_start >= path_end) {
 			return grdc_make_prep_file_error(p, directive_tok, "Empty #include path");
 		}
