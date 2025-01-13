@@ -98,3 +98,13 @@ GRD_TEST_CASE(reflect_real_type_test) {
 	auto type = grd_get_real_type(grd_reflect_type_of(*b), b);
 	GRD_EXPECT(type == grd_reflect_type_of<Derived>());
 }
+
+GRD_TEST_CASE(reflect_remove_const_ref) {
+	const char* str = "hello";
+	auto& xxx = str;
+
+	grd_println(grd_reflect_type_of(xxx));
+
+	GRD_EXPECT(strcmp(grd_reflect_type_of(xxx)->name, "char*") == 0);
+	GRD_EXPECT(strcmp(grd_reflect_type_of<decltype(xxx)>()->name, "char*") == 0);
+}
