@@ -8,6 +8,7 @@
 #include "grd_coroutine.h"
 #include "grd_scoped.h"
 #include "grd_heap_sprintf.h"
+#include "grd_code_location.h"
 
 template <typename T>
 struct GrdReflectGrdArray {
@@ -40,24 +41,31 @@ struct GrdReflectGrdArray {
 using GrdTypeId = u32;
 
 // GrdTypeKind is safe to cast to C string.
-using GrdTypeKind = u64;
+struct GrdTypeKind {
+	constexpr static u64 SZ = 8;
+	char s[SZ] = {};
 
-template <int N> requires(N <= sizeof(GrdTypeKind))
-GRD_DEDUP constexpr GrdTypeKind grd_make_type_kind(const char (&str)[N]) {
-	GrdTypeKind kind = 0;
+	bool operator==(GrdTypeKind rhs) {
+		return memcmp(this, &rhs, sizeof(*this)) == 0;
+	}
+};
+
+template <int N> requires(N <= sizeof(GrdTypeKind::SZ))
+GRD_DEDUP constexpr GrdTypeKind grd_make_type_kind(const char (&str)[N]){
+	GrdTypeKind kind;
 	for (int i = 0; i < (N - 1); i++) {
-		kind |= u64(str[i]) << u64(i * 8);
+		kind.s[i] = str[i];
 	}
 	return kind;
 }
 
 GRD_DEDUP const char* grd_type_kind_as_c_str(GrdTypeKind* kind) {
-	return (const char*) kind;
+	return (const char*) kind->s;
 }
 
 struct GrdType {
 	const char*    name    = "<unnamed>";
-	GrdTypeKind    kind    = 0;
+	GrdTypeKind    kind    = { 0 };
 	u32            size    = 0;
 	GrdTypeId      id      = 0;
 };
@@ -325,6 +333,9 @@ struct grd_remove_all_const<T* const> {
 	using type = typename grd_remove_all_const<T>::type*;
 };
 
+template <typename T>
+using grd_reflect_clean_type = typename std::remove_reference_t<typename grd_remove_all_const<T>::type>;
+
 template <typename T, typename TypeT>
 GRD_DEDUP TypeT* grd_reflect_add_type_named(const char* name) {
 	GrdScopedLock(GRD_REFLECT.lock);
@@ -334,9 +345,6 @@ GRD_DEDUP TypeT* grd_reflect_add_type_named(const char* name) {
 	type.name = name;
 	return &type;
 }
-
-template <typename T>
-GRD_DEDUP GrdType* grd_reflect_type_of();
 
 template <typename T>
 GRD_DEDUP GrdUnregisteredType* grd_reflect_create_type(T* x) {
@@ -362,6 +370,26 @@ GRD_DEDUP GrdPointerType* grd_reflect_create_type(T** thing) {
 }
 
 template <typename T>
+concept GrdReflectTypeOfMember =
+	requires (grd_reflect_clean_type<T> x) { grd_reflect_clean_type<T>::grd_reflect_create_type(&x); };
+
+template <typename T>
+concept GrdReflectTypeOfGlobal =
+	!GrdReflectTypeOfMember<T> &&
+	requires (grd_reflect_clean_type<T> x) { grd_reflect_create_type(&x); };
+
+template <typename T>
+concept GrdReflectTypeOf = GrdReflectTypeOfGlobal<T> || GrdReflectTypeOfMember<T>;
+
+template <GrdReflectTypeOfMember T>
+GRD_DEDUP GrdType* grd_reflect_type_of();
+template <GrdReflectTypeOfGlobal X>
+GRD_DEDUP GrdType* grd_reflect_type_of();
+template <typename T> requires (std::is_void_v<T>)
+GRD_DEDUP GrdType* grd_reflect_type_of();
+
+
+template <typename T>
 GRD_DEDUP void grd_reflect_type(T** thing, GrdPointerType* type) {
 	type->inner = grd_reflect_type_of<T>();
 	auto inner_name_length = strlen(type->inner->name);
@@ -373,7 +401,7 @@ GRD_DEDUP void grd_reflect_type(T** thing, GrdPointerType* type) {
 
 template <typename T, s64 N>
 GRD_DEDUP GrdFixedArrayType* grd_reflect_create_type(T (*arr)[N]) {
-	return grd_reflect_add_type_named<T (*)[N], GrdFixedArrayType>("");
+	return grd_reflect_add_type_named<grd_reflect_clean_type<decltype(*arr)>, GrdFixedArrayType>("");
 }
 
 template <typename T, s64 N>
@@ -424,10 +452,10 @@ GRD_DEDUP void grd_reflect_type(R (**function)(Args...), GrdFunctionType* type) 
 
 GRD_DEDUP void grd_reflect_maybe_flatten_struct_type(GrdType* type);
 
-template <typename T> requires requires(T x) { T::grd_reflect_type(&x, NULL); }
+template <GrdReflectTypeOfMember T>
 GRD_DEDUP GrdType* grd_reflect_type_of() {
 	GrdScopedLock(GRD_REFLECT.lock);
-	using XT = grd_remove_all_const<T>::type;
+	using XT = grd_reflect_clean_type<T>;
 	using Mapper = GrdTypeMapper<XT>;
 	if (!Mapper::type) {\
 		auto type = XT::grd_reflect_create_type((XT*) NULL);
@@ -439,12 +467,12 @@ GRD_DEDUP GrdType* grd_reflect_type_of() {
 	return Mapper::type;
 }
 
-template <typename X>
+template <GrdReflectTypeOfGlobal T>
 GRD_DEDUP GrdType* grd_reflect_type_of() {
 	GrdScopedLock(GRD_REFLECT.lock);
-	using XT = grd_remove_all_const<X>::type;
+	using XT = grd_reflect_clean_type<T>;
 	using Mapper = GrdTypeMapper<XT>;
-	if (!Mapper::type) {\
+	if (!Mapper::type) {
 		auto type = grd_reflect_create_type((XT*) NULL);
 		grd_reflect_type((XT*) NULL, type);
 		grd_reflect_maybe_flatten_struct_type(type);
@@ -454,8 +482,8 @@ GRD_DEDUP GrdType* grd_reflect_type_of() {
 	return Mapper::type;
 }
 
-template <>
-GRD_DEDUP GrdType* grd_reflect_type_of<void>() {
+template <typename T> requires (std::is_void_v<T>)
+GRD_DEDUP GrdType* grd_reflect_type_of() {
 	GrdScopedLock(GRD_REFLECT.lock);
 	using Mapper = GrdTypeMapper<void>;
 	if (!Mapper::type) {\
@@ -467,7 +495,6 @@ GRD_DEDUP GrdType* grd_reflect_type_of<void>() {
 	assert(Mapper::type);
 	return Mapper::type;
 }
-
 
 template <typename T>
 GRD_DEDUP GrdType* grd_reflect_type_of(T& value) {
@@ -693,9 +720,9 @@ using GrdReflectMacroPickType = std::conditional_t<std::is_class_v<T>, GrdStruct
 //   grd_reflect_type_of<T> returns the correct type if occurs earlier in the code than grd_reflect_type(T*).
 #define GRD_REFLECT_NAME(__T, _name)\
 template <int _N = 0> requires (_N == 0)\
-GRD_DEDUP GrdReflectMacroPickType<__T>* grd_reflect_create_type(__T* x) { return grd_reflect_add_type_named<__T, GrdReflectMacroPickType<__T>>(_name); }\
+GRD_DEDUP static GrdReflectMacroPickType<__T>* grd_reflect_create_type(__T* x) { return grd_reflect_add_type_named<__T, GrdReflectMacroPickType<__T>>(_name); }\
 template <int _N = 0> requires (_N == 0)\
-GRD_DEDUP void grd_reflect_type(__T* x, GrdReflectMacroPickType<__T>* type)
+GRD_DEDUP static void grd_reflect_type(__T* x, GrdReflectMacroPickType<__T>* type)
 
 
 #define GRD_REFLECT(_T) GRD_REFLECT_NAME(_T, #_T)
@@ -819,4 +846,13 @@ GRD_DEDUP GrdGeneratorType* grd_reflect_create_type(GrdGenerator<T>* x) {
 template <typename T>
 GRD_DEDUP void grd_reflect_type(GrdGenerator<T>* x, GrdGeneratorType* type) {
 	type->gen_type = grd_reflect_type_of<T>();
+}
+
+GRD_REFLECT(GrdTypeKind) {
+	GRD_MEMBER(s);
+}
+
+GRD_REFLECT(GrdCodeLoc) {
+	GRD_MEMBER(file);
+	GRD_MEMBER(line);
 }

@@ -926,63 +926,40 @@ GRD_DEDUP void grd_format_item(GrdFormatter* formatter, GrdType* type, void* thi
 
 	auto real_type = grd_get_real_type(type, thing);
 
-	switch (real_type->kind) {
-		case GrdStructType::KIND: {
-			auto casted = (GrdStructType*) real_type;
-			if (strcmp(casted->subkind, "tuple") == 0) {
-				grd_format_tuple(formatter, casted, thing);
-			} else {
-				grd_format_struct(formatter, casted, thing);
-			}
+	
+	if (real_type->kind == GrdStructType::KIND) {
+		auto casted = (GrdStructType*) real_type;
+		if (strcmp(casted->subkind, "tuple") == 0) {
+			grd_format_tuple(formatter, casted, thing);
+		} else {
+			grd_format_struct(formatter, casted, thing);
 		}
-		break;
-
-		case GrdPrimitiveType::KIND: {
-			auto casted = (GrdPrimitiveType*) real_type;
-			grd_format_primitive(formatter, casted, thing, spec);
+	} else if (real_type->kind == GrdPrimitiveType::KIND) {
+		auto casted = (GrdPrimitiveType*) real_type;
+		grd_format_primitive(formatter, casted, thing, spec);
+	} else if (real_type->kind == GrdEnumType::KIND) {
+		auto casted = (GrdEnumType*) real_type;
+		grd_format_enum(formatter, casted, thing);
+	} else if (real_type->kind == GrdSpanType::KIND) {
+		auto casted = (GrdArrayType*) real_type;
+		grd_format_span(formatter, casted, thing, spec);
+	} else if (real_type->kind == GrdPointerType::KIND) {
+		auto casted = (GrdPointerType*) real_type;
+		auto inner_type = grd_reflect_get_pointer_inner_type_with_indirection_level(casted, NULL);
+		if (inner_type == grd_reflect_type_of<char>() ||
+			inner_type == grd_reflect_type_of<wchar_t>() ||
+			inner_type == grd_reflect_type_of<char16_t>() ||
+			inner_type == grd_reflect_type_of<char32_t>()) {
+			formatter->quote_inner_string = saved_quote_string;
 		}
-		break;
-
-		case GrdEnumType::KIND: {
-			auto casted = (GrdEnumType*) real_type;
-			grd_format_enum(formatter, casted, thing);
-		}
-		break;
-
-		case GrdSpanType::KIND: {
-			auto casted = (GrdArrayType*) real_type;
-			grd_format_span(formatter, casted, thing, spec);
-		}
-		break;
-
-		case GrdPointerType::KIND: {
-			auto casted = (GrdPointerType*) real_type;
-			auto inner_type = grd_reflect_get_pointer_inner_type_with_indirection_level(casted, NULL);
-			if (inner_type == grd_reflect_type_of<char>() ||
-				inner_type == grd_reflect_type_of<wchar_t>() ||
-				inner_type == grd_reflect_type_of<char16_t>() ||
-				inner_type == grd_reflect_type_of<char32_t>()) {
-				formatter->quote_inner_string = saved_quote_string;
-			}
-			grd_format_pointer(formatter, casted, thing, spec);
-		}
-		break;
-
-		case GrdFunctionType::KIND: {
-			auto casted = (GrdFunctionType*) real_type;
-			grd_format_function(formatter, casted, thing, spec);
-		}
-		break;
-
-		case GrdUnregisteredType::KIND: {
-			grd_format(formatter, "(Unregistered type)"_b);
-		}
-		break;
-
-		default: {
-			grd_format(formatter, "(Unknown type)"_b);
-		}
-		break;
+		grd_format_pointer(formatter, casted, thing, spec);
+	} else if (real_type->kind == GrdFunctionType::KIND) {
+		auto casted = (GrdFunctionType*) real_type;
+		grd_format_function(formatter, casted, thing, spec);
+	} else if (real_type->kind == GrdUnregisteredType::KIND) {
+		grd_format(formatter, "(Unregistered type)"_b);
+	} else {
+		grd_format(formatter, "(Unknown type)"_b);
 	}
 }
 
