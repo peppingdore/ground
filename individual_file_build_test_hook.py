@@ -21,9 +21,11 @@ JUMBO_HEADER = """#pragma once
 #endif
 """
 JUMBO_FOOTER = """
+#if JUMBO_EXCLUDE_MAIN == 0
 	int main() {
 		return 0;
 	}
+#endif
 """
 
 def grd_test_hook(tester):
