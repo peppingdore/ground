@@ -145,7 +145,7 @@ GRD_DEDUP constexpr u64 grd_static_array_count(T(&)[n]) {
 GRD_DEDUP char* const* GRD_ARGV = NULL;
 GRD_DEDUP int          GRD_ARGC = 0;
 
-void grd_store_cmdline_args(int argc, char* const* argv) {
+GRD_DEDUP void grd_store_cmdline_args(int argc, char* const* argv) {
 	GRD_ARGV = argv;
 	GRD_ARGC = argc;
 }
