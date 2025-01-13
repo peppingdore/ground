@@ -4,6 +4,7 @@
 #include "grd_code_location.h"
 #include "grd_build.h"
 #include "grd_heap_sprintf.h"
+#include "grd_allocator.h"
 #include <stdio.h>
 #include <stdlib.h>
 
