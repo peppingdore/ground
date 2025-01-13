@@ -3,6 +3,7 @@
 #include "grd_base.h"
 #include "grd_format.h"
 #include "grd_file_path.h"
+#include <ctype.h>
 
 struct GrdLogger;
 
@@ -28,8 +29,15 @@ GRD_REFLECT(GrdLogLevel) {
 }
 
 struct GrdLogInfo {
-	GrdCodeLoc  loc   = grd_caller_loc();
-	GrdLogLevel level = GrdLogLevel::Verbose;
+	GrdCodeLoc  loc    = grd_caller_loc();
+	GrdLogLevel level  = GrdLogLevel::Verbose;
+	s64         indent = 0;
+
+	GRD_REFLECT(GrdLogInfo) {
+		GRD_MEMBER(loc);
+		GRD_MEMBER(level);
+		GRD_MEMBER(indent);
+	}
 };
 
 using GrdLoggerProc = void (*) (GrdLogger*, GrdLogInfo, GrdUnicodeString);
@@ -38,6 +46,12 @@ struct GrdLogger {
 	GrdAllocator   allocator = c_allocator;
 	GrdLoggerProc  proc = NULL;
 	GrdLogLevel    pass_level = GrdLogLevel::Warning;
+
+	GRD_REFLECT(GrdLogger) {
+		GRD_MEMBER(allocator);
+		GRD_MEMBER(proc);
+		GRD_MEMBER(pass_level);
+	}
 };
 
 GRD_DEDUP void grd_default_logger_proc(GrdLogger* logger, GrdLogInfo info, GrdUnicodeString text) {
