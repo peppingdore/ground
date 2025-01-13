@@ -1092,4 +1092,11 @@ GRD_DEDUP void grd_type_format(GrdFormatter* formatter, GrdFmtIndent* indent, Gr
 		grd_format(formatter, "%", indent->str);
 	}
 }
+
+GRD_DEDUP void grd_type_format(GrdFormatter* formatter, GrdTypeKind* kind, GrdString spec) {
+	if (kind == NULL) {
+		grd_format(formatter, "%{null}", grd_reflect_type_of(*kind)->name); 
+	}
+	auto c_str = grd_type_kind_as_c_str(kind);
+	grd_format(formatter, "%(no_quote){%*}", grd_reflect_type_of(*kind)->name, c_str);
 }
