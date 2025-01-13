@@ -1078,4 +1078,19 @@ GRD_DEDUP void grd_type_format(GrdFormatter* formatter, GrdSmallString* str, Grd
 GRD_REFLECT(GrdCodeLoc) {
 	GRD_MEMBER(file);
 	GRD_MEMBER(line);
+struct GrdFmtIndent {
+	s64              len = 0;
+	GrdUnicodeString str = U"   "_b;
+
+	GRD_REFLECT(GrdFmtIndent) {
+		GRD_MEMBER(len);
+		GRD_MEMBER(str);
+	}
+};
+
+GRD_DEDUP void grd_type_format(GrdFormatter* formatter, GrdFmtIndent* indent, GrdString spec) {
+	for (auto i: grd_range(indent->len)) {
+		grd_format(formatter, "%", indent->str);
+	}
+}
 }
