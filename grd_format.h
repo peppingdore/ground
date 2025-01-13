@@ -583,7 +583,8 @@ GRD_DEDUP void grd_format_c_string(GrdFormatter* formatter, T* c_str, GrdString 
 		return;
 	}
 
-	bool quote = grd_contains(spec, "quote"_b) || formatter->quote_inner_string;
+	bool no_quote = grd_contains(spec, "no_quote"_b);
+	bool quote = !no_quote && (grd_contains(spec, "quote"_b) || formatter->quote_inner_string);
 	formatter->quote_inner_string = false;
 	if (quote) {
 		grd_format(formatter, "\"");
@@ -612,7 +613,8 @@ GRD_DEDUP void grd_format_c_string(GrdFormatter* formatter, T* c_str, GrdString 
 }
 
 GRD_DEDUP void grd_format_string(GrdFormatter* formatter, GrdSpanType* type, void* thing, GrdString spec) {
-	bool quote = grd_contains(spec, "quote"_b) || formatter->quote_inner_string;
+	bool no_quote = grd_contains(spec, "no_quote"_b);
+	bool quote = !no_quote && (grd_contains(spec, "quote"_b) || formatter->quote_inner_string);
 	formatter->quote_inner_string = false;
 	if (quote) {
 		grd_format(formatter, "\"");
@@ -1075,9 +1077,6 @@ GRD_DEDUP void grd_type_format(GrdFormatter* formatter, GrdSmallString* str, Grd
 	grd_format(formatter, grd_as_str(str));
 }
 
-GRD_REFLECT(GrdCodeLoc) {
-	GRD_MEMBER(file);
-	GRD_MEMBER(line);
 struct GrdFmtIndent {
 	s64              len = 0;
 	GrdUnicodeString str = U"   "_b;
