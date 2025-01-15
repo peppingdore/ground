@@ -436,13 +436,32 @@ GRD_DEDUP s64 grd_len(GrdcTokenSet* set) {
 
 GRD_DEDUP GrdUnicodeString grdc_tok_str(GrdcToken* tok);
 
-GRD_DEDUP GrdcTokenSlice grdc_make_parent_token_set(GrdcTokenSetParentBuilder* b) {
-	GrdLogTrace("grdc_make_parent_token_set");
-	for (auto s: b->slices) {
+GRD_DEF grd_type_format(GrdFormatter* f, GrdcTokenSlice* slice, GrdString spec) {
+	grd_format(f, "[");
+	auto s = *slice;
+	if (grd_len(s) > 32) {
+		s64 idx = 0;
+		for (auto tok: s[{0, 5}]) {
+			grd_format(f, idx < 4 ? "%, " : "%", grdc_tok_str(tok));
+			idx += 1;
+		}
+		grd_format(f, "...");
+		idx = 0;
+		for (auto tok: s[{-5, {}}]) {
+			grd_format(f, idx < (grd_len(s) - 1) ? "%, " : "%", grdc_tok_str(tok));
+			idx += 1;
+		}
+	} else {
+		s64 idx = 0;
 		for (auto tok: s) {
-			GrdLogTrace("    tok: %", grdc_tok_str(tok));
+			grd_format(f, idx < (grd_len(s) - 1) ? "%, " : "%", grdc_tok_str(tok));
+			idx += 1;
 		}
 	}
+	grd_format(f, "]");
+}
+
+GRD_DEDUP GrdcTokenSlice grdc_make_parent_token_set(GrdcTokenSetParentBuilder* b) {
 	auto set = grd_make<GrdcTokenSet>();
 	set->is_parent = true;
 	set->children = b->slices;
