@@ -57,7 +57,7 @@ struct GrdLogger {
 GRD_DEDUP void grd_default_logger_proc(GrdLogger* logger, GrdLogInfo info, GrdUnicodeString text) {
 	auto unicode_path = grd_copy_unicode_string(grd_make_string(info.loc.file));
 	auto base = grd_path_basename(unicode_path);
-	auto formatted = grd_sprint("%:% %", base, info.loc.line, text);
+	auto formatted = grd_sprint("%:% %()%", base, info.loc.line, GrdFmtIndent{info.indent}, text);
 	grd_println(formatted);
 	formatted.free();
 	unicode_path.free();
@@ -191,7 +191,14 @@ GRD_DEDUP bool grd_can_log(GrdLogLevel level) {
 	return grd_can_log(grd_get_logger(), level);
 }
 
+GRD_DEDUP GrdLogInfo grd_log_info_with_loc(GrdLogInfo info, GrdCodeLoc loc) {
+	info.loc = loc;
+	return info;
+}
+
 // We can't use loc = grd_caller_loc() if we have parameter pack.
 //   These macros help us with that situation.
-#define GrdLog(...)      GrdLog(grd_current_loc(), __VA_ARGS__)
-#define GrdLogTrace(...) GrdLogTrace(grd_current_loc(), __VA_ARGS__)
+#define GrdLog(...)               GrdLog(grd_current_loc(), __VA_ARGS__)
+#define GrdLogTrace(...)          GrdLogTrace(grd_current_loc(), __VA_ARGS__)
+#define GrdLogWithInfo(info, ...) GrdLogWithInfo(grd_log_info_with_loc(info, grd_current_loc()), __VA_ARGS__)
+
