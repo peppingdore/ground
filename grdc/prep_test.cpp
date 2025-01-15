@@ -52,9 +52,9 @@ GrdTuple<GrdError*, GrdcPrep*> simple_prep(GrdUnicodeString str, GrdSpan<GrdTupl
 	auto e = grdc_preprocess_file(prep, root);
 	auto toks = grdc_get_tokens(prep);
 	for (auto it: toks) {
-		GrdLogTrace("Token: %, %, %, %, %", grdc_tok_str(it), it->file_start, it->file_end, it->kind, it->src_kind);
+		// GrdLogTrace("Token: %, %, %, %, %", grdc_tok_str(it), it->file_start, it->file_end, it->kind, it->src_kind);
 		if (it->src_kind == GRDC_PREP_TOKEN_SOURCE_INCLUDED_FILE) {
-			GrdLogTrace("  Included file: % (%:%)", it->included_file->file->fullpath, it->included_file_og_tok->file_start, it->included_file_og_tok->file_end);
+			// GrdLogTrace("  Included file: % (%:%)", it->included_file->file->fullpath, it->included_file_og_tok->file_start, it->included_file_og_tok->file_end);
 		}
 	}
 	return { e, prep };
@@ -257,18 +257,18 @@ GRD_TEST_CASE(mailmund_dk_posts_meta_programming) {
 foo(bar, 42)
 )CODE"_b, {}), U"\n\n\n\n\"bar(42)\"\n"_b);
 
-// 	expect_str(simple_prep(UR"CODE(
-// #define baz() bar
-// baz()
-// )CODE"_b, {}), U"\n\nbar\n"_b);
+	expect_str(simple_prep(UR"CODE(
+#define baz() bar
+baz()
+)CODE"_b, {}), U"\n\nbar\n"_b);
 
-// 	expect_str(simple_prep(UR"CODE(
-// #define s(x) #x
-// #define bar(x) 2 * x
-// #define baz() bar
-// #define foo(f, x) #f s(f) #x s(x)
-// foo(baz(), 42)
-// )CODE"_b, {}), U"\n\n\n\n\n\"baz()\" \"bar\" \"42\" \"42\"\n"_b);
+	expect_str(simple_prep(UR"CODE(
+#define s(x) #x
+#define bar(x) 2 * x
+#define baz() bar
+#define foo(f, x) #f s(f) #x s(x)
+foo(baz(), 42)
+)CODE"_b, {}), U"\n\n\n\n\n\"baz()\" \"bar\" \"42\" \"42\"\n"_b);
 }
 
 GRD_TEST_CASE(retarded_if_macro) {
@@ -283,17 +283,130 @@ if_else(1)(printf("also yeah!\n"))(abort());
 )CODE"_b, {}), U"\n\n\n\n\n\nprintf(\"yeah!\\n\");\nprintf(\"also yeah!\\n\") ;\n"_b);
 }
 
-// #define if_else(b) if_##b
-// #define if_0(...) else_0
-// #define if_1(...) __VA_ARGS__ else_1
-// #define else_0(...) __VA_ARGS__
-// #define else_1(...)
+GRD_TEST_CASE(retarded_if_macro_2) {
+	expect_str(simple_prep(UR"CODE(
+#define if_else(b) if_##b
+#define if_0(...) else_0
+#define if_1(...) __VA_ARGS__ else_1
+#define else_0(...) __VA_ARGS__
+#define else_1(...)
+#define second(a, b, ...) b
+#define test(p) second(p, 0)
+#define is_true() -, 1
+test(x) // 0
+test(is_true()) // 1
+)CODE"_b, {}), U"\n\n\n\n\n\n\n\n\n0 \n1 \n"_b);
+}
 
-// if_else(0)(abort())(printf("yeah!\n"));
-// if_else(1)(printf("also yeah!\n"))(abort());
+GRD_TEST_CASE(retarded_if_macro_3) {
+	expect_str(simple_prep(UR"CODE(
+#define if_else(b) if_##b
+#define if_0(...) else_0
+#define if_1(...) __VA_ARGS__ else_1
+#define else_0(...) __VA_ARGS__
+#define else_1(...)
+#define second(a, b, ...) b
+#define test(p) second(p, 0)
+#define is_true() -, 1
+#define cat(a,b) a##b
+#define not(b) test(cat(not_,b))
+#define not_0 is_true()
+#define truthiness(b) not(not(b))
+#define foo(x) foo_ ## x
+truthiness(foo) // => 1
+truthiness(0)   // => 0
+truthiness(1)   // => 1
+)CODE"_b, {}), U"\n\n\n\n\n\n\n\n\n\n\n\n\n\n1 \n0   \n1   \n"_b);
+}
 
-// #define s(x) #x
-// #define bar(x) 2 * x
-// #define baz() bar
-// #define foo(f, x) #f s(f) #x s(x)
-// foo(baz(), 42)
+
+GRD_TEST_CASE(preprocessor_map) {
+		expect_str(simple_prep(UR"CODE(
+#define if_else(b) if_##b
+#define if_0(...) else_0
+#define if_1(...) __VA_ARGS__ else_1
+#define else_0(...) __VA_ARGS__
+#define else_1(...)
+#define second(a, b, ...) b
+#define test(p) second(p, 0)
+#define is_true() -, 1
+#define cat(a,b) a##b
+#define not(b) test(cat(not_,b))
+#define not_0 is_true()
+#define truthiness(b) not(not(b))
+
+#define if_else(b) if_else_(truthiness(b))
+#define if_else_(b) cat(if_,b)
+
+#define expand_1(...) __VA_ARGS__
+#define expand_2(...) expand_1(expand_1(__VA_ARGS__))
+#define expand_4(...) expand_2(expand_2(__VA_ARGS__))
+#define expand_8(...) expand_4(expand_4(__VA_ARGS__))
+#define expand_16(...) expand_8(expand_8(__VA_ARGS__))
+#define eval expand_16
+
+#define head(a, ...) a
+#define tail(a, ...) __VA_ARGS__
+#define first(a, ...) a
+#define is_nil(...) test(first(is_true __VA_ARGS__)())
+#define empty()
+#define delay2(f) f empty empty()()
+#define map(f, ...) \
+    eval(map_(f, __VA_ARGS__))
+#define map__() map_
+#define map_(f, ...) \
+    if_else(is_nil(__VA_ARGS__))\
+    ()\
+    (f(head(__VA_ARGS__)) \
+     delay2(map__)()(f, tail(__VA_ARGS__)))
+
+#define foo(x) f(x),
+
+int x[] = { map(foo, x, y, z) };
+
+)CODE"_b, {}), U"\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nint x[] = { f(x),      f(y),      f(z),        };\n\n"_b);
+}
+#if 0
+#define if_else(b) if_##b
+#define if_0(...) else_0
+#define if_1(...) __VA_ARGS__ else_1
+#define else_0(...) __VA_ARGS__
+#define else_1(...)
+#define second(a, b, ...) b
+#define test(p) second(p, 0)
+#define is_true() -, 1
+#define cat(a,b) a##b
+#define not(b) test(cat(not_,b))
+#define not_0 is_true()
+#define truthiness(b) not(not(b))
+
+#define if_else(b) if_else_(truthiness(b))
+#define if_else_(b) cat(if_,b)
+
+#define expand_1(...) __VA_ARGS__
+#define expand_2(...) expand_1(expand_1(__VA_ARGS__))
+#define expand_4(...) expand_2(expand_2(__VA_ARGS__))
+#define expand_8(...) expand_4(expand_4(__VA_ARGS__))
+#define expand_16(...) expand_8(expand_8(__VA_ARGS__))
+#define eval expand_16
+
+#define head(a, ...) a
+#define tail(a, ...) __VA_ARGS__
+#define first(a, ...) a
+#define is_nil(...) test(first(is_true __VA_ARGS__)())
+#define empty()
+#define delay2(f) f empty empty()()
+#define map(f, ...) \
+    eval(map_(f, __VA_ARGS__))
+#define map__() map_
+#define map_(f, ...) \
+    if_else(is_nil(__VA_ARGS__))\
+    ()\
+    (f(head(__VA_ARGS__)) \
+     delay2(map__)()(f, tail(__VA_ARGS__)))
+
+
+#define foo(x) f(x),
+
+int x[] = { map(foo, x, y, z) };
+#endif
