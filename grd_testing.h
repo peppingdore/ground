@@ -165,7 +165,7 @@ GRD_DEDUP void grd_tester_print_summary() {
 		}
 		test = test->next;
 	}
-	f64 percentage = (f64) successful_tests / (f64) (successful_tests + failed_tests);
+	f64 percentage = (f64) successful_tests / (f64) (grd_max_s64(1, successful_tests + failed_tests));
 	printf("%lld/%lld passed tests - %.2f %s\n", successful_tests, failed_tests + successful_tests, percentage * 100.0, "%"); 
 }
 
