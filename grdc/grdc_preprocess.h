@@ -133,8 +133,8 @@ enum GrdcPrepTokenKind {
 	GRDC_PREP_TOKEN_KIND_IDENT,
 	GRDC_PREP_TOKEN_KIND_SPACE,
 	GRDC_PREP_TOKEN_KIND_PUNCT,
-	GRDC_PREP_TOKEN_KIND_GRD_CONCAT,
-	GRDC_PREP_TOKEN_KIND_GRD_CONCATTED,
+	GRDC_PREP_TOKEN_KIND_CONCAT,
+	GRDC_PREP_TOKEN_KIND_CONCATTED,
 	GRDC_PREP_TOKEN_KIND_MACRO_PRESCAN_IDENT,
 	GRDC_PREP_TOKEN_KIND_DOT_DOT_DOT,
 	GRDC_PREP_TOKEN_KIND_OTHER,
@@ -149,8 +149,8 @@ GRD_REFLECT(GrdcPrepTokenKind) {
 	GRD_ENUM_VALUE(GRDC_PREP_TOKEN_KIND_IDENT);
 	GRD_ENUM_VALUE(GRDC_PREP_TOKEN_KIND_SPACE);
 	GRD_ENUM_VALUE(GRDC_PREP_TOKEN_KIND_PUNCT);
-	GRD_ENUM_VALUE(GRDC_PREP_TOKEN_KIND_GRD_CONCAT);
-	GRD_ENUM_VALUE(GRDC_PREP_TOKEN_KIND_GRD_CONCATTED);
+	GRD_ENUM_VALUE(GRDC_PREP_TOKEN_KIND_CONCAT);
+	GRD_ENUM_VALUE(GRDC_PREP_TOKEN_KIND_CONCATTED);
 	GRD_ENUM_VALUE(GRDC_PREP_TOKEN_KIND_MACRO_PRESCAN_IDENT);
 	GRD_ENUM_VALUE(GRDC_PREP_TOKEN_KIND_DOT_DOT_DOT);
 	GRD_ENUM_VALUE(GRDC_PREP_TOKEN_KIND_OTHER);
@@ -1452,7 +1452,7 @@ GRD_DEDUP GrdTuple<s64, GrdcPrepTokenKind> grdc_get_token_end_at(GrdUnicodeStrin
 	assert(cursor < grd_len(src));
 	if (src[cursor] == '#') {
 		if (grd_starts_with(src[{cursor, {}}], "##")) {
-			return { cursor + 2, GRDC_PREP_TOKEN_KIND_GRD_CONCAT };
+			return { cursor + 2, GRDC_PREP_TOKEN_KIND_CONCAT };
 		}
 		return { cursor + 1, GRDC_PREP_TOKEN_KIND_HASH };
 	}
@@ -1958,11 +1958,11 @@ GRD_DEDUP GrdTuple<GrdError*, GrdcMacroExp*> grdc_maybe_expand_macro(GrdcPrep* p
 		// Concat.
 		auto after_concat_builder = grdc_make_token_set_parent_builder(p->allocator);
 		for (s64 idx = 0; idx < grd_len(exp->after_stringize); idx++) {
-			if (exp->after_stringize[idx]->kind == GRDC_PREP_TOKEN_KIND_GRD_CONCAT || (
+			if (exp->after_stringize[idx]->kind == GRDC_PREP_TOKEN_KIND_CONCAT || (
 			    idx + 1 < grd_len(exp->after_stringize) &&
-			    exp->after_stringize[idx + 1]->kind == GRDC_PREP_TOKEN_KIND_GRD_CONCAT
+			    exp->after_stringize[idx + 1]->kind == GRDC_PREP_TOKEN_KIND_CONCAT
 			)) {
-				s64 concat_idx = exp->after_stringize[idx]->kind == GRDC_PREP_TOKEN_KIND_GRD_CONCAT ? idx : idx + 1;
+				s64 concat_idx = exp->after_stringize[idx]->kind == GRDC_PREP_TOKEN_KIND_CONCAT ? idx : idx + 1;
 				// @TODO: use detailed printer to print the error.
 				// @TODO: use detailed printer for every error reporting.
 				if (concat_idx - 1 < 0 || grd_contains({GRDC_PREP_TOKEN_KIND_SPACE, GRDC_PREP_TOKEN_KIND_EOF}, exp->after_stringize[concat_idx - 1]->kind)) {
