@@ -356,7 +356,7 @@ GRD_DEDUP void grd_encode_utf8(GrdUnicodeString str, char* buf) {
 	}
 }
 
-// Zero terminated, terminator is at index length, not length - 1.
+// Zero terminated, terminator is at [length], not [length - 1].
 GRD_DEDUP GrdAllocatedString grd_encode_utf8(GrdAllocator allocator, GrdUnicodeString str, GrdCodeLoc loc = grd_caller_loc()) {
 	s64 length = grd_utf8_length(str);
 	GrdAllocatedString result = {
@@ -443,7 +443,7 @@ GRD_DEDUP GrdAllocatedUnicodeString grd_decode_utf8(GrdAllocator allocator, GrdS
 
 		switch (size) {
 			case 1:
-				dst[0] = src[0] & 0x8F;
+				dst[0] = src[0] & 0x7F;
 				break;
 			case 2:
 				dst[0] =
@@ -455,6 +455,7 @@ GRD_DEDUP GrdAllocatedUnicodeString grd_decode_utf8(GrdAllocator allocator, GrdS
 					char32_t(src[0] & 0x0F) << 12 |
 					char32_t(src[1] & 0x3F) << 6 |
 					char32_t(src[3] & 0x3F);
+				break;
 			case 4:
 				dst[0] =
 					char32_t(src[0] & 0x08) << 18 |
@@ -463,8 +464,8 @@ GRD_DEDUP GrdAllocatedUnicodeString grd_decode_utf8(GrdAllocator allocator, GrdS
 					char32_t(src[3] & 0x3F);
 				break;
 		}
-
 		dst += 1;
+		src += size;
 	}
 	result.count = length;
 	return result;
