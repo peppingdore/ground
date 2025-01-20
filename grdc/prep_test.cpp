@@ -53,7 +53,7 @@ GrdTuple<GrdError*, GrdcPrep*> simple_prep(GrdUnicodeString str, GrdSpan<GrdTupl
 	auto toks = grdc_get_tokens(prep);
 	for (auto it: toks) {
 		// GrdLogTrace("Token: %, %, %, %, %", grdc_tok_str(it), it->file_start, it->file_end, it->kind, it->src_kind);
-		if (it->src_kind == GRDC_PREP_TOKEN_SOURCE_INCLUDED_FILE) {
+		if (it->set->src_kind == GRDC_PREP_TOKEN_SOURCE_INCLUDED_FILE) {
 			// GrdLogTrace("  Included file: % (%:%)", it->included_file->file->fullpath, it->included_file_og_tok->file_start, it->included_file_og_tok->file_end);
 		}
 	}
