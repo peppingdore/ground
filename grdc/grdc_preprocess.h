@@ -1164,7 +1164,7 @@ GRD_DEF grdc_do_print(GrdcDpPrinter* printer) {
 	});
 
 	// Patch spans in.
-	s64 zone_number = 1;
+	s64 zone_counter = 1;
 	for (auto& span: printer->dp->spans) {
 		auto start = span.start;
 		auto end   = span.end;
@@ -1176,8 +1176,8 @@ GRD_DEF grdc_do_print(GrdcDpPrinter* printer) {
 		if (idx != -1) { // In reality always true, because idx = -1 should not happen.
 			printer->regs[idx].span = &span;
 			printer->regs[idx].need_exp = true;
-			printer->regs[idx].zone = zone_number;
-			zone_number += 1;
+			printer->regs[idx].zone = zone_counter;
+			zone_counter += 1;
 		}
 	}
 
@@ -1185,9 +1185,10 @@ GRD_DEF grdc_do_print(GrdcDpPrinter* printer) {
 		for (auto idx: grd_range(grd_len(printer->regs))) {
 			auto* reg = &printer->regs[idx];
 			reg->start_file_offset = grdc_get_file_tok_offset(printer->file_src, reg->start_tok)._0;
-			reg->end_file_offset   = grdc_get_file_tok_offset(printer->file_src, reg->end_tok).  _1;
+			reg->end_file_offset   = grdc_get_file_tok_offset(printer->file_src, reg->end_tok).  _0;
 			if (idx > 0) {
 				auto prev_reg = &printer->regs[idx - 1];
+				// prev_reg->end_file_offset = grd_min_s64(prev_reg->end_file_offset, reg->start_file_offset);
 				reg->start_file_offset = grd_max_s64(prev_reg->end_file_offset, reg->start_file_offset);
 			}
 		}
@@ -1201,6 +1202,24 @@ GRD_DEF grdc_do_print(GrdcDpPrinter* printer) {
 				grd_add(&printer->regs, gap);
 				i += 1;
 			}
+		}
+	}
+
+	// Make sure that we're printing whole lines.
+	if (printer->file_src) {
+		auto first_reg = &printer->regs[0];
+		while (first_reg->start_file_offset > 0) {
+			if (grd_is_line_break(printer->file_src->og_src[first_reg->start_file_offset - 1])) {
+				break;
+			}
+			first_reg->start_file_offset -= 1;
+		}
+		auto last_reg = &printer->regs[-1];
+		while (last_reg->end_file_offset < grd_len(printer->file_src->og_src)) {
+			if (grd_is_line_break(printer->file_src->og_src[last_reg->end_file_offset])) {
+				break;
+			}
+			last_reg->end_file_offset += 1;
 		}
 	}
 
@@ -1252,17 +1271,12 @@ GRD_DEF grdc_do_print(GrdcDpPrinter* printer) {
 		}
 	}
 	grdc_dp_printer_flush_line_double(printer);
+	grd_formatln(printer->f);
 
 	if (printer->dp->expand_site) {
-		for (auto reg: printer->regs) {
-			if (reg.start_tok < grd_len(printer->dp->tokens)) {
-				GrdcToken* tok = printer->dp->tokens[reg.start_tok];
-				grd_formatln(printer->f, "Site %:", reg.zone);
-				void grdc_print_dp_site(GrdcPrep* p, GrdFormatter* f, GrdcToken* tok);
-				grdc_print_dp_site(printer->dp->p, printer->f, tok);	
-			}
-		}
-	}	
+		void grdc_print_dp_site(GrdcPrep* p, GrdFormatter* f, GrdcTokenSet* set);
+		grdc_print_dp_site(printer->dp->p, printer->f, printer->dp->tokens.set);
+	}
 }
 
 GRD_DEDUP void grdc_do_detailed_print(GrdFormatter* f, GrdcDetailedPrinter* dp) {
@@ -1270,198 +1284,6 @@ GRD_DEDUP void grdc_do_detailed_print(GrdFormatter* f, GrdcDetailedPrinter* dp) 
 	grdc_init_dp_dprinter(&printer, f, dp);
 	grdc_do_print(&printer);
 }
-
-
-// GRD_DEDUP void grdc_do_detailed_print(GrdFormatter* f, GrdcDetailedPrinter* dp) {
-// 	if (grd_len(dp->spans) == 0) {
-// 		grd_formatln(f, "Empty DP");
-// 	}
-
-// 	grd_sort(dp->spans, [] (auto spans, s64 a, s64 b) {
-// 		if (spans[a].start < spans[b].start) {
-// 			return true;
-// 		}
-// 		if (spans[a].start == spans[b].start) {
-// 			return spans[a].end > spans[b].end;
-// 		}
-// 		return false;
-// 	});
-
-// 	s64 global_start = dp->spans[0].start;
-// 	s64 global_end = dp->spans[-1].end;
-// 	global_start = grdc_get_residual_tokens(dp->tokens, global_start, -1);
-// 	global_end   = grdc_get_residual_tokens(dp->tokens, global_end, 1);
-
-// 	struct Reg {
-// 		s64  zone = -1;
-// 		s64  start = -1;
-// 		s64  end = -1;
-// 		bool need_exp = false;
-// 		s64  og_file_start = -1;
-// 		s64  og_file_end = -1;
-// 	};
-	
-// 	GrdArray<Reg> regs;
-// 	grd_add(&regs, {
-// 		.zone = 0,
-// 		.start = global_start,
-// 		.end = global_end,
-// 		.need_exp = true
-// 	});
-// 	for (auto idx: grd_range_from_to(global_start, global_end)) {
-// 		bool match = idx < 1 || dp->tokens[idx]->set == dp->tokens[idx - 1]->set;
-// 		// bool match = grdc_do_token_sources_match(dp->tokens[idx], dp->tokens[idx - 1]);
-// 		if (!match) {
-// 			regs[-1].end = idx;
-// 			grd_add(&regs, { .start = idx, .end = global_end, .need_exp = true });
-// 		}
-// 	}
-
-// 	GrdcPrepFileSource* file_src = NULL;
-// 	if (dp->tokens.set->src_kind == GRDC_PREP_TOKEN_SOURCE_INCLUDED_FILE) {
-// 		file_src = dp->tokens.set->included_file->file;
-// 	} else if (dp->tokens.set->src_kind == GRDC_PREP_TOKEN_SOURCE_FILE_SOURCE) {
-// 		file_src = dp->tokens.set->file_source;
-// 	}
-// 	if (file_src) {
-// 		for (auto i: grd_range(grd_len(regs))) {
-// 			auto reg = &regs[i];
-// 			auto file = dp->tokens.set->included_file->file;
-// 			auto [tok_start, tok_end] = dp->tokens.set->included_file->file->tok_file_regions[reg->start];
-// 			reg->og_file_start = grdc_og_file_index(file_src, tok_start);
-// 			reg->og_file_end   = grdc_og_file_index(file_src, tok_end);
-// 		}
-// 	}
-
-
-// 	// Nuke empty regions.
-// 	// for (s64 idx = 0; idx < grd_len(regs); idx++) {
-// 	// 	if (regs[idx].start == regs[idx].end) {
-// 	// 		grd_remove(&regs, idx);
-// 	// 		idx -= 1;
-// 	// 		continue;
-// 	// 	}
-// 	// 	// auto tok = dp->tokens[regs[idx]._1];
-// 	// 	// if (tok->src_kind == GRDC_PREP_TOKEN_SOURCE_INCLUDED_FILE) {
-// 	// 	// 	if (tok->included_file == first_file) {
-// 	// 	// 		grd_remove(&regs, idx);
-// 	// 	// 		idx -= 1;
-// 	// 	// 	}
-// 	// 	// }
-// 	// }
-
-// 	// Fill gaps.
-// 	for (s64 i = 0; i < grd_len(regs); i++) {
-// 		s64 left_end = i - 1 >= 0 ? regs[i - 1].end : 0;
-// 		if (left_end < regs[i].start && i > 0) {
-// 			grd_add(&regs, { .start = left_end, .end = regs[i].start, .need_exp = false }, i);
-// 			i += 1;
-// 		}
-// 		s64 right_start = i + 1 < grd_len(regs) ? regs[i + 1].start : grd_len(dp->tokens);
-// 		if (regs[i].end < right_start && i < grd_len(regs) - 1) {
-// 			grd_add(&regs, { .start = regs[i].end, .end = right_start, .need_exp = false }, i + 1);
-// 			i += 1;
-// 		}
-// 	}
-
-// 	s64 zone_counter = 1;
-// 	for (auto& it: regs) {
-// 		if (it.need_exp == true) {
-// 			it.zone = zone_counter;
-// 			zone_counter += 1;
-// 		}
-// 	}
-
-// 	// for (auto it: regs) {
-// 	// 	// debug.
-// 	// 	grd_println("reg: %, %, %", it._0, it._1, it._2);
-// 	// }
-
-// 	// if (first_file) {
-// 	// 	// @TODO: dump include path.
-// 	// 	grd_println("  Path: %", first_file->file->fullpath);
-// 	// }
-
-// 	s64 first_line = 1;
-// 	// @TODO: write file_src version of first_line resolver.
-// 	// @TODO: this looks retarded. rewrite?
-// 	for (auto i: grd_range(grd_len(regs))) {
-// 		for (auto tok: dp->tokens[{0, regs[i].start}]) {
-// 			if (tok->kind == GRDC_PREP_TOKEN_KIND_LINE_BREAK) {
-// 				first_line += 1;
-// 			}
-// 		}
-// 		break;
-// 	}
-
-// 	s64 line = first_line;
-// 	bool did_print_line_number = false;
-
-// 	GrdAllocatedUnicodeString line_double;
-// 	grd_defer { line_double.free(); };
-// 	for (auto reg: regs) {
-// 		s64 printed_zone_len = 0;
-// 		auto get_zone_char = [&] () -> char {
-// 			auto zone_num = grd_to_string(reg.zone);
-// 			if (printed_zone_len < grd_len(zone_num)) {
-// 				return zone_num[printed_zone_len++];
-// 			} else {
-// 				return '~';
-// 			}
-// 		};
-// 		for (s64 idx: grd_range_from_to(reg.start, reg.end)) {
-// 			auto it = dp->tokens[idx];
-// 			if (!did_print_line_number && !dp->expand_site) {
-// 				GrdSmallString str = grd_to_string(line);
-// 				grd_format(f, "\x1b[0m% ", str);
-// 				for (auto i: grd_range(grd_len(str) + 1)) grd_add(&line_double, ' ');
-// 				did_print_line_number = true;
-// 			}
-// 			for (auto span: dp->spans) {
-// 				if (idx >= span.start && idx < span.end) {
-// 					grd_format(f, "\x1b[0;%m", 30 + span.color);
-// 				}
-// 			}
-// 			if (it->kind == GRDC_PREP_TOKEN_KIND_LINE_BREAK) {
-// 				grd_formatln(f);
-// 				if (dp->expand_site) {
-// 					grd_format(f, line_double);
-// 					grd_clear(&line_double);
-// 					grd_formatln(f);
-// 				}
-// 				line += 1;
-// 				did_print_line_number = false;
-// 				continue;
-// 			}
-// 			if (reg.need_exp) {
-// 				grd_format(f, grdc_tok_str(it));
-// 				for (auto i: grd_range(grd_len(grdc_tok_str(it)))) grd_add(&line_double, get_zone_char());
-// 			} else {
-// 				grd_format(f, grdc_tok_str(it));
-// 				for (auto i: grd_range(grd_len(grdc_tok_str(it)))) grd_add(&line_double, ' ');
-// 			}
-// 			grd_format(f, "\x1b[0m");
-// 		}
-// 	}
-// 	if (dp->expand_site) {
-// 		grd_formatln(f);
-// 		grd_format(f, line_double);
-// 		grd_formatln(f);
-// 	}
-// 	grd_formatln(f);
-
-// 	if (dp->expand_site) {
-// 		for (auto reg: regs) {
-// 			if (reg.end <= reg.start) {
-// 				continue;
-// 			}
-// 			GrdcToken* tok = dp->tokens[reg.start];
-// 			grd_formatln(f, "Site %:", reg.zone);
-// 			void grdc_print_dp_site(GrdcPrep* p, GrdFormatter* f, GrdcToken* tok);
-// 			grdc_print_dp_site(p, f, tok);
-// 		}
-// 	}	
-// }
 
 GRD_DEDUP void grdc_print_include_site(GrdFormatter* f, GrdcIncludedFile* inc) {
 	while (inc) {
@@ -1484,13 +1306,6 @@ GRD_DEF grdc_print_macro_exp(GrdcPrep* p, GrdFormatter* f, GrdcMacroExp* exp) ->
 	auto dp = grdc_make_detailed_printer(p, exp->macro->def_site->tokens, false);
 	grd_add(&dp->spans, { exp->macro->def_start, exp->macro->def_end, 1 });
 	grdc_do_detailed_print(f, dp);
-	if (exp->replaced_before_rescan.set) {
-		grd_formatln(f, "   Expand site:");
-		auto dp = grdc_make_detailed_printer(p, grdc_make_token_slice(exp->replaced_before_rescan.set), false);
-		grd_add(&dp->spans, { exp->replaced_before_rescan.start, exp->replaced_before_rescan.end, 1 });
-		grdc_do_detailed_print(f, dp);
-		grd_formatln(f);
-	}
 	if (exp->before_stringize.set) {
 		grd_formatln(f, "  Before stringizing:");
 		grd_format(f, "   ");
@@ -1521,17 +1336,22 @@ GRD_DEF grdc_print_macro_exp(GrdcPrep* p, GrdFormatter* f, GrdcMacroExp* exp) ->
 		grdc_print_slice(f, exp->after_rescan);
 		grd_formatln(f);
 	}
-	if (exp->parent) {
-		grdc_print_macro_exp(p, f, exp->parent);
+	if (exp->replaced_before_rescan.set) {
+		grd_formatln(f);
+		grd_formatln(f, "Expand site:");
+		auto dp = grdc_make_detailed_printer(p, grdc_make_token_slice(exp->replaced_before_rescan.set), true);
+		grd_add(&dp->spans, { exp->replaced_before_rescan.start, exp->replaced_before_rescan.end, 1 });
+		grdc_do_detailed_print(f, dp);
 	}
+	// if (exp->parent) {
+	// 	grdc_print_macro_exp(p, f, exp->parent);
+	// }
 }
 
-GRD_DEDUP void grdc_print_dp_site(GrdcPrep* p, GrdFormatter* f, GrdcToken* tok) {
-	switch (tok->set->src_kind) {
+GRD_DEDUP void grdc_print_dp_site(GrdcPrep* p, GrdFormatter* f, GrdcTokenSet* set) {
+	switch (set->src_kind) {
 		case GRDC_PREP_TOKEN_SOURCE_FILE_SOURCE: {
-			auto dp = grdc_make_detailed_printer(p, tok->set->file_source->tokens, false);
-			grd_add(&dp->spans, { tok->set_idx, tok->set_idx + 1, 1 });
-			grdc_do_detailed_print(f, dp);
+			grd_formatln(f, "File: %", set->file_source->fullpath);
 		}
 		break;
 		
@@ -1546,12 +1366,12 @@ GRD_DEDUP void grdc_print_dp_site(GrdcPrep* p, GrdFormatter* f, GrdcToken* tok) 
 		case GRDC_PREP_TOKEN_SOURCE_MACRO_JOINED_FOR_RESCAN:
 		case GRDC_PREP_TOKEN_SOURCE_PRESCAN_EXP:
 		case GRDC_PREP_TOKEN_SOURCE_MACRO_RESULT: {
-			grdc_print_macro_exp(p, f, tok->set->macro_exp);
+			grdc_print_macro_exp(p, f, set->macro_exp);
 		}
 		break;
 		case GRDC_PREP_TOKEN_SOURCE_INCLUDED_FILE: {
-			auto file = tok->set->included_file;
-			grd_formatln(f, "Included from file: ");
+			auto file = set->included_file;
+			grd_formatln(f, "At file: ");
 			grdc_print_include_site(f, file);
 		}
 		break;
@@ -1561,7 +1381,7 @@ GRD_DEDUP void grdc_print_dp_site(GrdcPrep* p, GrdFormatter* f, GrdcToken* tok) 
 		// case GRDC_PREP_TOKEN_SOURCE_PRESCAN_EXP
 
 		default: {
-			grd_panic("Unknown token source kind: %", tok->set->src_kind);
+			grd_panic("Unknown token source kind: %", set->src_kind);
 		}
 	}
 }
@@ -1775,6 +1595,9 @@ GRD_DEDUP GrdError* grdc_prep_remove_comments(GrdcPrep* p, GrdcPrepFileSource* f
 				s64 end   = grdc_map_index(file->splice_mappings, comment_start + 2);
 				return grdc_make_file_region_error(file, start, end, "Unclosed block comment");
 			}
+			// @TODO: comments must be turned into whitespace.
+			//    Otherwise we might get wrong behaviour in the following case:
+			//      int/*comment/*x  where int and x must be separated by whitespace generated by comment.
 			grd_add(&regions_to_remove, { comment_start, cursor });
 		} else {
 			cursor += 1;
