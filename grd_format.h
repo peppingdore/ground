@@ -488,7 +488,7 @@ GRD_DEDUP GrdArrayPrinter grd_make_array_printer(GrdFormatter* formatter) {
 
 struct GrdTuplePrinter {
 	GrdFormatter* formatter;
-	s64        index = 0;
+	s64           index = 0;
 
 	void head() {
 		if (formatter->is_compact()) {
@@ -500,10 +500,12 @@ struct GrdTuplePrinter {
 	}
 
 	void item(auto value) {
-		if (formatter->is_compact()) {
-			grd_format(formatter, ", "_b);
-		} else {
-			grd_format(formatter, ",\n"_b);
+		if (index > 0) {
+			if (formatter->is_compact()) {
+				grd_format(formatter, ", "_b);
+			} else {
+				grd_format(formatter, ",\n"_b);
+			}
 		}
 		formatter->quote_inner_string = true;
 		grd_format(formatter, "%", value);
