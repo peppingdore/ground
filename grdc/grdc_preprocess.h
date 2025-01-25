@@ -162,6 +162,12 @@ struct GrdcPrepFileMapping {
 	s64 start;
 	s64 real_start;
 	s64 length;
+
+	GRD_REFLECT(GrdcPrepFileMapping) {
+		GRD_MEMBER(start);
+		GRD_MEMBER(real_start);
+		GRD_MEMBER(length);
+	}
 };
 
 struct GrdcMacroExp;
@@ -541,8 +547,8 @@ struct GrdcPrepFileSource {
 	GrdUnicodeString          fullpath;
 	GrdUnicodeString          og_src;
 	GrdUnicodeString          src;
-	GrdArray<GrdcPrepFileMapping> splice_mappings;
-	GrdArray<GrdcPrepFileMapping> comment_mappings;
+	GrdArray<GrdcPrepFileMapping> splice_mappings = { .allocator = null_allocator };
+	GrdArray<GrdcPrepFileMapping> comment_mappings = { .allocator = null_allocator };
 	bool                      is_tokenized = false;
 	GrdArray<GrdTuple<s64, s64>> tok_file_regions = { .allocator = null_allocator };
 };
@@ -985,13 +991,15 @@ GRD_DEDUP s64 grdc_get_residual_tokens(GrdcTokenSlice tokens, s64 cursor, s64 di
 
 GRD_DEF grdc_get_file_tok_offset(GrdcPrepFileSource* file, s64 tok_idx) -> GrdTuple<s64, s64> {
 	if (tok_idx == grd_len(file->tok_file_regions)) {
-		return { grd_len(file->src), grd_len(file->src) };
+		return { grd_len(file->og_src), grd_len(file->og_src) };
 	}
 	auto [start, end] = file->tok_file_regions[tok_idx];
-	// start = grdc_og_file_index(file, start);
-	// end   = grdc_og_file_index(file, end);
 	grd_assert(start >= 0 && start <= grd_len(file->src));
 	grd_assert(end >= 0 && end <= grd_len(file->src));
+	start = grdc_og_file_index(file, start);
+	end   = grdc_og_file_index(file, end);
+	grd_assert(start >= 0 && start <= grd_len(file->og_src));
+	grd_assert(end >= 0 && end <= grd_len(file->og_src));
 	return { start, end };
 }
 
@@ -1047,7 +1055,6 @@ GRD_DEF grdc_init_dp_dprinter(GrdcDpPrinter* printer, GrdFormatter* f, GrdcDetai
 		[](void* x, s64 idx, s64 start, s64 end) -> void {
 			auto ctx = (GrdcDpPrinter*)x;
 			auto reg = &(ctx->regs)[idx];
-			GrdLogTrace("resize region % from %, % to %, %", idx, reg->start_tok, reg->end_tok, start, end);
 			reg->start_tok = start;
 			reg->end_tok   = end;
 		},
@@ -1059,7 +1066,6 @@ GRD_DEF grdc_init_dp_dprinter(GrdcDpPrinter* printer, GrdFormatter* f, GrdcDetai
 				reg.start_file_offset = -1;
 				reg.end_file_offset = -1;
 			}
-			GrdLogTrace("insert % - %, % copy from %", idx, start, end, copy_idx);
 			reg.start_tok = start;
 			reg.end_tok = end;
 			grd_add(&ctx->regs, reg, idx);
@@ -1144,14 +1150,9 @@ GRD_DEF grdc_do_print(GrdcDpPrinter* printer) {
 	printer->tok_start = printer->dp->spans[ 0].start;
 	printer->tok_end   = printer->dp->spans[-1].end;
 
-	GrdLogTrace("tokens len: %", grd_len(printer->dp->tokens));
-	GrdLogTrace("tok_start, tok_end: %, %", printer->tok_start, printer->tok_end);
-
 	// Add some padding lines.
 	printer->tok_start = grdc_get_residual_tokens(printer->dp->tokens, printer->tok_start, -1);
 	printer->tok_end   = grdc_get_residual_tokens(printer->dp->tokens, printer->tok_end,    1);
-
-	GrdLogTrace("adjusted tok_start, tok_end: %, %", printer->tok_start, printer->tok_end);
 
 	grd_add(&printer->regs, GrdcDpPrinterRegion {
 		.start_tok = printer->tok_start,
@@ -1174,12 +1175,6 @@ GRD_DEF grdc_do_print(GrdcDpPrinter* printer) {
 			printer->regs[idx].zone = zone_number;
 			zone_number += 1;
 		}
-	}
-
-	// log after patching.
-	GrdLogTrace("printer->regs.len = %", grd_len(printer->regs));
-	for (auto reg: printer->regs) {
-		GrdLogTrace("reg %, %", reg.start_tok, reg.end_tok);
 	}
 
 	if (printer->file_src) {
@@ -1205,13 +1200,23 @@ GRD_DEF grdc_do_print(GrdcDpPrinter* printer) {
 		}
 	}
 
+	s64 max_line = 0;
 	if (printer->file_src) {
 		printer->current_line = 1;
-		auto pre_start_src = printer->file_src->src[{{}, printer->regs[0].start_file_offset}];
+		auto pre_start_src = printer->file_src->og_src[{{}, printer->regs[0].start_file_offset}];
 		for (s64 i = 0; i < grd_len(pre_start_src); i += 1) {
 			auto lb_len = grd_get_line_break_len(pre_start_src, i);
 			if (lb_len > 0) {
 				printer->current_line += 1;
+				i += lb_len - 1;
+			}
+		}
+		max_line = printer->current_line;
+		auto src = printer->file_src->og_src[{printer->regs[0].start_file_offset, printer->regs[-1].end_file_offset}];
+		for (s64 i = 0; i < grd_len(src); i += 1) {
+			auto lb_len = grd_get_line_break_len(src, i);
+			if (lb_len > 0) {
+				max_line += 1;
 				i += lb_len - 1;
 			}
 		}
@@ -1222,11 +1227,18 @@ GRD_DEF grdc_do_print(GrdcDpPrinter* printer) {
 				printer->current_line += 1;
 			}
 		}
+		max_line = printer->current_line;
+		for (auto tok: printer->dp->tokens[{printer->regs[0].start_tok, printer->regs[-1].end_tok}]) {
+			if (tok->kind == GRDC_PREP_TOKEN_KIND_LINE_BREAK) {
+				max_line += 1;
+			}
+		}
 	}
+	printer->max_line_num_width = grd_len(grd_to_string(max_line));
 
 	for (auto reg: printer->regs) {
 		if (printer->file_src) {
-			auto text = printer->file_src->src[{reg.start_file_offset, reg.end_file_offset}];
+			auto text = printer->file_src->og_src[{reg.start_file_offset, reg.end_file_offset}];
 			grdc_dp_printer_push_text(printer, text, &reg);
 		} else {
 			for (auto it: grd_range_from_to(reg.start_tok, reg.end_tok)) {
@@ -1657,6 +1669,8 @@ GRD_DEF grdc_use_custom_str(GrdcToken* tok, GrdAllocatedUnicodeString str) {
 
 GRD_DEF grd_apply_mapping_from_removed_regions(GrdcPrepFileSource* file, GrdSpan<GrdTuple<s64, s64>> regions_to_remove, GrdArray<GrdcPrepFileMapping>* mappings) {
 	
+	s64 og_len = grd_len(file->src);
+
 	grd_assert(grd_len(*mappings) == 0);
 	grd_add(mappings, {
 		.start = 0,
@@ -1667,13 +1681,19 @@ GRD_DEF grd_apply_mapping_from_removed_regions(GrdcPrepFileSource* file, GrdSpan
 	s64 removed = 0;
 	for (auto it: regions_to_remove) {
 		grd_remove(&file->src, it._0 - removed, it._1 - it._0);
-		(*mappings)[-1].length = it._1 - (*mappings)[-1].real_start;
+		(*mappings)[-1].length = it._0 - (*mappings)[-1].real_start;
+		removed += it._1 - it._0;
 		grd_add(mappings, {
 			.start = it._0 - removed,
 			.real_start = it._0,
 			.length = -1,
 		});
-		removed += it._1 - it._0;
+	}
+	(*mappings)[-1].length = og_len - (*mappings)[-1].real_start;
+
+	s64 sum_len = 0;
+	for (auto mappings: *mappings) {
+		sum_len += mappings.length;
 	}
 }
 
@@ -1684,20 +1704,23 @@ GRD_DEDUP void grdc_splice_lines(GrdcPrep* p, GrdcPrepFileSource* file) {
 	s64 cursor = 0;
 	while (cursor < grd_len(file->src)) {
 		if (file->src[cursor] == '\\') {
+			// GrdLog("backslash at %", cursor);
 			s64 start = cursor;
 			cursor += 1;
 			while (cursor < grd_len(file->src)) {
-				auto lb_len = grd_get_line_break_len(file->src, cursor);
-				if (lb_len > 0) {
-					grd_add(&regions_to_remove, { start, cursor + lb_len });
-					cursor += lb_len;
+				if (grd_is_line_break(file->src[cursor]) || !grd_is_whitespace(file->src[cursor])) {
 					break;
 				}
-				s64 cur = cursor;
+				// GrdLog("whitespace at % - %h", cursor, (s64) file->src[cursor]);
 				cursor += 1;
-				if (!grd_is_whitespace(file->src[cur])) {
-					break;
-				}
+			}
+			auto lb_len = grd_get_line_break_len(file->src, cursor);
+			// GrdLog("lb_len: %", lb_len);
+			if (lb_len > 0) {
+				grd_add(&regions_to_remove, { start, cursor + lb_len });
+				cursor += lb_len;
+			} else if (cursor == grd_len(file->src)) {
+				grd_add(&regions_to_remove, { start, cursor });
 			}
 		} else {
 			cursor += 1;
