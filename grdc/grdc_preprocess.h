@@ -1103,6 +1103,7 @@ GRD_DEF grdc_dp_printer_push_text(GrdcDpPrinter* printer, GrdUnicodeString text,
 	}
 	for (s64 idx = 0; idx < grd_len(text); idx++) {
 		if (printer->line_cursor == 0) {
+			grd_format(printer->f, "\x1b[0m");
 			auto line_num_str = grd_to_string(printer->current_line);
 			grd_format(printer->f, "% ", line_num_str);
 			for (auto i: grd_range(grd_len(line_num_str) + 1)) {
@@ -1111,6 +1112,9 @@ GRD_DEF grdc_dp_printer_push_text(GrdcDpPrinter* printer, GrdUnicodeString text,
 			for (auto i: grd_range_from_to(grd_len(line_num_str), printer->max_line_num_width)) {
 				grd_format(printer->f, " ");
 				grd_add(&printer->line_double, ' ');
+			}
+			if (reg && reg->span) {
+				grd_format(printer->f, "\x1b[0;%m", 30 + reg->span->color);
 			}
 		}
 		grd_defer_x(printer->line_cursor += 1);
