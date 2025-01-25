@@ -1092,7 +1092,7 @@ GRD_DEF grdc_get_line_double_char(GrdcDpPrinter* printer, GrdcDpPrinterRegion* r
 GRD_DEF grdc_dp_printer_flush_line_double(GrdcDpPrinter* printer) {
 	grd_formatln(printer->f);
 	if (printer->dp->expand_site) {
-		grd_format(printer->f, printer->line_double);
+		// grd_format(printer->f, printer->line_double);
 		grd_clear(&printer->line_double);
 	}
 }
