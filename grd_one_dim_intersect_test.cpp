@@ -48,43 +48,53 @@ GrdArray<TestRegion> build_test_regions() {
 
 GRD_TEST_CASE(one_dim) {
 	auto regions = build_test_regions();
-	
-	auto get_region = [&](s64 i) {
-		auto reg = regions[i];
-		return GrdOneDimRegion { reg.start, reg.length };
-	};
 
-	auto resize = [&](s64 i, s64 start, s64 end) {
-		regions[i].start = start;
-		regions[i].length = end - start;
-	};
+	static char insert_letter = 'N';
 
-	char insert_letter = 'N';
-	auto insert = [&](s64 i, s64 start, s64 end, s64 copy_idx) {
-		if (copy_idx == -1) {
-			grd_add(&regions, TestRegion{start, end - start, insert_letter}, i);
-		} else {
-			grd_add(&regions, TestRegion{start, end - start, regions[copy_idx].c }, i);
+	auto patcher = grd_make_one_dim_patcher(&regions,
+		[](void* x) {
+			auto arr = (decltype(regions)*) x;
+			return grd_len(*arr);
+		},
+		[](void* x, s64 idx) {
+			auto reg = (*(decltype(regions)*) x)[idx];
+			return GrdOneDimRegion {
+				.start = reg.start,
+				.end = reg.start + reg.length
+			};
+		},
+		[](void* x, s64 idx, s64 start, s64 end) {
+			auto arr = (decltype(regions)*) x;
+			(*arr)[idx].start = start;
+			(*arr)[idx].length = end - start;
+		},
+		[](void* x, s64 idx, s64 start, s64 end, s64 copy_idx) {
+			auto arr = (decltype(regions)*) x;
+			if (copy_idx == -1) {
+				grd_add(arr, TestRegion{start, end - start, insert_letter}, idx);
+			} else {
+				grd_add(arr, TestRegion{start, end - start, (*arr)[copy_idx].c }, idx);
+			}
+		},
+		[](void* x, s64 idx) {
+			auto arr = (decltype(regions)*) x;
+			grd_remove(arr, idx);
 		}
-	};
-
-	auto remove = [&](s64 i) {
-		grd_remove(&regions, i);
-	};
+	);
 
 	verify_one_dim_array(regions, "aaaaaaaaaaBBBBBBBBBBccccccccccDDDDDDDDDD"_b);
-	grd_one_dim_patch(grd_len(regions), get_region, resize, insert, remove, 3, 30);
+	grd_one_dim_patch(&patcher, 3, 33);
 	verify_one_dim_array(regions, "aaaNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNDDDDDDD"_b);
 	insert_letter = 'L';
-	grd_one_dim_patch(grd_len(regions), get_region, resize, insert, remove, 6, 10);
+	grd_one_dim_patch(&patcher, 6, 16);
 	verify_one_dim_array(regions, "aaaNNNLLLLLLLLLLNNNNNNNNNNNNNNNNNDDDDDDD"_b);
 	insert_letter = 'M';
-	grd_one_dim_patch(grd_len(regions), get_region, resize, insert, remove, 20, 4);
+	grd_one_dim_patch(&patcher, 20, 24);
 	verify_one_dim_array(regions, "aaaNNNLLLLLLLLLLNNNNMMMMNNNNNNNNNDDDDDDD"_b);
 	insert_letter = 'P';
-	grd_one_dim_patch(grd_len(regions), get_region, resize, insert, remove, 1, 38);
+	grd_one_dim_patch(&patcher, 1, 39);
 	verify_one_dim_array(regions, "aPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPD"_b);
 	insert_letter = 'O';
-	grd_one_dim_patch(grd_len(regions), get_region, resize, insert, remove, 0, 40);
+	grd_one_dim_patch(&patcher, 0, 40);
 	verify_one_dim_array(regions, "OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO"_b);
 }
