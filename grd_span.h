@@ -101,8 +101,8 @@ GRD_DEDUP s64 grd_index_of(GrdSpan<T> span, T item) {
 	return -1;
 }
 
-template <typename T, typename U>
-GRD_DEDUP s64 grd_index_of(GrdSpan<T> span, GrdSpan<U> item) {
+template <typename T>
+GRD_DEDUP s64 grd_index_of(GrdSpan<T> span, GrdSpan<T> item) {
 	if (grd_len(item) > grd_len(span)) {
 		return -1;
 	}
