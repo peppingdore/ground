@@ -410,3 +410,7 @@ int x[] = { map(foo, x, y, z) };
 
 int x[] = { map(foo, x, y, z) };
 #endif
+
+GRD_TEST_CASE(gcc_replacement_example) {
+	 expect_str(simple_prep(U" #define foo(x) bar x\nfoo(foo) (2)"_b, {}), U" \nbar foo (2)\n"_b);
+}
