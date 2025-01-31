@@ -38,8 +38,9 @@ struct GrdHashMap {
 	}
 
 	GrdGenerator<Entry*> iterate() {
-		for (auto i: grd_range(capacity)) {
-			auto* e = &data[i];
+		auto xxx = this; // Crashes without copying |this|. I don't get it. Is |this| referenced???
+		for (auto i: grd_range(xxx->capacity)) {
+			auto* e = &xxx->data[i];
 			if (e->is_occupied()) {
 				co_yield e;
 			}
