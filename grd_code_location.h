@@ -11,6 +11,11 @@ struct GrdCodeLoc {
 	bool operator==(GrdCodeLoc rhs) {
 		return line == rhs.line && (strcmp(file, rhs.file) == 0);
 	}
+
+	void hash(GrdHasher* h) {
+		grd_update(h, line);
+		grd_update(h, file);
+	}
 };
 
 GRD_DEDUP constexpr GrdCodeLoc grd_make_code_loc(s32 line, const char* file) {
