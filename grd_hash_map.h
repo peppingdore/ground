@@ -27,7 +27,7 @@ struct GrdHashMap {
 	s64          capacity    = 0;
 	s64          count       = 0;
 	f32          load_factor = 0.75;
-	GrdCodeLoc loc = grd_caller_loc();
+	GrdCodeLoc   loc = grd_caller_loc();
 
 	void free() {
 		if (data) {
