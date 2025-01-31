@@ -1486,6 +1486,21 @@ GRD_DEDUP void grdc_print_prep_error(GrdError* e) {
 }
 
 GRD_DEDUP GrdcToken* grdc_make_token(GrdcPrep* p, GrdcPrepTokenKind kind) {
+	static s64 token_counter = 0;
+	static s64 token_kinds[32] = {};
+	token_counter += 1;
+	token_kinds[(s64) kind] += 1;
+	if (token_counter % 100000 == 0) {
+		printf("Tokens: %lld\n", token_counter);
+		if (token_counter == 1500000) {
+			exit(0);
+		}
+		for (auto i: grd_range(32)) {
+			if (token_kinds[i] > 0) {
+				GrdLogWithInfo({ .level = GrdLogLevel::Important }, "  % %", GrdcPrepTokenKind(i), token_kinds[i]);
+			}
+		}
+	}
 	auto* tok = grd_make<GrdcToken>(p->arena);
 	tok->kind = kind;
 	return tok;
@@ -2175,6 +2190,12 @@ GRD_DEDUP GrdTuple<GrdError*, GrdcMacroExp*> grdc_maybe_expand_macro(GrdcPrep* p
 			GrdLogWithInfo(log_i, "Recursive macro expansion prevented: %", grdc_tok_str(name_tok));
 			return { };
 		}
+	}
+
+	static s64 macro_expand_counter = 0;
+	macro_expand_counter += 1;
+	if (macro_expand_counter % 1000 == 0) {
+		printf("Macro expand counter: %lld\n", macro_expand_counter);
 	}
 
 	// GrdLogWithInfo(log_i, "Expanding macro: %", grdc_tok_str(name_tok));
