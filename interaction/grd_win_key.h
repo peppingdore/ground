@@ -1,7 +1,7 @@
 #pragma once
 
 #include "grd_key.h"
-#include <Windows.h>
+#include "grd_win32_api.h"
 
 GRD_BUILD_RUN("params.add_lib('user32.lib')");
 

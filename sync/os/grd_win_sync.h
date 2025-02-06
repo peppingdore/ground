@@ -2,7 +2,7 @@
 
 #include "../../grd_base.h"
 
-#include <Windows.h>
+#include "grd_win32_api.h"
 #include <limits>
 
 using GrdOsMutex = CRITICAL_SECTION;

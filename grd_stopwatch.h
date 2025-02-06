@@ -3,7 +3,7 @@
 #include "grd_base.h"
 
 #if GRD_OS_WINDOWS
-	#include "Windows.h"
+	#include "grd_win32_api.h"
 #elif GRD_OS_DARWIN
 	#include <mach/clock.h>
 	#include <mach/mach.h>

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../../grd_base.h"
-#include <Windows.h>
+#include "grd_win32_api.h"
 
 using GrdThreadId = DWORD;
 
