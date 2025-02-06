@@ -3,6 +3,7 @@
 #include "../../grd_base.h"
 
 #include <Windows.h>
+#include <limits>
 
 using GrdOsMutex = CRITICAL_SECTION;
 
