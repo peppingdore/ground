@@ -153,12 +153,22 @@ struct GrdBaseVector: GrdVectorMembers<N, T> {
 		return result;
 	}
 
+	auto& operator-=(GrdBaseVector rhs) {
+		*this = *this - rhs;
+		return *this;
+	}
+
 	auto operator+(GrdBaseVector rhs) {
 		auto result = *this;
 		for (auto i: grd_range(N)) {
 			result.components[i] += rhs.components[i];
 		}
 		return result;
+	}
+
+	auto& operator+=(GrdBaseVector rhs) {
+		*this = *this + rhs;
+		return *this;
 	}
 
 	auto operator*(T x) {
@@ -169,12 +179,22 @@ struct GrdBaseVector: GrdVectorMembers<N, T> {
 		return result;
 	}
 
+	auto& operator*=(T x) {
+		*this = *this * x;
+		return *this;
+	}
+
 	auto operator/(T x) {
 		auto result = *this;
 		for (auto i: grd_range(N)) {
-			result.components[i] *= x;
+			result.components[i] /= x;
 		}
 		return result;
+	}
+
+	auto& operator/=(T x) {
+		*this = *this / x;
+		return *this;
 	}
 
 	auto operator-() {
