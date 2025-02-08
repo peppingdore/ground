@@ -250,13 +250,13 @@ using GrdVector4i = GrdVector4_s64;
 
 
 GRD_DEDUP auto grd_make_vector2(auto x, auto y) {
-	return GrdVector2::grd_make(x, y);	
+	return GrdVector2::make(x, y);	
 }
 GRD_DEDUP auto grd_make_vector3(auto x, auto y, auto z) {
-	return GrdVector3::grd_make(x, y, z);	
+	return GrdVector3::make(x, y, z);	
 }
 GRD_DEDUP auto grd_make_vector4(auto x, auto y, auto z, auto w) {
-	return GrdVector4::grd_make(x, y, z, w);	
+	return GrdVector4::make(x, y, z, w);	
 }
 
 template <int N, typename T>
@@ -266,6 +266,11 @@ GRD_DEDUP auto grd_dot(GrdBaseVector<N, T> a, GrdBaseVector<N, T> b) {
 		sum += a[i] * b[i];
 	}
 	return sum;
+}
+
+template <typename T>
+GRD_DEF grd_cross(GrdBaseVector<3, T> a, GrdBaseVector<3, T> b) -> GrdBaseVector<3, T> {
+	return GrdBaseVector<3, T> { a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x };
 }
 
 template <int N, typename T>
