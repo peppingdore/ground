@@ -111,8 +111,9 @@ struct GrdBaseVector: GrdVectorMembers<N, T> {
 		return components[idx];
 	}
 
+	// @TODO: remove???
 	template <typename... Pack>
-	static GrdBaseVector grd_make(Pack... args) {
+	static GrdBaseVector make(Pack... args) {
 		T arr[N] = { (T) args... };
 		GrdBaseVector vec;
 		for (auto i: grd_range(N)) {
@@ -121,10 +122,11 @@ struct GrdBaseVector: GrdVectorMembers<N, T> {
 		return vec;
 	}
 
+	// @TODO: remove???
 	template <typename Thing> requires
 		std::is_integral_v<T> &&
 		std::is_floating_point_v<decltype(Thing().components[0])> 
-	static GrdBaseVector grd_make(Thing thing) {
+	static GrdBaseVector make(Thing thing) {
 		static_assert(N == grd_static_array_count(thing.components));
 		GrdBaseVector result;
 		for (auto i: grd_range(N)) {
