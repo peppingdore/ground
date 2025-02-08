@@ -95,3 +95,7 @@ GRD_DEDUP bool grd_signbit(f64 x) {
 GRD_DEDUP bool grd_is_nan(f64 x) {
 	return grd_fp_classify(x) == GRD_FP_NAN;
 }
+
+GRD_DEF grd_lerp(f64 a, f64 b, f64 t) -> f64 {
+	return a + (b - a) * t;
+}
