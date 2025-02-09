@@ -1210,7 +1210,7 @@ public:
       }
     }
 
-    _stacktrace.resize(std::min(_stacktrace.size(), skip_n_firsts() + depth));
+    _stacktrace.resize(min(_stacktrace.size(), skip_n_firsts() + depth));
     return size();
   }
 
