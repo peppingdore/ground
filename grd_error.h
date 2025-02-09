@@ -6,49 +6,45 @@
 #include "grd_code_location.h"
 #include "grd_format.h"
 
+struct GrdFreeList {
+	void*        data = NULL;
+	void       (*free_proc)(void* data) = NULL;
+	GrdFreeList* next = NULL;
+};
+
+GRD_DEF grd_free_list_free(GrdFreeList* list) {
+	auto cur = list;
+	while (cur) {
+		cur->free_proc(cur->data);
+		auto old_cur = cur;
+		cur = cur->next;
+		GrdFree(old_cur);
+	}
+}
+
+GRD_DEF grd_free_list_push(GrdFreeList** list, void* data, void (*free_proc)(void* data)) {
+	auto* new_list = grd_make<GrdFreeList>();
+	new_list->data = data;
+	new_list->free_proc = free_proc;
+	new_list->next = *list;
+	*list = new_list;
+}
+
 struct GrdError {
 	GrdAllocatedString text;
 	GrdType*           type;
 	GrdCodeLoc         loc;
-	void             (*on_free)(GrdError*) = NULL;
-	GrdError*          prev = NULL;
+	GrdFreeList*       free_list = NULL;
 
 	void free() {
-		if (prev) {
-			prev->free();
-		}
-		if (on_free) {
-			on_free(this);
-		}
+		grd_free_list_free(free_list);
 		text.free();
 		GrdFree(this);
-	}
-
-	GrdError* because(GrdError* error) {
-		prev = error;
-		return this;
 	}
 };
 
 GRD_DEDUP void grd_type_format(GrdFormatter* formatter, GrdError* e, GrdString spec) {
-	bool is_nested = grd_contains(spec, "nested_error"_b);
-
-	GrdString prefix = ""_b;
-	if (is_nested) {
-		prefix = "because "_b;
-	}
-	grd_format(formatter, "%% at %", prefix, e->text, e->loc);
-
-	if (e->prev) {
-		if (!is_nested) {
-			formatter->indentation += 1;
-		}
-		grd_format(formatter, "\n");
-		grd_format(formatter, "%(nested_error)", *e->prev);
-		if (!is_nested) {
-			formatter->indentation -= 1;
-		}
-	}
+	grd_format(formatter, "% at %", e->text, e->loc);
 }
 
 GRD_REFLECT(GrdError) {
@@ -56,7 +52,6 @@ GRD_REFLECT(GrdError) {
 	GRD_MEMBER(type);
 		GRD_TAG(GrdRealTypeMember{});
 	GRD_MEMBER(loc);
-	GRD_MEMBER(prev);
 }
 
 template <typename T = GrdError>
