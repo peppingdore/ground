@@ -222,3 +222,61 @@ GRD_DEDUP GrdError* write_string_to_file(GrdString str, GrdUnicodeString path) {
 	}
 	return NULL;
 }
+
+GRD_DEF grd_iterate_folder(GrdUnicodeString path) -> GrdGenerator<GrdTuple<GrdError*, GrdAllocatedUnicodeString>> {
+#if GRD_OS_WINDOWS
+	WIN32_FIND_DATAW findFileData;
+	HANDLE hFind = INVALID_HANDLE_VALUE;
+	auto wide_path = grd_encode_utf16(path);
+	grd_add(&wide_path, u"/*\0"_b);
+	grd_defer_x(wide_path.free());
+	hFind = FindFirstFileW((wchar_t*) wide_path.data, &findFileData);
+	grd_defer_x(FindClose(hFind));
+	if (hFind == INVALID_HANDLE_VALUE) {
+		co_yield { grd_windows_error() };
+		co_return;
+	}
+	while (true) {
+		auto name = grd_decode_utf16((char16_t*) findFileData.cFileName);
+		if (name != "." && name != "..") {
+			co_yield { NULL, name };
+		} else {
+			name.free();
+		}
+		auto res = FindNextFileW(hFind, &findFileData);
+		if (res == 0) {
+			if (GetLastError() == ERROR_NO_MORE_FILES) {
+				break;
+			}
+			co_yield { grd_windows_error() };
+		}
+	}
+#elif GRD_IS_POSIX
+	auto c_str = grd_encode_utf8(path);
+	grd_defer_x(c_str.free());
+	DIR* dir = opendir(c_str.data);
+	if (!dir) {
+		co_yield { grd_posix_error() };
+	}
+	grd_defer_x(closedir(dir));
+	struct dirent* entry;
+	while (true) {
+		errno = 0;
+		entry = readdir(dir);
+		if (entry == NULL) {
+			if (errno == 0) {
+				break;
+			}
+			co_yield { grd_posix_error() };
+		}
+		GrdAllocatedUnicodeString name = grd_decode_utf8(entry->d_name);
+		if (name == "." || name == "..") {
+			name.free();
+			continue;
+		}
+		co_yield { NULL, name };
+	}
+#else
+	static_assert(false);
+#endif
+}
