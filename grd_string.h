@@ -41,6 +41,14 @@ GRD_DEDUP constexpr GrdUnicodeString operator""_b(const char32_t* c_str, size_t 
 	return { (char32_t*) c_str, (s64) length };
 }
 
+GRD_DEDUP constexpr GrdSpan<wchar_t> operator""_b(const wchar_t* c_str, size_t length) {
+	return { (wchar_t*) c_str, (s64) length };
+}
+
+GRD_DEDUP constexpr GrdSpan<char16_t> operator""_b(const char16_t* c_str, size_t length) {
+	return { (char16_t*) c_str, (s64) length };
+}
+
 template <GrdStringChar T>
 GRD_DEDUP void grd_append(GrdArray<T>* arr, GrdSpan<T> str, s64 index = -1, GrdCodeLoc loc = grd_caller_loc()) { 
 	auto ptr = grd_reserve(arr, grd_len(str), index, loc);
