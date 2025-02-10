@@ -248,7 +248,7 @@ GRD_DEDUP void grd_tuple_reflect_dummy(std::initializer_list<int> x) {
 
 template <typename... Args>
 GRD_DEDUP GrdStructType* grd_reflect_create_type(GrdTuple<Args...>* x) {
-	return grd_reflect_add_type_named<GrdTuple<Args...>, GrdStructType>("");
+	return grd_reflect_register_type<GrdTuple<Args...>, GrdStructType>("");
 }
 
 template <typename... Args>

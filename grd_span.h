@@ -196,7 +196,7 @@ GRD_DEDUP void grd_type_hash(GrdHasher* hasher, GrdSpan<T> array) {
 
 template <typename T>
 GRD_DEDUP GrdSpanType* grd_reflect_create_type(GrdSpan<T>* x) {
-	return grd_reflect_add_type_named<GrdSpan<T>, GrdSpanType>("");
+	return grd_reflect_register_type<GrdSpan<T>, GrdSpanType>("");
 }
 
 template <typename T>

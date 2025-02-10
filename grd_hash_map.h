@@ -278,7 +278,7 @@ struct GrdHashMapType: GrdMapType {
 
 template <typename K, typename V>
 GRD_DEDUP GrdHashMapType* grd_reflect_create_type(GrdHashMap<K, V>* x) {
-	return grd_reflect_add_type_named<GrdHashMap<K, V>, GrdHashMapType>("");
+	return grd_reflect_register_type<GrdHashMap<K, V>, GrdHashMapType>("");
 }
 
 template <typename K, typename V>
