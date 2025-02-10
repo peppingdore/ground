@@ -5,6 +5,8 @@
 #include "sync/grd_atomics.h"
 #include "sync/grd_spinlock.h"
 
+#define GRD_USE_WINDOWS_HEADER 0
+
 #if !defined(_WINDOWS_) && GRD_USE_WINDOWS_HEADER
 	#define WIN32_LEAN_AND_MEAN
 	#include <Windows.h>
@@ -16,6 +18,8 @@
 	#define GRD_WIN_INFINITE INFINITE
 	#define GRD_WIN_HANDLE HANDLE
 	#define GRD_LPTHREAD_START_ROUTINE LPTHREAD_START_ROUTINE
+	#define GRD_WIN32_CRITICAL_SECTION CRITICAL_SECTION
+	#define GRD_WIN_BOOL BOOL
 
 #elif !defined(_WINDOWS_)
 	// #pragma comment(lib, "kernel32.lib")
