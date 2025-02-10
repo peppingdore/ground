@@ -509,6 +509,7 @@ class DefaultBuildParams:
 
 class BuildCtx:
 	def __init__(self, file, stdout=None, verbose=False):
+		self.build_run_time = 0.
 		self.module = __import__(__name__)
 		self.stdout = stdout or sys.stdout
 		self.file_stack = [Path(file).resolve()]
@@ -550,6 +551,7 @@ class BuildCtx:
 		return { 'ctx': self, '__FILE__': self.file_stack[-1] }
 
 	def run_build_runs(self, file):
+		start = time.perf_counter()
 		process, elapsed = run_preprocessor('clang++', file)
 		self.verbose(f"run_preprocessor({file}) took: {elapsed:.2f} sec")
 		runs = collect_build_runs(process.stdout.decode('utf-8', errors='ignore'))
@@ -563,6 +565,7 @@ class BuildCtx:
 			self.file_stack.append(Path(it.file).resolve())
 			exec(code, self.create_exec_scope())
 			self.file_stack.pop()
+		self.build_run_time = time.perf_counter() - start
 
 	def build(self, **kwargs):
 		scope = self.create_exec_scope()
@@ -573,7 +576,7 @@ class BuildCtx:
 def get_binary_path(file, output_kind):
 	return file.parent / "built" / f'{get_binary_prefix(output_kind)}{str(Path(file).stem)}{get_binary_ext(output_kind)}'
 
-def default_build_main(self, *, do_not_link=False, **kwargs):
+def default_build_main(self: BuildCtx, *, do_not_link=False, **kwargs):
 	self.params.units.append(self.root)
 	argparser = argparse.ArgumentParser()
 	argparser.add_argument('--run', '-r', action='store_true', help="Runs executable after successful compiling")
@@ -609,6 +612,7 @@ def default_build_main(self, *, do_not_link=False, **kwargs):
 
 	link_result = link(self, compile_results, output_path)
 	print_link_result(self.stdout, link_result)
+	print(f'Build runs took {self.build_run_time:.2f} sec', file=self.stdout)
 	if not did_link_successfully(link_result): raise Exception("Failed to link")
 	if args.run:
 		if len(extra) > 0: extra = extra[1:] # Skip double dash (--)
