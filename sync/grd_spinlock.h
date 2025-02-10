@@ -4,7 +4,7 @@
 #include "os/grd_os_sync.h"
 #include "../grd_type_utils.h"
 #include "../thread/os/grd_os_thread.h"
-#include "../math/grd_basic_functions.h"
+#include "../math/grd_math_base.h"
 
 static_assert(
 	sizeof(GrdThreadId) == 4 ||

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "grd_base.h"
-#include "math/grd_basic_functions.h"
+#include "math/grd_math_base.h"
 
 struct GrdRange {
 	s64 start;

@@ -2,7 +2,7 @@
 
 #include "third_party/spooky_hash/spooky_hash.h"
 #include "grd_type_utils.h"
-#include "math/grd_basic_functions.h"
+#include "math/grd_math_base.h"
 #include <string.h>
 
 using GrdHash64 = u64;

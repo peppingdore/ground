@@ -111,18 +111,6 @@ struct GrdBaseVector: GrdVectorMembers<N, T> {
 		return components[idx];
 	}
 
-	// @TODO: remove???
-	template <typename... Pack>
-	static GrdBaseVector make(Pack... args) {
-		T arr[N] = { (T) args... };
-		GrdBaseVector vec;
-		for (auto i: grd_range(N)) {
-			vec.components[i] = arr[i];
-		}
-		return vec;
-	}
-
-	// @TODO: remove???
 	template <typename Thing> requires
 		std::is_integral_v<T> &&
 		std::is_floating_point_v<decltype(Thing().components[0])> 
@@ -219,25 +207,20 @@ struct GrdBaseVector: GrdVectorMembers<N, T> {
 	// }
 };
 
-template <typename T> using GrdVector2Impl = GrdBaseVector<2, T>;
-template <typename T> using GrdVector3Impl = GrdBaseVector<3, T>;
-template <typename T> using GrdVector4Impl = GrdBaseVector<4, T>;
+using GrdVector2_f32 = GrdBaseVector<2, f32>;
+using GrdVector2_s32 = GrdBaseVector<2, s32>;
+using GrdVector2_f64 = GrdBaseVector<2, f64>;
+using GrdVector2_s64 = GrdBaseVector<2, s64>;
 
-using GrdVector2_f32 = GrdVector2Impl<f32>;
-using GrdVector2_s32 = GrdVector2Impl<s32>;
-using GrdVector2_f64 = GrdVector2Impl<f64>;
-using GrdVector2_s64 = GrdVector2Impl<s64>;
+using GrdVector3_f32 = GrdBaseVector<3, f32>;
+using GrdVector3_s32 = GrdBaseVector<3, s32>;
+using GrdVector3_f64 = GrdBaseVector<3, f64>;
+using GrdVector3_s64 = GrdBaseVector<3, s64>;
 
-using GrdVector3_f32 = GrdVector3Impl<f32>;
-using GrdVector3_s32 = GrdVector3Impl<s32>;
-using GrdVector3_f64 = GrdVector3Impl<f64>;
-using GrdVector3_s64 = GrdVector3Impl<s64>;
-
-
-using GrdVector4_f32 = GrdVector4Impl<f32>;
-using GrdVector4_s32 = GrdVector4Impl<s32>;
-using GrdVector4_f64 = GrdVector4Impl<f64>;
-using GrdVector4_s64 = GrdVector4Impl<s64>;
+using GrdVector4_f32 = GrdBaseVector<4, f32>;
+using GrdVector4_s32 = GrdBaseVector<4, s32>;
+using GrdVector4_f64 = GrdBaseVector<4, f64>;
+using GrdVector4_s64 = GrdBaseVector<4, s64>;
 
 
 using GrdVector2 = GrdVector2_f64;

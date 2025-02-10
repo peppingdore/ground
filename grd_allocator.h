@@ -3,7 +3,7 @@
 #include "grd_base.h"
 #include "grd_range.h"
 #include "grd_code_location.h"
-#include "math/grd_basic_functions.h"
+#include "math/grd_math_base.h"
 #include "grd_reflect.h"
 
 #include <cstdlib>

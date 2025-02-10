@@ -4,7 +4,7 @@
 #include "grd_allocator.h"
 #include "grd_string.h"
 #include "grd_reflect.h"
-#include "math/grd_basic_functions.h"
+#include "math/grd_math_base.h"
 
 #include <type_traits>
 #include <limits>
