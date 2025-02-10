@@ -140,6 +140,7 @@ GRD_DEDUP int end(GrdHasGlobalGeneratorIterator auto t) {
 	return 0;
 }
 
+#if !GRD_COMPILER_MSVC
 GRD_DEDUP auto grd_map(auto iter, auto func) -> GrdGenerator<decltype(func(*iter.begin()))> {
 	for (auto it: iter) {
 		co_yield func(it);
@@ -151,3 +152,4 @@ GRD_DEDUP auto grd_map(auto iter, auto func) -> GrdGenerator<decltype(func(*begi
 		co_yield func(it);
 	}
 }
+#endif

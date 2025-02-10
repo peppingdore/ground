@@ -167,7 +167,7 @@ GRD_DEDUP bool grd_starts_with(GrdSpan<T> str, GrdSpan<U> start) {
 	if (grd_len(start) > grd_len(str)) {
 		return false;
 	}
-	return str[0, grd_len(start)] == start;
+	return str[{0, grd_len(start)}] == start;
 }
 
 template <GrdStringChar T, GrdStringChar U, s64 N>
@@ -180,7 +180,7 @@ GRD_DEDUP bool grd_ends_with(GrdSpan<T> str, GrdSpan<U> end) {
 	if (grd_len(end) > grd_len(str)) {
 		return false;
 	}
-	return str[-grd_len(end), {}] == end;
+	return str[{-grd_len(end), {}}] == end;
 }
 
 GRD_DEDUP char32_t grd_ascii_to_lower(char32_t c) {
@@ -234,7 +234,7 @@ template <GrdStringChar T>
 GRD_DEDUP GrdTuple<GrdSpan<T>, bool> grd_take_until(GrdSpan<T> str, auto should_stop) {
 	for (auto i: grd_range(grd_len(str))) {
 		if (should_stop(str[i])) {
-			return { str[0, i], true };	
+			return { str[{0, i}], true };	
 		}
 	}
 	return { str, false };
@@ -245,13 +245,13 @@ GRD_DEDUP GrdGenerator<GrdSpan<T>> grd_split(GrdSpan<T> str, auto predicate) {
 	s64 cursor = 0;
 	for (auto i: grd_range(grd_len(str))) {
 		if (predicate(str[i])) {
-			auto x = str[cursor, i];
+			auto x = str[{cursor, i}];
 			co_yield x;
 			cursor = i + 1;
 		}
 	}
 
-	auto x = str[cursor, grd_len(str)];
+	auto x = str[{cursor, grd_len(str)}];
 	co_yield x;
 }
 
@@ -259,7 +259,7 @@ template <GrdStringChar T>
 GRD_DEDUP GrdTuple<GrdSpan<T>, GrdSpan<T>> grd_split2(GrdSpan<T> str, auto predicate) {
 	for (auto i: grd_range(grd_len(str))) {
 		if (predicate(str[i])) {
-			return { str[0, i], str[i + 1, grd_len(str)] };
+			return { str[{0, i}], str[{i + 1, grd_len(str)}] };
 		}
 	}
 	return { str, GrdSpan<T>{} }; 
@@ -287,19 +287,19 @@ GRD_DEDUP GrdGenerator<GrdSpan<T>> grd_iterate_lines(GrdSpan<T> str, bool includ
 	while (i < grd_len(str)) {
 		auto line_break_len = grd_get_line_break_len(str, i);
 		if (line_break_len != 0) {
-			co_yield str[cursor, i + (include_line_breaks ? line_break_len : 0)];
+			co_yield str[{cursor, i + (include_line_breaks ? line_break_len : 0)}];
 			cursor = i + line_break_len;
 			i += line_break_len - 1;
 		}
 		i += 1;
 	}
-	co_yield str[cursor, grd_len(str)];
+	co_yield str[{cursor, grd_len(str)}];
 }
 
 template <GrdStringChar T, GrdStringChar U>
 GRD_DEDUP GrdSpan<T> grd_remove_prefix(GrdSpan<T> str, GrdSpan<U> prefix) {
 	if (grd_starts_with(str, prefix)) {
-		return str[grd_len(prefix), grd_len(str)];
+		return str[{grd_len(prefix), grd_len(str)}];
 	}
 	return str;
 }
@@ -307,7 +307,7 @@ GRD_DEDUP GrdSpan<T> grd_remove_prefix(GrdSpan<T> str, GrdSpan<U> prefix) {
 template <GrdStringChar T, GrdStringChar U>
 GRD_DEDUP GrdSpan<T> grd_remove_suffix(GrdSpan<T> str, GrdSpan<U> suffix) {
 	if (grd_ends_with(str, suffix)) {
-		return str[0, grd_len(str) - grd_len(suffix)];
+		return str[{0, grd_len(str) - grd_len(suffix)}];
 	}
 	return str;
 }
@@ -322,7 +322,7 @@ GRD_DEDUP bool grd_contains(GrdSpan<T> str, const T* substr) {
 GRD_DEDUP s32 grd_utf8_char_size(char32_t c) {
 	if (c <= 0x007F) return 1;
 	if (c <= 0x07FF) return 2;
-	if (c <= 0xFFFF) return 3; 
+	if (c <= 0xFFFF) return 3;
 	                 return 4;
 }
 

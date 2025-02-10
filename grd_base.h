@@ -46,7 +46,7 @@
 #endif
 
 #if GRD_COMPILER_MSVC
-	#define GrdDebugBreak() __DebugBreak()
+	#define GrdDebugBreak() __debugbreak()
 #else
 	#define GrdDebugBreak() __builtin_debugtrap()
 #endif

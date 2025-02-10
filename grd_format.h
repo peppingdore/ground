@@ -221,15 +221,15 @@ GRD_DEDUP void format_parser(
 			decltype(fmt) format_spec;
 
 			for (auto it: short_specs) {
-				if (grd_starts_with(fmt[i + 1, grd_len(fmt)], it)) {
-					format_spec = fmt[i + 1, i + 1 + grd_len(it)];
+				if (grd_starts_with(fmt[{i + 1, grd_len(fmt)}], it)) {
+					format_spec = fmt[{i + 1, i + 1 + grd_len(it)}];
 					i += grd_len(it);
 					break;
 				}
 			}
 
-			if (grd_starts_with(fmt[i + 1, grd_len(fmt)], "["_b)) {
-				auto [idx_str, found] = grd_take_until(fmt[i + 2, grd_len(fmt)], grd_lambda(x, x == ']'));
+			if (grd_starts_with(fmt[{i + 1, grd_len(fmt)}], "["_b)) {
+				auto [idx_str, found] = grd_take_until(fmt[{i + 2, grd_len(fmt)}], grd_lambda(x, x == ']'));
 				if (found) {
 					s64 new_idx;
 					if (grd_parse_integer(idx_str, &new_idx)) {
@@ -240,7 +240,7 @@ GRD_DEDUP void format_parser(
 			}
 
 			while (true) {
-				auto start = fmt[i + 1, grd_len(fmt)];
+				auto start = fmt[{i + 1, grd_len(fmt)}];
 				for (auto it: format_flags) {
 					if (grd_starts_with(start, it.text)) {
 						if (it.unset) {
@@ -257,7 +257,7 @@ GRD_DEDUP void format_parser(
 				continue;
 			}
 
-			if (grd_len(format_spec) == 0 && grd_starts_with(fmt[i + 1, {}], "("_b)) {
+			if (grd_len(format_spec) == 0 && grd_starts_with(fmt[{i + 1, {}}], "("_b)) {
 				s64 open_counter = 1;
 				s64 closing_index = -1;
 				for (auto j: grd_range_from_to(i + 2, grd_len(fmt))) {
@@ -274,7 +274,7 @@ GRD_DEDUP void format_parser(
 				}
 
 				if (closing_index != -1) {
-					auto str = fmt[i + 2, closing_index]; 
+					auto str = fmt[{i + 2, closing_index}]; 
 					format_spec = str;
 					i = closing_index;
 				}

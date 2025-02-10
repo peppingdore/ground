@@ -29,7 +29,8 @@
 	#define GRD_WIN_INFINITE 0xFFFFFFFF
 	#define GRD_WIN_HANDLE void*
 	#define GRD_WIN_WORD unsigned short
-	
+	typedef long long GRD_WIN_LONG64;
+
 	typedef GRD_WIN_DWORD (GRD_WINAPI *GRD_PTHREAD_START_ROUTINE)(void* lpThreadParameter);
 	typedef GRD_PTHREAD_START_ROUTINE GRD_LPTHREAD_START_ROUTINE;
 	
@@ -153,4 +154,19 @@
 	GRD_WIN_IMPORT_API GRD_WIN_BOOL GRD_WINAPI FindNextFileW(GRD_WIN_HANDLE hFindFile, LPWIN32_FIND_DATAW lpFindFileData);
 
 	#define ERROR_NO_MORE_FILES              18L
+
+
+	// GRD_WIN_LONG64 _InterlockedCompareExchange64 (
+	// 	GRD_WIN_LONG64 volatile *Destination,
+	// 	GRD_WIN_LONG64 ExChange,
+	// 	GRD_WIN_LONG64 Comperand
+    // );
+	
+	// __int64 _InterlockedCompareExchange64 (
+	// 	__int64 volatile *Destination,
+	// 	__int64 ExChange,
+	// 	__int64 Comperand
+    // );
+	// #pragma intrinsic(_InterlockedCompareExchange64)
+
 #endif
