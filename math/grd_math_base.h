@@ -3,6 +3,7 @@
 #include "../grd_base.h"
 #include "../grd_data_ops.h"
 #include <type_traits>
+#include <math.h>
 
 template <typename T>
 GRD_DEDUP constexpr T grd_sign(T a) {

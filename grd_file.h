@@ -5,6 +5,7 @@
 
 #if GRD_IS_POSIX
 	#include <fcntl.h>
+	#include <dirent.h>
 #endif
 
 using GrdOpenFileFlag = u32;
