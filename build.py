@@ -445,7 +445,12 @@ def collect_build_runs(out):
 		res.append(BuildRun(code, file, int(line)))
 	return res
 
-def run_preprocessor(compiler, path):
+def run_preprocessor(path):
+	compiler = 'clang++'
+	argparser = argparse.ArgumentParser()
+	argparser.add_argument('--compiler')
+	args, extra = argparser.parse_known_args()
+	if args.compiler: compiler = args.compiler
 	args = [ compiler ]
 	args.append(f'"{path}"')
 	if is_msvc_interface(compiler):
@@ -453,6 +458,7 @@ def run_preprocessor(compiler, path):
 		if compiler == 'clang-cl':
 			args.append('/clang:"-std=c++23"')
 		else:
+			args.append('/Zc:preprocessor')
 			args.append('/std:c++latest')
 	else:
 		if platform.system() == 'Darwin':
@@ -509,6 +515,7 @@ class DefaultBuildParams:
 
 class BuildCtx:
 	def __init__(self, file, stdout=None, verbose=False):
+		self.start_time = time.perf_counter()
 		self.build_run_time = 0.
 		self.module = __import__(__name__)
 		self.stdout = stdout or sys.stdout
@@ -552,7 +559,7 @@ class BuildCtx:
 
 	def run_build_runs(self, file):
 		start = time.perf_counter()
-		process, elapsed = run_preprocessor('clang++', file)
+		process, elapsed = run_preprocessor(file)
 		self.verbose(f"run_preprocessor({file}) took: {elapsed:.2f} sec")
 		runs = collect_build_runs(process.stdout.decode('utf-8', errors='ignore'))
 		for it in runs:
@@ -613,6 +620,7 @@ def default_build_main(self: BuildCtx, *, do_not_link=False, **kwargs):
 	link_result = link(self, compile_results, output_path)
 	print_link_result(self.stdout, link_result)
 	print(f'Build runs took {self.build_run_time:.2f} sec', file=self.stdout)
+	print(f'Total build time: {time.perf_counter() - self.start_time:.2f} sec', file=self.stdout)
 	if not did_link_successfully(link_result): raise Exception("Failed to link")
 	if args.run:
 		if len(extra) > 0: extra = extra[1:] # Skip double dash (--)
