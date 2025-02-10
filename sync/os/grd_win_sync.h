@@ -3,9 +3,9 @@
 #include "../../grd_base.h"
 
 #include "grd_win32_api.h"
-#include <limits>
+// #include <limits>
 
-using GrdOsMutex = CRITICAL_SECTION;
+using GrdOsMutex = GRD_WIN32_CRITICAL_SECTION;
 
 GRD_DEDUP void grd_os_mutex_create(GrdOsMutex* mutex) {
 	*mutex = {};
@@ -25,14 +25,14 @@ GRD_DEDUP void grd_os_mutex_destroy(GrdOsMutex* mutex) {
 }
 
 
-using GrdOsSemaphore = HANDLE;
+using GrdOsSemaphore = GRD_WIN_HANDLE;
 
 GRD_DEDUP void grd_os_semaphore_create(GrdOsSemaphore* sem, u32 initial_value) {
-	*sem = CreateSemaphoreA(NULL, initial_value, LONG_MAX, NULL);
+	*sem = CreateSemaphoreA(NULL, initial_value, 2147483647L, NULL);
 }
 
 GRD_DEDUP void grd_os_semaphore_wait_and_decrement(GrdOsSemaphore* sem) {
-	WaitForSingleObject(*sem, INFINITE);
+	WaitForSingleObject(*sem, GRD_WIN_INFINITE);
 }
 
 GRD_DEDUP void grd_os_semaphore_increment(GrdOsSemaphore* sem) {
