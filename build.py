@@ -547,7 +547,8 @@ class BuildCtx:
 		return { 'ctx': self, '__FILE__': self.file_stack[-1] }
 
 	def run_build_runs(self, file):
-		process, _ = run_preprocessor('clang++', file)
+		process, elapsed = run_preprocessor('clang++', file)
+		self.verbose(f"run_preprocessor({file}) took: {elapsed:.2f} sec")
 		runs = collect_build_runs(process.stdout.decode('utf-8', errors='ignore'))
 		for it in runs:
 			self.verbose(f'BUILD_RUN {it}')
