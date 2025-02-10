@@ -15,11 +15,13 @@
 		#define BACKWARD_HAS_DWARF 1
 		#define BACKWARD_HAS_LIBUNWIND 1
 	#endif
-	#include "third_party/backward_cpp/backward_cpp.h"
-	#define GRD_USE_BACKWARD_CPP_STACKTRACE 1
+	// #include "third_party/backward_cpp/backward_cpp.h"
+	#define GRD_USE_BACKWARD_CPP_STACKTRACE 0
 #endif
 
-#include <string>
+#if GRD_STACKTRACE_USE_CXX_STRING_HEADER
+	#include <string>
+#endif
 #include "grd_defer.h"
 #include "grd_allocator.h"
 #include "grd_code_location.h"
@@ -49,6 +51,7 @@ struct GrdStackTrace {
 	}
 };
 
+#if GRD_STACKTRACE_USE_CXX_STRING_HEADER
 GRD_DEDUP const char* grd_stack_trace_copy_std_str(GrdAllocator allocator, std::string& str) {
 	auto str_mem = GrdAlloc<char>(allocator, str.size() + 1);
 	for (auto i: grd_range(str.size())) {
@@ -57,6 +60,7 @@ GRD_DEDUP const char* grd_stack_trace_copy_std_str(GrdAllocator allocator, std::
 	str_mem[str.size()] = '\0';
 	return str_mem;
 }
+#endif
 
 GRD_DEDUP GrdStackTrace grd_get_stack_trace(GrdAllocator allocator = c_allocator) {
 	GrdStackTrace st;
