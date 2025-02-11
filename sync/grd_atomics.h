@@ -122,27 +122,31 @@ GRD_DEDUP T grd_compare_and_swap(T* dst, T comp_v, T xchg_v) {
 
 	#if GRD_COMPILER_MSVC
 		#if GRD_ARCH_X64
-			#define GRD_INTERLOCKED_COMPARE_EXCHANGE(postfix) return (T) _InterlockedCompareExchange##postfix((N*) dst, grd_bitcast<N>(xchg_v), grd_bitcast<N>(comp_v));
+			#define GRD_INTERLOCKED_COMPARE_EXCHANGE(postfix) _InterlockedCompareExchange##postfix((N*) dst, grd_bitcast<N>(xchg_v), grd_bitcast<N>(comp_v));
 		#elif GRD_ARCH_ARM64
 			#define GRD_INTERLOCKED_COMPARE_EXCHANGE(postfix)\
-			if constexpr(success_mo == GrdMemoryOrder::Relaxed) return (T) _InterlockedCompareExchange##postfix##_nf((N*) dst, grd_bitcast<N>(xchg_v), grd_bitcast<N>(comp_v));\
-			if constexpr(success_mo == GrdMemoryOrder::Consume) return (T) _InterlockedCompareExchange##postfix##_acq((N*) dst, grd_bitcast<N>(xchg_v), grd_bitcast<N>(comp_v));\
-			if constexpr(success_mo == GrdMemoryOrder::Acquire) return (T) _InterlockedCompareExchange##postfix##_acq((N*) dst, grd_bitcast<N>(xchg_v), grd_bitcast<N>(comp_v));\
-			if constexpr(success_mo == GrdMemoryOrder::Release) return (T) _InterlockedCompareExchange##postfix##_rel((N*) dst, grd_bitcast<N>(xchg_v), grd_bitcast<N>(comp_v));\
-			if constexpr(success_mo == GrdMemoryOrder::AcqRel) return (T) _InterlockedCompareExchange##postfix((N*) dst, grd_bitcast<N>(xchg_v), grd_bitcast<N>(comp_v));\
-			if constexpr(success_mo == GrdMemoryOrder::SeqCst) return (T) _InterlockedCompareExchange##postfix((N*) dst, grd_bitcast<N>(xchg_v), grd_bitcast<N>(comp_v));\
+			if constexpr(success_mo == GrdMemoryOrder::Relaxed) _InterlockedCompareExchange##postfix##_nf((N*) dst, grd_bitcast<N>(xchg_v), grd_bitcast<N>(comp_v));\
+			if constexpr(success_mo == GrdMemoryOrder::Consume) _InterlockedCompareExchange##postfix##_acq((N*) dst, grd_bitcast<N>(xchg_v), grd_bitcast<N>(comp_v));\
+			if constexpr(success_mo == GrdMemoryOrder::Acquire) _InterlockedCompareExchange##postfix##_acq((N*) dst, grd_bitcast<N>(xchg_v), grd_bitcast<N>(comp_v));\
+			if constexpr(success_mo == GrdMemoryOrder::Release) _InterlockedCompareExchange##postfix##_rel((N*) dst, grd_bitcast<N>(xchg_v), grd_bitcast<N>(comp_v));\
+			if constexpr(success_mo == GrdMemoryOrder::AcqRel) _InterlockedCompareExchange##postfix((N*) dst, grd_bitcast<N>(xchg_v), grd_bitcast<N>(comp_v));\
+			if constexpr(success_mo == GrdMemoryOrder::SeqCst) _InterlockedCompareExchange##postfix((N*) dst, grd_bitcast<N>(xchg_v), grd_bitcast<N>(comp_v));\
 		#else
 			static_assert(false);
 		#endif
 
 		if constexpr (sizeof(T) == 1) {
-			GRD_INTERLOCKED_COMPARE_EXCHANGE(8);
+			auto prev = GRD_INTERLOCKED_COMPARE_EXCHANGE(8);
+			return grd_bitcast<T>(prev);
 		} else if constexpr (sizeof(T) == 2) {
-			GRD_INTERLOCKED_COMPARE_EXCHANGE(16);
+			auto prev = GRD_INTERLOCKED_COMPARE_EXCHANGE(16);
+			return grd_bitcast<T>(prev);
 		} else if constexpr (sizeof(T) == 4) {
-			GRD_INTERLOCKED_COMPARE_EXCHANGE();
+			auto prev = GRD_INTERLOCKED_COMPARE_EXCHANGE();
+			return grd_bitcast<T>(prev);
 		} else if constexpr (sizeof(T) == 8) {
-			GRD_INTERLOCKED_COMPARE_EXCHANGE(64);
+			auto prev = GRD_INTERLOCKED_COMPARE_EXCHANGE(64);
+			return grd_bitcast<T>(prev);
 		} else {
 			static_assert(false);
 		}
