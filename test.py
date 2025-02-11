@@ -329,7 +329,7 @@ def main():
 	parser.add_argument('--path', default=Path(__file__).parent)
 	parser.add_argument('--verbose', action='store_true')
 	parser.add_argument('--whitelist', help='Regex pattern', default=None)
-	ARGS = parser.parse_args()
+	ARGS, extra = parser.parse_known_args()
 	os.chdir(ARGS.path)
 	tester = Tester(Path('.'))
 	tester.add_path_filter(lambda x: 'third_party' in Path(x).parts)
