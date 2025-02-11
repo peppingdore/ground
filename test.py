@@ -272,9 +272,13 @@ class CppTest(Test):
 				raise ParseResultsException(f"Unknown verb {verb}")
 
 	def run(self):
+		if not self.exec_path:
+			self.status = 'test_finished'
+			return
 		prev_cases_to_skip_len = -1
 		self.run_count = 0
-		while True:
+		while self.run_count < 64:
+			self.run_count += 1
 			cases_to_skip = []
 			for name, case in self.cases.items():
 				if case.status != 'case_did_not_run':
@@ -288,7 +292,6 @@ class CppTest(Test):
 			self.tester.verbose(f"Running test {self.path} with skipped cases {cases_to_skip}")
 			process = self.tester.run_exec(self.exec_path
 			, ['--write_test_results_to_stderr', '--skip_cases'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, input=input.encode('utf-8'))
-			self.run_count += 1
 			self.tester.verbose(f"Test {self.path} stdout: \n{process.stdout.decode('utf-8', errors='ignore')}")
 			try:
 				self.parse_results(process.stderr)
@@ -303,15 +306,18 @@ class CppTest(Test):
 	def build(self):
 		self.tester.print(f'Building: {self.path}')
 		stdout = StringIO()
-		ctx=builder.BuildCtx(self.path, stdout=stdout)
-		ctx.test = self
 		res = None
 		try:
+			ctx=builder.BuildCtx(self.path, stdout=stdout)
+			ctx.test = self
 			res = ctx.build()
 		except Exception as e:
 			self.tester.verbose(f'Failed to build: {self.path}\n{e}')
 		if isinstance(res, builder.LinkResult):
-			self.exec_path = res.output_path
+			can_run = ctx is not None
+			can_run = can_run and ctx.params.link_params.output_kind == builder.LinkOutputKind.Executable
+			if can_run:
+				self.exec_path = res.output_path
 			self.status = 'test_built'
 		else:
 			self.status = 'test_failed_to_build'
