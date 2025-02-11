@@ -64,6 +64,12 @@ struct GrdSpan {
 		GrdSpan<U> span = { (U*) rhs, N - 1 }; 
 		return operator==(span);  
 	}
+
+	template <typename U>
+	bool operator==(std::initializer_list<U> rhs) {
+		GrdSpan<U> span = { (U*) rhs.begin(), (s64) rhs.size() }; 
+		return operator==(span);  
+	}
 };
 
 template <typename T, s64 N>
