@@ -362,7 +362,7 @@ def link(ctx, objects, output_path):
 				if sys.platform == 'linux':
 					program += ' -rcs'
 				else:
-					program += ' -r'
+					program += ' -rcs'
 	args.append(program)
 	clang_args = []
 	link_exe_args = []
@@ -377,7 +377,8 @@ def link(ctx, objects, output_path):
 	if ctx.VERBOSE:
 		link_exe_args.append(f'/VERBOSE')
 		clang_args.append(f'-v')
-		ar_args.append(f'-v')
+		if sys.platform != 'darwin':
+			ar_args.append(f'-v')
 	clang_args.append(f'--target={make_target_triplet(ctx.params.target)}')
 	clang_args.append(f'--output="{output_path}"')
 	link_exe_args.append(f'/OUT:"{output_path}"')
