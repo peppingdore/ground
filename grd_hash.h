@@ -142,7 +142,7 @@ GRD_DEDUP void grd_hash_fp_naive(GrdHasher* h, T num) {
 	}
 }
 
-void grd_type_hash(GrdHasher* h, const char* str) {
+GRD_DEDUP void grd_type_hash(GrdHasher* h, const char* str) {
 	auto len = strlen(str);
 	grd_update(h, (void*) str, (u64) len);
 }
