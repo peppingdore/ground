@@ -419,7 +419,7 @@ def link(ctx, objects, output_path):
 				link_exe_args.append('/SUBSYSTEM:WINDOWS')
 			for it in p.natvis_files:
 				link_exe_args.append(f'/NATVIS:"{it}"')
-	if not is_msvc_interface(p.compiler) and not archive:
+	if not is_msvc_interface(p.compiler) and not archive and sys.platform != 'darwin':
 		args.append('-fuse-ld=lld')
 	if archive:
 		args.extend(ar_args)
