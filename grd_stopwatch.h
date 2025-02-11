@@ -20,7 +20,7 @@ struct GrdStopwatch {
 
 GRD_DEDUP s64 grd_get_current_nanos(GrdStopwatch* w) {
 #if GRD_OS_WINDOWS
-	LARGE_INTEGER counter;
+	GRD_WIN_LARGE_INTEGER counter;
 	QueryPerformanceCounter(&counter);
 	counter.QuadPart *= 1000000;
 	return counter.QuadPart / w->freq_per_second;
@@ -71,7 +71,7 @@ GRD_DEDUP void grd_reset(GrdStopwatch* w) {
 GRD_DEDUP GrdStopwatch grd_make_stopwatch() {
 	GrdStopwatch w;
 #if GRD_OS_WINDOWS
-	LARGE_INTEGER freq_li;
+	GRD_WIN_LARGE_INTEGER freq_li;
 	QueryPerformanceFrequency(&freq_li);
 	w.freq_per_second = freq_li.QuadPart;
 #endif
