@@ -137,8 +137,14 @@ class CompilationParams:
 		self.use_windows_static_crt = use_windows_static_crt
 		self.use_windows_debug_crt = use_windows_debug_crt
 
+def is_msvc(compiler):
+	return (compiler.endswith('cl') or compiler.endswith('cl.exe')) and not is_clang_cl(compiler)
+
 def is_msvc_interface(compiler):
-	return compiler == 'cl' or compiler == 'clang-cl'
+	return is_msvc(compiler) or is_clang_cl(compiler)
+
+def is_clang_cl(compiler):
+	return compiler.endswith('clang-cl') or compiler.endswith('clang-cl.exe')
 
 def lower_clang_cl_arg(arg):
 	PREFIX = "passthrough_clang_cl:"
@@ -147,9 +153,9 @@ def lower_clang_cl_arg(arg):
 	return f'/clang:"{arg}"'
 
 def resolve_compiler_flag(flag, compiler):
-	x = flag.msvc if compiler == 'cl' else flag.clang
+	x = flag.msvc if is_msvc(compiler) else flag.clang
 	x = (x,) if isinstance(x, str) else x
-	if compiler == 'clang-cl': x = tuple(lower_clang_cl_arg(it) for it in x)
+	if is_clang_cl(compiler): x = tuple(lower_clang_cl_arg(it) for it in x)
 	x = tuple(it.removeprefix("passthrough_clang_cl:") for it in x)
 	return ' '.join(x)
 
@@ -164,7 +170,7 @@ def build_compile_cmdline(ctx, unit, out_path):
 	p = ctx.params.compile_params
 	args.append(p.compiler)
 	if ctx.VERBOSE:
-		if p.compiler == 'cl':
+		if is_msvc(p.compiler):
 			args.append('/VERBOSE')
 		else:
 			args.append('/clang:-v' if is_msvc_interface(p.compiler) else '-v')
@@ -200,7 +206,7 @@ def build_compile_cmdline(ctx, unit, out_path):
 		if p.optimization_level == 3: args.append('/O2ix')
 	else:
 		args.append(f'-O{p.optimization_level}')
-	if p.compiler != 'cl':
+	if not is_msvc(p.compiler):
 		args.append(("/clang:" if is_msvc_interface(p.compiler) else "") + "-fvisibility=internal")
 	for it in p.compiler_flags:
 		args.append(resolve_compiler_flag(it, p.compiler))
@@ -300,7 +306,6 @@ class LinkParams:
 		lib_directories=None,
 		apple_frameworks=None,
 		use_windows_subsystem=False,
-		flags = None,
 	):
 		self.compiler = compiler or DEFAULT_COMPILER
 		self.natvis_files = natvis_files or []
@@ -310,7 +315,6 @@ class LinkParams:
 		self.lib_directories = lib_directories or []
 		self.apple_frameworks = apple_frameworks or []
 		self.use_windows_subsystem = use_windows_subsystem
-		self.flags = flags or []
 	
 class LinkResult:
 	def __init__(self, process, elapsed, output_path, params):
@@ -339,37 +343,38 @@ def get_binary_ext(kind, os=native_os()):
 
 def link(ctx, objects, output_path):
 	p = ctx.params.link_params
-	os.makedirs(Path(output_path).parent, exist_ok=True)
 	args = []
-	args.append(p.compiler)
-	for it in objects:
-		x = it
-		if isinstance(x, CompileResult):
-			x = x.out_path
-		args.append(x)
-	for it in p.static_libraries:
-		args.append(it)
-	prefix = '/clang:' if is_msvc_interface(p.compiler) else ""
+	args.append(('lib.exe' if p.output_kind == LinkOutputKind.StaticLibrary else'link.exe') if is_msvc(p.compiler) else p.compiler)
+	clang_args = []
+	link_exe_args = []
+	clang_prefix = '/clang:' if is_msvc_interface(p.compiler) else ""
+	for it in [*objects, *p.static_libraries]:
+		if isinstance(it, CompileResult): it = it.out_path
+		clang_args.append(it)
+		link_exe_args.append(it)
 	if ctx.VERBOSE:
-		args.append(f'{prefix}-v')
-	if p.compiler != 'cl':
-		args.append(f'{prefix}--target={make_target_triplet(ctx.params.target)}')
-	args.append(f'{prefix}--output="{output_path}"')
+		clang_args.append(f'-v')
+	clang_args.append(f'--target={make_target_triplet(ctx.params.target)}')
+	clang_args.append(f'--output="{output_path}"')
+	link_exe_args.append(f'/OUT:"{output_path}"')
 	for it in p.lib_directories:
-		if not is_msvc_interface(p.compiler):
-			args.append(f'-L"{it}"')
+		clang_args.append(f'-L"{it}"')
+		link_exe_args.append(f'/LIBPATH:"{it}"')
 	for it in p.libraries:
-		args.append(f'{prefix}-l{it}')
+		clang_args.append(f'-l{it}')
+		link_exe_args.append(f'/DEFAULTLIB:"{it}"')
 	for it in p.apple_frameworks:
-		args.append(f'-framework {it}')
-	args.append(f'{prefix}-g') # do not strip away debug info.
-	args.extend(p.flags)
+		clang_args.append(f'-framework {it}')
+	clang_args.append('-g')
+	link_exe_args.append('/DEBUG')
+
 	if p.output_kind == LinkOutputKind.DynamicLibrary:
-		args.append(f'{prefix}-shared')
+		clang_args.append(f'-shared')
+		link_exe_args.append('/DLL')
 	elif p.output_kind == LinkOutputKind.StaticLibrary:
-		args.append(f'{prefix}-static')
-		if is_msvc_interface(p.compiler):
-			args.append(f'{prefix}-fuse-ld=llvm-lib')
+		clang_args.append(f'-static')
+		# if is_clang_cl(p.compiler):
+			# clang_args.append(f'-fuse-ld=llvm-lib')
 	elif p.output_kind == LinkOutputKind.Executable:
 		pass
 	else:
@@ -377,18 +382,20 @@ def link(ctx, objects, output_path):
 	if is_msvc_interface(p.compiler):
 		# args.append(f'/M{"T" if p.use_windows_static_crt else "D"}{"d" if p.use_windows_debug_crt else ""}')
 		if p.output_kind != LinkOutputKind.StaticLibrary:
-			args.append('/link') # Rest of |args| is passed to linker.
-			args.append('/INCREMENTAL:NO')
-			args.append('/PDBTMCACHE:NO')
-			for it in p.lib_directories:
-				args.append(f'/LIBPATH:"{it}"')
+			# link_exe_args.append('/link') # Rest of |args| is passed to linker.
+			link_exe_args.append('/INCREMENTAL:NO')
+			link_exe_args.append('/PDBTMCACHE:NO')
 			if p.use_windows_subsystem:
-				args.append('/ENTRY:mainCRTStartup')
-				args.append('/SUBSYSTEM:WINDOWS')
+				link_exe_args.append('/ENTRY:mainCRTStartup')
+				link_exe_args.append('/SUBSYSTEM:WINDOWS')
 			for it in p.natvis_files:
-				args.append(f'/NATVIS:"{it}"')
+				link_exe_args.append(f'/NATVIS:"{it}"')
 	if not is_msvc_interface(p.compiler):
 		args.append('-fuse-ld=lld')
+	if is_msvc(p.compiler):
+		args.extend(link_exe_args)
+	else:
+		args.extend(map(lambda it: f'{clang_prefix}{it}', clang_args))
 	ctx.verbose(args)
 	cmdline = ' '.join(str(it) for it in args)
 	process, elapsed = run(cmdline)
@@ -455,7 +462,7 @@ def run_preprocessor(path):
 	args.append(f'"{path}"')
 	if is_msvc_interface(compiler):
 		args.append('/E /TP /C')
-		if compiler == 'clang-cl':
+		if is_clang_cl(compiler):
 			args.append('/clang:"-std=c++23"')
 		else:
 			args.append('/Zc:preprocessor')
@@ -503,7 +510,6 @@ class DefaultBuildParams:
 
 	def add_lib(self, lib):
 		if str(lib).endswith('.a') or str(lib).endswith('.lib') or str(lib).endswith('.obj') or str(lib).endswith('.o'):
-			lib = Path(lib).resolve()
 			if not lib in self.link_params.static_libraries:
 				self.link_params.static_libraries.append(lib)
 			return
@@ -512,6 +518,8 @@ class DefaultBuildParams:
 
 	def add_natvis_file(self, file):
 		self.link_params.natvis_files.append(file)
+
+class BuildRunException(Exception): pass
 
 class BuildCtx:
 	def __init__(self, file, stdout=None, verbose=False):
@@ -558,21 +566,24 @@ class BuildCtx:
 		return { 'ctx': self, '__FILE__': self.file_stack[-1] }
 
 	def run_build_runs(self, file):
-		start = time.perf_counter()
-		process, elapsed = run_preprocessor(file)
-		self.verbose(f"run_preprocessor({file}) took: {elapsed:.2f} sec")
-		runs = collect_build_runs(process.stdout.decode('utf-8', errors='ignore'))
-		for it in runs:
-			self.verbose(f'BUILD_RUN {it}')
-			# Inform Python about source code location. 
-			name = f'{it.file}: {it.line}'
-			lines = it.code.splitlines(True)
-			linecache.cache[name] = len(it.code), None, lines, name
-			code = compile(it.code, name, 'exec')
-			self.file_stack.append(Path(it.file).resolve())
-			exec(code, self.create_exec_scope())
-			self.file_stack.pop()
-		self.build_run_time = time.perf_counter() - start
+		try:
+			start = time.perf_counter()
+			process, elapsed = run_preprocessor(file)
+			self.verbose(f"run_preprocessor({file}) took: {elapsed:.2f} sec")
+			runs = collect_build_runs(process.stdout.decode('utf-8', errors='ignore'))
+			for it in runs:
+				self.verbose(f'BUILD_RUN {it}')
+				# Inform Python about source code location. 
+				name = f'{it.file}: {it.line}'
+				lines = it.code.splitlines(True)
+				linecache.cache[name] = len(it.code), None, lines, name
+				code = compile(it.code, name, 'exec')
+				self.file_stack.append(Path(it.file).resolve())
+				exec(code, self.create_exec_scope())
+				self.file_stack.pop()
+			self.build_run_time = time.perf_counter() - start
+		except Exception as e:
+			raise BuildRunException("Failed to run build runs") from e
 
 	def build(self, **kwargs):
 		scope = self.create_exec_scope()
@@ -639,7 +650,7 @@ def main():
 	try:
 		build_file(args.file, verbose=args.verbose)
 	except Exception as e:
-		if args.verbose:
+		if args.verbose or isinstance(e, BuildRunException):
 			raise e
 		raise SystemExit(e) # avoid printing traceback.
 
