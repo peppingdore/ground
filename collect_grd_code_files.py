@@ -12,7 +12,7 @@ def collect():
 				gen(dir / it.name, level=level+1)
 				continue
 			if it.name.endswith(".h"):
-				skiplist = (['posix_', 'darwin_'] if os.name == 'nt' else ['win_']) + ["_test"]
+				skiplist = (['posix_', 'darwin_'] if os.name == 'nt' else ['grd_win_', 'grd_win32_']) + ["_test"]
 				if any (x in it.name for x in skiplist): continue
 				files.append(dir / it.name)
 	gen(root)
