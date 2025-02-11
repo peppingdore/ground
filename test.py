@@ -326,7 +326,7 @@ class CppTest(Test):
 def main():
 	global ARGS
 	parser = argparse.ArgumentParser()
-	parser.add_argument('--path', default=os.getcwd())
+	parser.add_argument('--path', default=Path(__file__).parent)
 	parser.add_argument('--verbose', action='store_true')
 	parser.add_argument('--whitelist', help='Regex pattern', default=None)
 	ARGS = parser.parse_args()
