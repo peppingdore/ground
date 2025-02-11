@@ -206,6 +206,10 @@ def build_compile_cmdline(ctx, unit, out_path):
 		if p.optimization_level == 3: args.append('/O2ix')
 	else:
 		args.append(f'-O{p.optimization_level}')
+	if is_msvc(p.compiler):
+		# fatal error C1041: cannot open program database 'E:\carder\ground\vc140.pdb';
+		# if multiple CL.EXE write to the same .PDB file, please use /FS
+		args.append('/FS')
 	if not is_msvc(p.compiler):
 		args.append(("/clang:" if is_msvc_interface(p.compiler) else "") + "-fvisibility=internal")
 	for it in p.compiler_flags:
