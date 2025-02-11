@@ -7,8 +7,8 @@
 #else
 	#include "grd_build.h"
 	#if GRD_OS_LINUX
-		GRD_BUILD_RUN("ctx.params.add_lib('dwarf')")
-		GRD_BUILD_RUN("ctx.params.add_lib('elf')")
+		// GRD_BUILD_RUN("ctx.params.add_lib('dwarf')")
+		// GRD_BUILD_RUN("ctx.params.add_lib('elf')")
 		#define BACKWARD_HAS_DWARF 1
 	#endif
 	#if GRD_OS_DARWIN
