@@ -140,16 +140,9 @@ GRD_DEDUP int end(GrdHasGlobalGeneratorIterator auto t) {
 	return 0;
 }
 
-#if !GRD_COMPILER_MSVC
-GRD_DEDUP auto grd_map(auto iter, auto func) -> GrdGenerator<decltype(func(*iter.begin()))> {
+template <typename T, typename V> // Can't use |auto|, MSVC bitches.  
+GRD_DEF grd_map(T iter, V func) -> GrdGenerator<decltype(func(*begin(iter)))> {
 	for (auto it: iter) {
 		co_yield func(it);
 	}
 }
-
-GRD_DEDUP auto grd_map(auto iter, auto func) -> GrdGenerator<decltype(func(*begin(iter)))> {
-	for (auto it: iter) {
-		co_yield func(it);
-	}
-}
-#endif
