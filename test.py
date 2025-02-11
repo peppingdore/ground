@@ -86,14 +86,14 @@ class Tester:
 		
 
 	def scan(self, dir):
-		if any(map(lambda x: x(dir), self.path_filters)): return
+		if any(map(lambda x: x(Path(dir)), self.path_filters)): return
 		self.verbose(f'Scanning for tests in {dir}')
 		for it in os.scandir(dir):
 			if it.is_dir():
 				self.scan(Path(it.path))
 				continue
 			if it.name.lower().endswith(("_test.h", "_test.cpp", "_test.hpp", "_test.c")):
-				if any(map(lambda x: x(it), self.file_filters)): continue
+				if any(map(lambda x: x(Path(it)), self.file_filters)): continue
 				self.add(CppTest(it.path, self))
 
 	def cases(self):
