@@ -348,27 +348,50 @@ def get_binary_ext(kind, os=native_os()):
 def link(ctx, objects, output_path):
 	p = ctx.params.link_params
 	args = []
-	args.append(('lib.exe' if p.output_kind == LinkOutputKind.StaticLibrary else'link.exe') if is_msvc(p.compiler) else p.compiler)
+	program = None
+	archive = False
+	if is_msvc(p.compiler):
+		program = ('lib.exe' if p.output_kind == LinkOutputKind.StaticLibrary else'link.exe')
+	else:
+		if ctx.params.target.os == OS_WINDOWS:
+			program = p.compiler
+		else:
+			program = 'ar' if p.output_kind == LinkOutputKind.StaticLibrary else p.compiler
+			if program == 'ar':
+				archive = True
+				if sys.platform == 'linux':
+					program += ' -rcs'
+				else:
+					program += ' -r'
+	args.append(program)
 	clang_args = []
 	link_exe_args = []
+	ar_args = []
+	ar_args.append(output_path)
 	clang_prefix = '/clang:' if is_msvc_interface(p.compiler) else ""
 	for it in [*objects, *p.static_libraries]:
 		if isinstance(it, CompileResult): it = it.out_path
 		clang_args.append(it)
 		link_exe_args.append(it)
+		ar_args.append(it)
 	if ctx.VERBOSE:
+		link_exe_args.append(f'/VERBOSE')
 		clang_args.append(f'-v')
+		ar_args.append(f'-v')
 	clang_args.append(f'--target={make_target_triplet(ctx.params.target)}')
 	clang_args.append(f'--output="{output_path}"')
 	link_exe_args.append(f'/OUT:"{output_path}"')
 	for it in p.lib_directories:
 		clang_args.append(f'-L"{it}"')
+		ar_args.append(f'-L"{it}"')
 		link_exe_args.append(f'/LIBPATH:"{it}"')
 	for it in p.libraries:
 		clang_args.append(f'-l{it}')
+		ar_args.append(f'-l{it}')
 		link_exe_args.append(f'/DEFAULTLIB:"{it}"')
 	for it in p.apple_frameworks:
 		clang_args.append(f'-framework {it}')
+		ar_args.append(f'-framework {it}')
 	clang_args.append('-g')
 	link_exe_args.append('/DEBUG')
 
@@ -376,9 +399,10 @@ def link(ctx, objects, output_path):
 		clang_args.append(f'-shared')
 		link_exe_args.append('/DLL')
 	elif p.output_kind == LinkOutputKind.StaticLibrary:
-		clang_args.append(f'-static')
+		# clang_args.append(f'-static')
 		# if is_clang_cl(p.compiler):
 			# clang_args.append(f'-fuse-ld=llvm-lib')
+		pass
 	elif p.output_kind == LinkOutputKind.Executable:
 		pass
 	else:
@@ -394,9 +418,11 @@ def link(ctx, objects, output_path):
 				link_exe_args.append('/SUBSYSTEM:WINDOWS')
 			for it in p.natvis_files:
 				link_exe_args.append(f'/NATVIS:"{it}"')
-	if not is_msvc_interface(p.compiler):
+	if not is_msvc_interface(p.compiler) and not archive:
 		args.append('-fuse-ld=lld')
-	if is_msvc(p.compiler):
+	if archive:
+		args.extend(ar_args)
+	elif is_msvc(p.compiler):
 		args.extend(link_exe_args)
 	else:
 		args.extend(map(lambda it: f'{clang_prefix}{it}', clang_args))
