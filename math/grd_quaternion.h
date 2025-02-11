@@ -1,6 +1,8 @@
 #pragma once
 
 #include "grd_math_base.h"
+#include "grd_vector.h"
+#include "../grd_tuple.h"
 
 template <typename T>
 struct GrdBaseQuaternion {
