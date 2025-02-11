@@ -11,6 +11,8 @@ def grd_test_hook(tester):
 		else:
 			if str(path).endswith("win_sync.h_test.cpp"):
 				return True
+		if path.name == "stack_trace_test.cpp":
+			return True
 			
 	@tester.add_path_filter
 	def path_filter(path: Path):
