@@ -59,7 +59,7 @@ struct GrdOptionalType: GrdType {
 
 template <typename T>
 GRD_DEDUP GrdOptionalType* grd_reflect_create_type(GrdOptional<T>* x) {
-	return grd_reflect_add_type_named<GrdOptional<T>, GrdOptionalType>("");
+	return grd_reflect_register_type<GrdOptional<T>, GrdOptionalType>("");
 }
 
 template <typename T>

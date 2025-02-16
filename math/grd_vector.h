@@ -111,20 +111,10 @@ struct GrdBaseVector: GrdVectorMembers<N, T> {
 		return components[idx];
 	}
 
-	template <typename... Pack>
-	static GrdBaseVector grd_make(Pack... args) {
-		T arr[N] = { (T) args... };
-		GrdBaseVector vec;
-		for (auto i: grd_range(N)) {
-			vec.components[i] = arr[i];
-		}
-		return vec;
-	}
-
 	template <typename Thing> requires
 		std::is_integral_v<T> &&
 		std::is_floating_point_v<decltype(Thing().components[0])> 
-	static GrdBaseVector grd_make(Thing thing) {
+	static GrdBaseVector make(Thing thing) {
 		static_assert(N == grd_static_array_count(thing.components));
 		GrdBaseVector result;
 		for (auto i: grd_range(N)) {
@@ -151,12 +141,22 @@ struct GrdBaseVector: GrdVectorMembers<N, T> {
 		return result;
 	}
 
+	auto& operator-=(GrdBaseVector rhs) {
+		*this = *this - rhs;
+		return *this;
+	}
+
 	auto operator+(GrdBaseVector rhs) {
 		auto result = *this;
 		for (auto i: grd_range(N)) {
 			result.components[i] += rhs.components[i];
 		}
 		return result;
+	}
+
+	auto& operator+=(GrdBaseVector rhs) {
+		*this = *this + rhs;
+		return *this;
 	}
 
 	auto operator*(T x) {
@@ -167,12 +167,22 @@ struct GrdBaseVector: GrdVectorMembers<N, T> {
 		return result;
 	}
 
+	auto& operator*=(T x) {
+		*this = *this * x;
+		return *this;
+	}
+
 	auto operator/(T x) {
 		auto result = *this;
 		for (auto i: grd_range(N)) {
-			result.components[i] *= x;
+			result.components[i] /= x;
 		}
 		return result;
+	}
+
+	auto& operator/=(T x) {
+		*this = *this / x;
+		return *this;
 	}
 
 	auto operator-() {
@@ -197,25 +207,20 @@ struct GrdBaseVector: GrdVectorMembers<N, T> {
 	// }
 };
 
-template <typename T> using GrdVector2Impl = GrdBaseVector<2, T>;
-template <typename T> using GrdVector3Impl = GrdBaseVector<3, T>;
-template <typename T> using GrdVector4Impl = GrdBaseVector<4, T>;
+using GrdVector2_f32 = GrdBaseVector<2, f32>;
+using GrdVector2_s32 = GrdBaseVector<2, s32>;
+using GrdVector2_f64 = GrdBaseVector<2, f64>;
+using GrdVector2_s64 = GrdBaseVector<2, s64>;
 
-using GrdVector2_f32 = GrdVector2Impl<f32>;
-using GrdVector2_s32 = GrdVector2Impl<s32>;
-using GrdVector2_f64 = GrdVector2Impl<f64>;
-using GrdVector2_s64 = GrdVector2Impl<s64>;
+using GrdVector3_f32 = GrdBaseVector<3, f32>;
+using GrdVector3_s32 = GrdBaseVector<3, s32>;
+using GrdVector3_f64 = GrdBaseVector<3, f64>;
+using GrdVector3_s64 = GrdBaseVector<3, s64>;
 
-using GrdVector3_f32 = GrdVector3Impl<f32>;
-using GrdVector3_s32 = GrdVector3Impl<s32>;
-using GrdVector3_f64 = GrdVector3Impl<f64>;
-using GrdVector3_s64 = GrdVector3Impl<s64>;
-
-
-using GrdVector4_f32 = GrdVector4Impl<f32>;
-using GrdVector4_s32 = GrdVector4Impl<s32>;
-using GrdVector4_f64 = GrdVector4Impl<f64>;
-using GrdVector4_s64 = GrdVector4Impl<s64>;
+using GrdVector4_f32 = GrdBaseVector<4, f32>;
+using GrdVector4_s32 = GrdBaseVector<4, s32>;
+using GrdVector4_f64 = GrdBaseVector<4, f64>;
+using GrdVector4_s64 = GrdBaseVector<4, s64>;
 
 
 using GrdVector2 = GrdVector2_f64;
@@ -228,13 +233,13 @@ using GrdVector4i = GrdVector4_s64;
 
 
 GRD_DEDUP auto grd_make_vector2(auto x, auto y) {
-	return GrdVector2::grd_make(x, y);	
+	return GrdVector2::make(x, y);	
 }
 GRD_DEDUP auto grd_make_vector3(auto x, auto y, auto z) {
-	return GrdVector3::grd_make(x, y, z);	
+	return GrdVector3::make(x, y, z);	
 }
 GRD_DEDUP auto grd_make_vector4(auto x, auto y, auto z, auto w) {
-	return GrdVector4::grd_make(x, y, z, w);	
+	return GrdVector4::make(x, y, z, w);	
 }
 
 template <int N, typename T>
@@ -244,6 +249,11 @@ GRD_DEDUP auto grd_dot(GrdBaseVector<N, T> a, GrdBaseVector<N, T> b) {
 		sum += a[i] * b[i];
 	}
 	return sum;
+}
+
+template <typename T>
+GRD_DEF grd_cross(GrdBaseVector<3, T> a, GrdBaseVector<3, T> b) -> GrdBaseVector<3, T> {
+	return GrdBaseVector<3, T> { a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x };
 }
 
 template <int N, typename T>

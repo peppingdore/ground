@@ -4,7 +4,7 @@
 #include "os/grd_os_sync.h"
 #include "../grd_type_utils.h"
 #include "../thread/os/grd_os_thread.h"
-#include "../math/grd_basic_functions.h"
+#include "../math/grd_math_base.h"
 
 static_assert(
 	sizeof(GrdThreadId) == 4 ||
@@ -26,8 +26,8 @@ GRD_DEDUP void grd_lock(GrdSpinlock* x) {
 	auto loaded = grd_atomic_load(x);
 	auto thread_id = grd_current_thread_id();
 
-	if (loaded.locking_thread_id == thread_id && x->lock_count != 0) {
-		assert(x->lock_count > 0);
+	assert(loaded.lock_count >= 0);
+	if (loaded.locking_thread_id == thread_id && loaded.lock_count > 0) {
 		grd_atomic_load_add<GrdSpinlockNumType>(&x->lock_count, 1LL);
 		return;
 	}

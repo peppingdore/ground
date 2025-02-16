@@ -3,6 +3,7 @@
 #include "../grd_base.h"
 #include "../grd_data_ops.h"
 #include <type_traits>
+#include <math.h>
 
 template <typename T>
 GRD_DEDUP constexpr T grd_sign(T a) {
@@ -85,8 +86,13 @@ GRD_DEDUP GrdFpClass grd_fp_classify(f64 x) {
 	return GRD_FP_NORMAL;
 }
 
-#define GRD_INFINITY (1.0f / 0.0f)
-#define GRD_NAN (0.0f / 0.0f)
+#if GRD_COMPILER_MSVC
+	#define GRD_INFINITY (1e300 * 1e300)
+	#define GRD_NAN ((-(float)(GRD_INFINITY * 0.0f)))
+#else
+	#define GRD_INFINITY (1.0f / 0.0f)
+	#define GRD_NAN (0.0f / 0.0f)
+#endif
 
 GRD_DEDUP bool grd_signbit(f64 x) {
 	return grd_bitcast<u64>(x) & (1ULL << 63);
@@ -94,4 +100,8 @@ GRD_DEDUP bool grd_signbit(f64 x) {
 
 GRD_DEDUP bool grd_is_nan(f64 x) {
 	return grd_fp_classify(x) == GRD_FP_NAN;
+}
+
+GRD_DEF grd_lerp(f64 a, f64 b, f64 t) -> f64 {
+	return a + (b - a) * t;
 }

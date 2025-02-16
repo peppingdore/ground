@@ -23,9 +23,15 @@ struct GrdSpan {
 		return data[index];
 	}
 
-	GrdSpan operator[](GrdOptional<s64> start, GrdOptional<s64> end) {
-		s64 start_val = start.has_value ? start.value : 0;
-		s64 end_val   = end.has_value   ? end.value   : count;
+	// We can't use operator[] with multiple arguments because MSVC doesn't support it yet.
+	struct GrdSpanRange {
+		GrdOptional<s64> start;
+		GrdOptional<s64> end;
+	};
+
+	GrdSpan operator[](GrdSpanRange x) {
+		s64 start_val = x.start.has_value ? x.start.value : 0;
+		s64 end_val   = x.end.has_value   ? x.end.value   : count;
 		if (start_val < 0) {
 			start_val += count;
 		}
@@ -39,15 +45,6 @@ struct GrdSpan {
 		assert(end_val >= start_val);
 		GrdSpan slice = { data + start_val, end_val - start_val };
 		return slice;
-	}
-
-	struct GrdSpanRange {
-		GrdOptional<s64> start;
-		GrdOptional<s64> end;
-	};
-
-	GrdSpan operator[](GrdSpanRange x) {
-		return operator[](x.start, x.end);
 	}
 
 	template <typename U>
@@ -65,6 +62,12 @@ struct GrdSpan {
 	template <typename U, s64 N>
 	bool operator==(const U (&rhs)[N]) {
 		GrdSpan<U> span = { (U*) rhs, N - 1 }; 
+		return operator==(span);  
+	}
+
+	template <typename U>
+	bool operator==(std::initializer_list<U> rhs) {
+		GrdSpan<U> span = { (U*) rhs.begin(), (s64) rhs.size() }; 
 		return operator==(span);  
 	}
 };
@@ -107,7 +110,7 @@ GRD_DEDUP s64 grd_index_of(GrdSpan<T> span, GrdSpan<T> item) {
 		return -1;
 	}
 	for (auto i: grd_range(grd_len(span) - grd_len(item) + 1)) {
-		if (span[i, i + grd_len(item)] == item) {
+		if (span[{i, i + grd_len(item)}] == item) {
 			return i;
 		}
 	}
@@ -196,7 +199,7 @@ GRD_DEDUP void grd_type_hash(GrdHasher* hasher, GrdSpan<T> array) {
 
 template <typename T>
 GRD_DEDUP GrdSpanType* grd_reflect_create_type(GrdSpan<T>* x) {
-	return grd_reflect_add_type_named<GrdSpan<T>, GrdSpanType>("");
+	return grd_reflect_register_type<GrdSpan<T>, GrdSpanType>("");
 }
 
 template <typename T>

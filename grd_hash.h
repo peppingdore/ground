@@ -2,7 +2,7 @@
 
 #include "third_party/spooky_hash/spooky_hash.h"
 #include "grd_type_utils.h"
-#include "math/grd_basic_functions.h"
+#include "math/grd_math_base.h"
 #include <string.h>
 
 using GrdHash64 = u64;
@@ -142,7 +142,7 @@ GRD_DEDUP void grd_hash_fp_naive(GrdHasher* h, T num) {
 	}
 }
 
-void grd_type_hash(GrdHasher* h, const char* str) {
+GRD_DEDUP void grd_type_hash(GrdHasher* h, const char* str) {
 	auto len = strlen(str);
 	grd_update(h, (void*) str, (u64) len);
 }

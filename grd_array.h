@@ -139,7 +139,7 @@ struct GrdArrayType: GrdSpanType {
 
 template <typename T>
 GRD_DEDUP GrdArrayType* grd_reflect_create_type(GrdArray<T>* x) {
-	return grd_reflect_add_type_named<GrdArray<T>, GrdArrayType>("");
+	return grd_reflect_register_type<GrdArray<T>, GrdArrayType>("");
 }
 
 template <typename T>

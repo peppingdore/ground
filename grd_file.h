@@ -5,6 +5,7 @@
 
 #if GRD_IS_POSIX
 	#include <fcntl.h>
+	#include <dirent.h>
 #endif
 
 using GrdOpenFileFlag = u32;
@@ -14,7 +15,7 @@ GRD_DEDUP constexpr GrdOpenFileFlag GRD_FILE_CREATE_NEW = 1 << 3;
 GRD_DEDUP constexpr GrdOpenFileFlag GRD_FILE_APPEND     = 1 << 4;
 
 #if GRD_OS_WINDOWS
-	using GrdNativeFileHandle = HANDLE;
+	using GrdNativeFileHandle = GRD_WIN_HANDLE;
 #elif GRD_IS_POSIX
 	using GrdNativeFileHandle = int;
 #else
@@ -48,7 +49,7 @@ GRD_DEDUP GrdTuple<GrdFile, GrdError*> grd_open_file(GrdUnicodeString path, GrdO
 	auto wide = grd_encode_utf16(path);
 	grd_defer { wide.free(); };
 
-	HANDLE handle = CreateFileW((wchar_t*) wide.data, windows_flags, FILE_SHARE_READ, NULL, creation_disposition, FILE_ATTRIBUTE_NORMAL, NULL);
+	GRD_WIN_HANDLE handle = CreateFileW((wchar_t*) wide.data, windows_flags, FILE_SHARE_READ, NULL, creation_disposition, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (handle == INVALID_HANDLE_VALUE) {
 		return { {}, grd_windows_error() };
 	}
@@ -60,9 +61,9 @@ GRD_DEDUP GrdTuple<GrdFile, GrdError*> grd_open_file(GrdUnicodeString path, GrdO
 }
 
 GRD_DEDUP GrdTuple<s64, GrdError*> grd_os_write_file(GrdFile* file, void* data, s64 size) {
-	DWORD to_write = grd_clamp_u64(0, u32_max, size);
-	DWORD written = 0;
-	BOOL  result = WriteFile(file->handle, data, to_write, &written, NULL);
+	GRD_WIN_DWORD to_write = grd_clamp_u64(0, u32_max, size);
+	GRD_WIN_DWORD written = 0;
+	GRD_WIN_BOOL  result = WriteFile(file->handle, data, to_write, &written, NULL);
 	if (!result) {
 		return { -1, grd_windows_error() };
 	}
@@ -71,9 +72,9 @@ GRD_DEDUP GrdTuple<s64, GrdError*> grd_os_write_file(GrdFile* file, void* data, 
 
 // Returns 0, NULL if EOF is reached.
 GRD_DEDUP GrdTuple<s64, GrdError*> grd_os_read_file(GrdFile* file, void* buf, s64 size) {
-	DWORD to_read = grd_clamp_u64(0, u32_max, size);
-	DWORD read;
-	BOOL  result = ReadFile(file->handle, buf, to_read, &read, NULL);
+	GRD_WIN_DWORD to_read = grd_clamp_u64(0, u32_max, size);
+	GRD_WIN_DWORD read;
+	GRD_WIN_BOOL  result = ReadFile(file->handle, buf, to_read, &read, NULL);
 	if (!result) {
 		if (GetLastError() == ERROR_HANDLE_EOF) {
 			return { 0, NULL };
@@ -221,4 +222,62 @@ GRD_DEDUP GrdError* write_string_to_file(GrdString str, GrdUnicodeString path) {
 		return e;
 	}
 	return NULL;
+}
+
+GRD_DEF grd_iterate_folder(GrdUnicodeString path) -> GrdGenerator<GrdTuple<GrdError*, GrdAllocatedUnicodeString>> {
+#if GRD_OS_WINDOWS
+	WIN32_FIND_DATAW findFileData;
+	GRD_WIN_HANDLE hFind = INVALID_HANDLE_VALUE;
+	auto wide_path = grd_encode_utf16(path);
+	grd_add(&wide_path, u"/*\0"_b);
+	grd_defer_x(wide_path.free());
+	hFind = FindFirstFileW((wchar_t*) wide_path.data, &findFileData);
+	grd_defer_x(FindClose(hFind));
+	if (hFind == INVALID_HANDLE_VALUE) {
+		co_yield { grd_windows_error() };
+		co_return;
+	}
+	while (true) {
+		auto name = grd_decode_utf16((char16_t*) findFileData.cFileName);
+		if (name != "." && name != "..") {
+			co_yield { NULL, name };
+		} else {
+			name.free();
+		}
+		auto res = FindNextFileW(hFind, &findFileData);
+		if (res == 0) {
+			if (GetLastError() == ERROR_NO_MORE_FILES) {
+				break;
+			}
+			co_yield { grd_windows_error() };
+		}
+	}
+#elif GRD_IS_POSIX
+	auto c_str = grd_encode_utf8(path);
+	grd_defer_x(c_str.free());
+	DIR* dir = opendir(c_str.data);
+	if (!dir) {
+		co_yield { grd_posix_error() };
+	}
+	grd_defer_x(closedir(dir));
+	struct dirent* entry;
+	while (true) {
+		errno = 0;
+		entry = readdir(dir);
+		if (entry == NULL) {
+			if (errno == 0) {
+				break;
+			}
+			co_yield { grd_posix_error() };
+		}
+		GrdAllocatedUnicodeString name = grd_decode_utf8(entry->d_name);
+		if (name == "." || name == "..") {
+			name.free();
+			continue;
+		}
+		co_yield { NULL, name };
+	}
+#else
+	static_assert(false);
+#endif
 }
