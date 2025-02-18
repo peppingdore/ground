@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 def collect():
-	blacklist = ['.git', '.vscode', 'third_party', 'b_lib', 'testing.h', 'misc']
+	blacklist = ['.git', '.vscode', 'third_party', 'b_lib', 'testing.h', 'misc', "grdc"]
 	files = []
 	root = Path(__file__).parent
 	def gen(dir, level=1):
@@ -17,6 +17,6 @@ def collect():
 				files.append(dir / it.name)
 	gen(root)
 	# @TODO: remove.
-	files = filter(lambda x: all(not skip in str(x) for skip in ["ssa.h", "grdc_parser.h", "ast_printer.h", "window.h", "grd_regexp.h"]) , files)
+	files = filter(lambda x: all(not skip in str(x) for skip in ["ssa.h", "grdc_parser.h", "ast_printer.h", "window.h", "grd_regexp.h",]) , files)
 	files = list(map(lambda x: x.relative_to(root), files))
 	return root.resolve(), files
