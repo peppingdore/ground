@@ -186,3 +186,34 @@ GRD_DEDUP T* grd_make(s64 count, GrdAllocator allocator = c_allocator, GrdCodeLo
 	}
 	return mem;
 }
+
+
+struct GrdFreeList {
+	void*        data = NULL;
+	void       (*free_proc)(void* data) = NULL;
+	GrdFreeList* next = NULL;
+
+	GRD_REFLECT(GrdFreeList) {
+		GRD_MEMBER(data);
+		GRD_MEMBER(free_proc);
+		GRD_MEMBER(next);
+	}
+};
+
+GRD_DEF grd_free_list_free(GrdFreeList* list) {
+	auto cur = list;
+	while (cur) {
+		cur->free_proc(cur->data);
+		auto old_cur = cur;
+		cur = cur->next;
+		GrdFree(old_cur);
+	}
+}
+
+GRD_DEF grd_free_list_push(GrdFreeList** list, void* data, void (*free_proc)(void* data)) {
+	auto* new_list = grd_make<GrdFreeList>();
+	new_list->data = data;
+	new_list->free_proc = free_proc;
+	new_list->next = *list;
+	*list = new_list;
+}

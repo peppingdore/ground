@@ -6,30 +6,6 @@
 #include "grd_code_location.h"
 #include "grd_format.h"
 
-struct GrdFreeList {
-	void*        data = NULL;
-	void       (*free_proc)(void* data) = NULL;
-	GrdFreeList* next = NULL;
-};
-
-GRD_DEF grd_free_list_free(GrdFreeList* list) {
-	auto cur = list;
-	while (cur) {
-		cur->free_proc(cur->data);
-		auto old_cur = cur;
-		cur = cur->next;
-		GrdFree(old_cur);
-	}
-}
-
-GRD_DEF grd_free_list_push(GrdFreeList** list, void* data, void (*free_proc)(void* data)) {
-	auto* new_list = grd_make<GrdFreeList>();
-	new_list->data = data;
-	new_list->free_proc = free_proc;
-	new_list->next = *list;
-	*list = new_list;
-}
-
 struct GrdError {
 	GrdAllocatedString text;
 	GrdType*           type;
@@ -52,6 +28,7 @@ GRD_REFLECT(GrdError) {
 	GRD_MEMBER(type);
 		GRD_TAG(GrdRealTypeMember{});
 	GRD_MEMBER(loc);
+	GRD_MEMBER(free_list);
 }
 
 template <typename T = GrdError>
@@ -93,8 +70,8 @@ GRD_REFLECT(GrdWindowsError) {
 GRD_DEDUP GrdWindowsError* grd_windows_error(GrdCodeLoc loc = grd_caller_loc()) {
 	auto code = GetLastError();
 	char buf[256];
-	FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-		NULL, code, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+	FormatMessageA(GRD_WIN_FORMAT_MESSAGE_FROM_SYSTEM | GRD_WIN_FORMAT_MESSAGE_IGNORE_INSERTS,
+		NULL, code, GRD_WIN_MAKELANGID(GRD_WIN_LANG_NEUTRAL, GRD_WIN_SUBLANG_DEFAULT),
 		buf, grd_static_array_count(buf), NULL);
 	auto e = grd_make_error<GrdWindowsError>(buf, loc);
 	e->code = code;
