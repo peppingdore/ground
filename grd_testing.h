@@ -38,6 +38,7 @@ struct GrdTestStringNode {
 };
 
 struct GrdTester {
+	GrdAllocator       allocator;
 	GrdTestCase*       first_case;
 	GrdTestScopeNode*  scope;
 	GrdTestCase*       current_test = NULL;
@@ -119,7 +120,7 @@ GRD_DEDUP GrdTestScopeNode* grd_tester_copy_scope(GrdTestScopeNode* scope) {
 	GrdTestScopeNode* root = NULL;
 	GrdTestScopeNode* dst = NULL;
 	while (scope) {
-		auto node = grd_make<GrdTestScopeNode>();
+		auto node = grd_make<GrdTestScopeNode>(tester.allocator);
 		*node = *scope;
 		if (dst) {
 			dst->next = node;
@@ -219,6 +220,7 @@ int main(int argc, char* argv[]) {
 			}
 		}
 	}
+	tester.allocator = c_allocator;
 
 	if (tester.skip_cases) {
 		int count = 0;
