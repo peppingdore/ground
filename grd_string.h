@@ -98,8 +98,8 @@ GRD_DEDUP void grd_append(GrdArray<char>* arr, const char* str, s64 index = -1, 
 }
 
 template <GrdStringChar T>
-GRD_DEDUP T* grd_copy_c_str(GrdSpan<T> str, GrdAllocator allocator = c_allocator) {
-	auto cp = GrdAlloc<T>(allocator, grd_len(str) + 1);
+GRD_DEDUP T* grd_copy_c_str(GrdSpan<T> str, GrdAllocator allocator = c_allocator, GrdCodeLoc loc = grd_caller_loc()) {
+	auto cp = GrdAlloc<T>(allocator, grd_len(str) + 1, loc);
 	memcpy(cp, str.data, grd_len(str) * sizeof(T));
 	cp[grd_len(str)] = '\0';
 	return cp;
