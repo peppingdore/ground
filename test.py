@@ -231,7 +231,11 @@ class CppTest(Test):
 			lines = lines[1:]
 			return res
 		def read_int():
-			return int(read_line())
+			ln = read_line()
+			try:
+				return int(ln)
+			except ValueError:
+				raise ParseResultsException(f"Expected an int, but got {ln}")
 		def read_str():
 			line_count = read_int()
 			return '\n'.join(read_line() for i in range(line_count))
