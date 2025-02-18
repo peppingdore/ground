@@ -35,7 +35,7 @@ GRD_REFLECTION_REFLECT_HOOK(T) {
 	auto proc = grd_pick_type_format<T>();
 	if (proc) {
 		if (!GRD_TYPE_FORMAT_PROCS) {
-			GRD_TYPE_FORMAT_PROCS = grd_make<GrdHashMap<GrdType*, GrdTypeFormatTypeErased*>>();
+			GRD_TYPE_FORMAT_PROCS = grd_make<GrdHashMap<GrdType*, GrdTypeFormatTypeErased*>>(grd_crt_allocator);
 		}
 		grd_put(GRD_TYPE_FORMAT_PROCS, grd_reflect_type_of<T>(), proc);
 	}
