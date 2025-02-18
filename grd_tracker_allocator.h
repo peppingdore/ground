@@ -29,7 +29,20 @@ struct GrdTrackerAllocator {
 	}
 };
 
-GRD_DEF grd_tracker_allocator_print_usage(GrdTrackerAllocator* ta) -> void {
+GRD_DEF grd_get_tracker_allocator(GrdAllocator allocator) -> GrdTrackerAllocator* {
+	auto tp = grd_get_allocator_type(allocator);
+	if (tp == grd_reflect_type_of<GrdTrackerAllocator>()) {
+		return (GrdTrackerAllocator*) allocator.data;
+	}
+	return NULL;
+}
+
+GRD_DEF grd_tracker_allocator_print_usage(GrdAllocator x) -> void {
+	auto ta = grd_get_tracker_allocator(x);
+	if (!ta) {
+		return;
+	}
+
 	auto arena = grd_make_arena_allocator(ta->parent_allocator, 1 * 1024 * 1024);
 	grd_defer_x(grd_free_allocator(arena));
 
@@ -173,14 +186,6 @@ GRD_DEDUP GrdAllocatorProcResult grd_tracker_allocator_proc(void* allocator_data
 	}
 }
 
-GRD_DEF grd_get_tracker_allocator(GrdAllocator allocator) -> GrdTrackerAllocator* {
-	auto tp = grd_get_allocator_type(allocator);
-	if (tp == grd_reflect_type_of<GrdTrackerAllocator>()) {
-		return (GrdTrackerAllocator*) allocator.data;
-	}
-	return NULL;
-}
-
 GRD_DEF grd_make_tracker_allocator(GrdAllocator parent_allocator = c_allocator) -> GrdAllocator {
 	auto ta = grd_make<GrdTrackerAllocator>();
 	ta->parent_allocator = parent_allocator;
@@ -193,4 +198,13 @@ GRD_DEF grd_make_tracker_allocator(GrdAllocator parent_allocator = c_allocator) 
 		.proc = grd_tracker_allocator_proc,
 		.data = ta,
 	};
+}
+
+GRD_DEF grd_tracker_allocator_is_empty(GrdAllocator x) -> bool {
+	auto ta = grd_get_tracker_allocator(x);
+	if (!ta) {
+		return true;
+	}
+	GrdScopedLock(ta->mutex);
+	return grd_len(ta->allocations) == 0;
 }
