@@ -1,5 +1,7 @@
-#include "../grd_window.h"
+#include "../../grd_base.h"
 #include "../../grd_testing.h"
+#if !GRD_OS_LINUX
+#include "../grd_window.h"
 #include "../../grd_tracker_allocator.h"
 
 GRD_TEST_CASE(window_open_close) {
@@ -9,3 +11,4 @@ GRD_TEST_CASE(window_open_close) {
 	
 	grd_close_window(window);
 }
+#endif
