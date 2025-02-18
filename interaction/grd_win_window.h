@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../grd_build.h"
-#include "grd_window_interface.h"
+#include "grd_window_base.h"
 #include "grd_event.h"
 #include "grd_win_key.h"
 #include "grd_pointer.h"
@@ -10,36 +10,39 @@
 
 #include <windowsx.h>
 
-GRD_BUILD_RUN("params.add_lib('user32.lib')");
+GRD_BUILD_RUN("ctx.params.add_lib('user32.lib')");
 
 
 struct GrdWindowsWindow: GrdWindow {
-	HWND               hwnd;
-	wchar_t*           utf16_title = NULL;
-	GrdArray<Event*>   events;
-	char16_t           wm_char_high_surrogate = 0;
-	LRESULT          (*wnd_proc)(GrdWindowsWindow* window, HWND h, UINT m, WPARAM wParam, LPARAM lParam) = NULL;
-	OsPointerIdMapper  os_pointer_mapper;
-	LONG               last_wmmousemove_time = 0;
+	GRD_WIN_HWND           hwnd;
+	wchar_t*               utf16_title = NULL;
+	GrdArray<GrdEvent*>    events;
+	char16_t               wm_char_high_surrogate = 0;
+	GRD_WIN_LRESULT      (*wnd_proc)(GrdWindowsWindow* window, GRD_WIN_HWND h, GRD_WIN_UINT m, GRD_WIN_WPARAM wParam, GRD_WIN_LPARAM lParam) = NULL;
+	GrdOsPointerIdMapper   os_pointer_mapper;
+	GRD_WIN_LONG           last_wmmousemove_time = 0; 
 };
 
 GRD_DEDUP GrdSpinlock GRD_WINDOWS_WINDOW_CREATE_LOCK;
 GRD_DEDUP bool        GRD_WINDOWS_IS_WINDOW_CLASS_CREATED = false;
-// Windows sends WM_GETMINMAXINFO event before WM_NCCREATE,
-//  which means we can't read Window* pointer from GWLP_USERDATA, because we set GWLP_USERDATA in WM_NCCREATE,
-//  so the solution is to have a global lock with global Window* pointer, which we can use in WM_GETMINMAXINFO.
+//  Windows sends WM_GETMINMAXINFO event before WM_NCCREATE, which is a problem.
+// 
+//  It means we can't read Window* pointer from GWLP_USERDATA in WM_GETMINMAXINFO,
+//  because we set GWLP_USERDATA in WM_NCCREATE which happens later,
+//  so the solution is to have a global lock with global GrdWindowsWindow* pointer,
+//  from which we can read max/min size in WM_GETMINMAXINFO while window is being created.
 GRD_DEDUP GrdWindowsWindow* GRD_WINDOWS_GETMINMAXINFO_WINDOW_POINTER = NULL;
 
-GRD_DEDUP LRESULT grd_wnd_proc(HWND h, UINT m, WPARAM wParam, LPARAM lParam);
+GRD_DEDUP GRD_WIN_LRESULT grd_wnd_proc(GRD_WIN_HWND h, GRD_WIN_UINT m, GRD_WIN_WPARAM wParam, GRD_WIN_LPARAM lParam);
 
 GRD_DEDUP const wchar_t* grd_windows_get_window_class() {
-	// This function assumes you have taken the creation lock.
+	// This function assumes you have taken |GRD_WINDOWS_WINDOW_CREATE_LOCK|.
 	auto class_name = L"GRD_WINDOW_CLASS";
 	if (!GRD_WINDOWS_IS_WINDOW_CLASS_CREATED) {
 		GRD_WINDOWS_IS_WINDOW_CLASS_CREATED = true;
-		WNDCLASSW wc = { 
+		GRD_WIN_WNDCLASSW wc = { 
 			.lpfnWndProc = grd_wnd_proc,
-			.hInstance = GetModuleHandle(NULL),
+			.hInstance = GetModuleHandleW(NULL),
 			.lpszClassName = class_name,
 		};
 		RegisterClassW(&wc);
@@ -50,21 +53,20 @@ GRD_DEDUP const wchar_t* grd_windows_get_window_class() {
 GRD_DEDUP GrdTuple<GrdWindowsWindow*, GrdError*> grd_os_create_window(GrdWindowParams params) {
 	GrdScopedLock(GRD_WINDOWS_WINDOW_CREATE_LOCK);
 
-	s32 window_width  = GetSystemMetrics(SM_CXSCREEN) / 2 - params.initial_size.x / 2;
-	s32 window_height = GetSystemMetrics(SM_CYSCREEN) / 2 - params.initial_size.y / 2;
-	RECT window_rect = { window_width, window_height, window_width + (s32) params.initial_size.x, window_height + (s32) params.initial_size.y };
-	DWORD window_style = WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX;
-	AdjustWindowRect(&window_rect, window_style, false);
-
 	auto window = grd_make<GrdWindowsWindow>();
-	window->type = grd_reflect_type_of<GrdWindowsWindow>();
-	window->params = params;
-	window->utf16_title = (wchar_t*) grd_encode_utf16(params.title).data;
-	
+	grd_init_window(window, params, grd_reflect_type_of<GrdWindowsWindow>());
+
 	GRD_WINDOWS_GETMINMAXINFO_WINDOW_POINTER = window;
 
+	s32 window_width  = GetSystemMetrics(GRD_WIN_SM_CXSCREEN) / 2 - params.initial_size.x / 2;
+	s32 window_height = GetSystemMetrics(GRD_WIN_SM_CYSCREEN) / 2 - params.initial_size.y / 2;
+	GRD_WIN_RECT window_rect = { window_width, window_height, window_width + (s32) params.initial_size.x, window_height + (s32) params.initial_size.y };
+	GRD_WIN_DWORD window_style = GRD_WIN_WS_CAPTION | GRD_WIN_WS_SYSMENU | GRD_WIN_WS_THICKFRAME | GRD_WIN_WS_MINIMIZEBOX | GRD_WIN_WS_MAXIMIZEBOX;
+	AdjustWindowRect(&window_rect, window_style, false);
+
+	window->utf16_title = (wchar_t*) grd_encode_utf16(params.title).data;
 	window->hwnd = CreateWindowExW(
-		WS_EX_APPWINDOW,
+		GRD_WIN_WS_EX_APPWINDOW,
 		grd_windows_get_window_class(),
 		window->utf16_title,
 		window_style,
@@ -74,7 +76,7 @@ GRD_DEDUP GrdTuple<GrdWindowsWindow*, GrdError*> grd_os_create_window(GrdWindowP
 		window_rect.bottom - window_rect.top,
 		NULL,   
 		NULL,
-		GetModuleHandle(NULL),
+		GetModuleHandleA(NULL),
 		window
 	);
 
@@ -84,22 +86,22 @@ GRD_DEDUP GrdTuple<GrdWindowsWindow*, GrdError*> grd_os_create_window(GrdWindowP
 		return { NULL, grd_windows_error() };
 	}
 
-	ShowWindow(window->hwnd, SW_SHOWDEFAULT);
+	ShowWindow(window->hwnd, GRD_WIN_SW_SHOWDEFAULT);
 	SetForegroundWindow(window->hwnd);
 	return { window, NULL };
 }
 
-GRD_DEDUP LRESULT grd_wnd_proc(HWND h, UINT m, WPARAM wParam, LPARAM lParam) {
-	auto window = (GrdWindowsWindow*) GetWindowLongPtrW(h, GWLP_USERDATA);
+GRD_DEDUP GRD_WIN_LRESULT grd_wnd_proc(GRD_WIN_HWND h, GRD_WIN_UINT m, GRD_WIN_WPARAM wParam, GRD_WIN_LPARAM lParam) {
+	auto window = (GrdWindowsWindow*) GetWindowLongPtrW(h, GRD_WIN_GWLP_USERDATA);
 
 	switch (m) {
-		case WM_NCHITTEST: {
+		case GRD_WIN_WM_NCHITTEST: {
 			if (!window->params.borderless) {
 				return DefWindowProcW(h, m, wParam, lParam);
 			}
 
-			POINT ptMouse = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
-			POINT ptMouseWindowLocal = ptMouse;
+			GRD_WIN_POINT ptMouse = { GRD_WIN_GET_X_LPARAM(lParam), GRD_WIN_GET_Y_LPARAM(lParam) };
+			GRD_WIN_POINT ptMouseWindowLocal = ptMouse;
 			ScreenToClient(h, &ptMouseWindowLocal);
 
 			int LEFTEXTENDWIDTH = 8;
@@ -107,18 +109,18 @@ GRD_DEDUP LRESULT grd_wnd_proc(HWND h, UINT m, WPARAM wParam, LPARAM lParam) {
 			int BOTTOMEXTENDWIDTH = 8;
 			int TOPEXTENDWIDTH = 8; // @TODO: is this correct??
 
-			if (IsMaximized(h)) {
+			if (GRD_WIN_IS_MAXIMIZED(h)) {
 				TOPEXTENDWIDTH += 8;
 			}
 
 			// Get the window rectangle.
-			RECT rcWindow;
+			GRD_WIN_RECT rcWindow;
 			GetWindowRect(h, &rcWindow);
 
 			// Determine if the hit test is for resizing. Default middle (1,1).
-			USHORT row = 1;
-			USHORT column = 1;
-			bool   on_top_resize_border = false;
+			u16  row = 1;
+			u16  column = 1;
+			bool on_top_resize_border = false;
 
 			// Determine if the point is at the top or bottom of the window.
 			if (ptMouse.y >= rcWindow.top && ptMouse.y < rcWindow.top + TOPEXTENDWIDTH) {
@@ -137,41 +139,41 @@ GRD_DEDUP LRESULT grd_wnd_proc(HWND h, UINT m, WPARAM wParam, LPARAM lParam) {
 
 			if (IsMaximized(h)) {
 				if (row > 0) {
-					return HTCLIENT;
+					return GRD_WIN_HTCLIENT;
 				}
 				if (column != 1) {
-					return HTCLIENT;
+					return GRD_WIN_HTCLIENT;
 				}
-				return HTCAPTION;
+				return GRD_WIN_HTCAPTION;
 			}
 
-			LRESULT hit_tests[3][3] = {
-				{ HTTOPLEFT,    on_top_resize_border ? HTTOP : HTCAPTION, HTTOPRIGHT },
-				{ HTLEFT,       HTCLIENT, HTRIGHT },
-				{ HTBOTTOMLEFT, HTBOTTOM, HTBOTTOMRIGHT },
+			GRD_WIN_LRESULT hit_tests[3][3] = {
+				{ GRD_WIN_HTTOPLEFT,    on_top_resize_border ? GRD_WIN_HTTOP : GRD_WIN_HTCAPTION, GRD_WIN_HTTOPRIGHT },
+				{ GRD_WIN_HTLEFT,       GRD_WIN_HTCLIENT, GRD_WIN_HTRIGHT },
+				{ GRD_WIN_HTBOTTOMLEFT, GRD_WIN_HTBOTTOM, GRD_WIN_HTBOTTOMRIGHT },
 			};
 			return hit_tests[row][column];
 		}
 		break;
 
-		case WM_NCCREATE: {
-			CREATESTRUCTW* createstruct = (CREATESTRUCTW*) lParam;
-			SetWindowLongPtrW(h, GWLP_USERDATA, (LONG_PTR) createstruct->lpCreateParams);
+		case GRD_WIN_WM_NCCREATE: {
+			auto* createstruct = (GRD_WIN_CREATESTRUCTW*) lParam;
+			SetWindowLongPtrW(h, GRD_WIN_GWLP_USERDATA, (GRD_WIN_LONG_PTR) createstruct->lpCreateParams);
 			return DefWindowProcW(h, m, wParam, lParam);
 		}
 		break;
 		
-		case WM_NCCALCSIZE: {
+		case GRD_WIN_WM_NCCALCSIZE: {
 			if (window->params.borderless) {
 				if (IsMaximized(h)) {
-					NCCALCSIZE_PARAMS* pncsp = reinterpret_cast<NCCALCSIZE_PARAMS*>(lParam);
+					auto* pncsp = reinterpret_cast<GRD_WIN_NCCALCSIZE_PARAMS*>(lParam);
 					union {
-						LPARAM lparam;
-						RECT* rect;
+						GRD_WIN_LPARAM lparam;
+						GRD_WIN_RECT* rect;
 					} params = { .lparam = lParam };
-					RECT nonclient = *params.rect;
-					DefWindowProcW(h, WM_NCCALCSIZE, wParam, lParam);
-					RECT client = *params.rect;
+					GRD_WIN_RECT nonclient = *params.rect;
+					DefWindowProcW(h, GRD_WIN_WM_NCCALCSIZE, wParam, lParam);
+					GRD_WIN_RECT client = *params.rect;
 					pncsp->rgrc[0] = nonclient;
 					pncsp->rgrc[0].top    += 8;
 					pncsp->rgrc[0].bottom -= 8;
@@ -182,8 +184,8 @@ GRD_DEDUP LRESULT grd_wnd_proc(HWND h, UINT m, WPARAM wParam, LPARAM lParam) {
 					int m_ncBottom = -8;
 					int m_ncLeft = -8;
 					int m_ncRight = -8;
-					if (wParam == TRUE) {
-						NCCALCSIZE_PARAMS* params = (NCCALCSIZE_PARAMS*)lParam;
+					if (wParam == 1) {
+						auto* params = (GRD_WIN_NCCALCSIZE_PARAMS*)lParam;
 						params->rgrc[0].top    -= m_ncTop;
 						params->rgrc[0].bottom += m_ncBottom;
 						params->rgrc[0].left   -= m_ncLeft;
@@ -195,9 +197,9 @@ GRD_DEDUP LRESULT grd_wnd_proc(HWND h, UINT m, WPARAM wParam, LPARAM lParam) {
 			}
 		}
 		break;
-		case WM_GETMINMAXINFO: {
+		case GRD_WIN_WM_GETMINMAXINFO: {
 			window = GRD_WINDOWS_GETMINMAXINFO_WINDOW_POINTER;
-			LPMINMAXINFO lpMMI = (LPMINMAXINFO) lParam;
+			auto* lpMMI = (GRD_WIN_MINMAXINFO*) lParam;
 			lpMMI->ptMinTrackSize.x = window->params.min_size.x;
 			lpMMI->ptMinTrackSize.y = window->params.min_size.y;
 		}
@@ -213,38 +215,38 @@ GRD_DEDUP LRESULT grd_wnd_proc(HWND h, UINT m, WPARAM wParam, LPARAM lParam) {
 	return DefWindowProcW(h, m, wParam, lParam);
 }
 
-GRD_DEDUP f64 grd_get_windows_time_from_start(DWORD message_time) {
+GRD_DEDUP f64 grd_get_windows_time_from_start(GRD_WIN_DWORD message_time) {
 	u64 time = GetTickCount64();
 	// Adjust the lower bits.
 	*((u32*) &time) = message_time;
 	return ((f64) time) / 1000.0;
 }
 
-GRD_DEDUP void grd_push_windows_window_event(GrdWindowsWindow* window, WindowEvent* event, GrdOptional<DWORD> custom_time = {}) {
+GRD_DEDUP void grd_push_windows_window_event(GrdWindowsWindow* window, GrdWindowEvent* event, GrdOptional<GRD_WIN_DWORD> custom_time = {}) {
 	// GetMessageTime() is like GetTickCount(), but casted to LONG instead of DWORD.
-	auto time = custom_time.has_value ? custom_time.value : grd_bitcast<DWORD>(GetMessageTime());
+	auto time = custom_time.has_value ? custom_time.value : grd_bitcast<GRD_WIN_DWORD>(GetMessageTime());
 	event->time_from_system_start = grd_get_windows_time_from_start(time);
 	grd_add(&window->events, event);
 }
 
-GRD_DEDUP GrdPointerButtonFlags grd_wparam_to_pointer_buttons(WPARAM wParam) {
+GRD_DEDUP GrdPointerButtonFlags grd_wparam_to_pointer_buttons(GRD_WIN_WPARAM wParam) {
 	u64 buttons = 0;
-	if (wParam & MK_LBUTTON)  buttons |= 1 << 0;
-	if (wParam & MK_RBUTTON)  buttons |= 1 << 1;
-	if (wParam & MK_MBUTTON)  buttons |= 1 << 2;
-	if (wParam & MK_XBUTTON1) buttons |= 1 << 3;
-	if (wParam & MK_XBUTTON2) buttons |= 1 << 4;
+	if (wParam & GRD_WIN_MK_LBUTTON)  buttons |= 1 << 0;
+	if (wParam & GRD_WIN_MK_RBUTTON)  buttons |= 1 << 1;
+	if (wParam & GRD_WIN_MK_MBUTTON)  buttons |= 1 << 2;
+	if (wParam & GRD_WIN_MK_XBUTTON1) buttons |= 1 << 3;
+	if (wParam & GRD_WIN_MK_XBUTTON2) buttons |= 1 << 4;
 	return (GrdPointerButtonFlags) buttons;
 }
 
-GRD_DEDUP GrdVector2 grd_convert_windows_coords(HWND hwnd, POINT p) {
-	RECT window_rect;
+GRD_DEDUP GrdVector2 grd_convert_windows_coords(GRD_WIN_HWND hwnd, GRD_WIN_POINT p) {
+	GRD_WIN_RECT window_rect;
 	GetWindowRect(hwnd, &window_rect);
-	return grd_make_vector2(p.x, window_rect.bottom - p.y);
+	return GrdVector2 { (f64) p.x, (f64) (window_rect.bottom - p.y) };
 }
 
-GRD_DEDUP void grd_push_windows_mouse_button_event(GrdWindowsWindow* window, WPARAM wParam, LPARAM lParam, GrdPointerAction action, GrdPointerButtonFlags button) {
-	POINT p = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
+GRD_DEDUP void grd_push_windows_mouse_button_event(GrdWindowsWindow* window, GRD_WIN_WPARAM wParam, GRD_WIN_LPARAM lParam, GrdPointerAction action, GrdPointerButtonFlags button) {
+	GRD_WIN_POINT p = { GRD_WIN_GET_X_LPARAM(lParam), GRD_WIN_GET_Y_LPARAM(lParam) };
 	GrdPointer pointer = {
 		.id       = grd_map_os_mouse_to_pointer_id(&window->os_pointer_mapper),
 		.kind     = GrdPointerKind::Mouse,
@@ -258,30 +260,30 @@ GRD_DEDUP void grd_push_windows_mouse_button_event(GrdWindowsWindow* window, WPA
 	grd_push_windows_window_event(window, event);
 }
 
-GRD_DEDUP LRESULT grd_read_event_wnd_proc(GrdWindowsWindow* window, HWND h, UINT m, WPARAM wParam, LPARAM lParam) {
+GRD_DEDUP GRD_WIN_LRESULT grd_read_event_wnd_proc(GrdWindowsWindow* window, GRD_WIN_HWND h, GRD_WIN_UINT m, GRD_WIN_WPARAM wParam, GRD_WIN_LPARAM lParam) {
 	switch (m) {
-		case WM_ACTIVATE: {
-			auto event = grd_make_event<FocusEvent>();
-			event->have_focus = LOWORD(wParam) != 0;
+		case GRD_WIN_WM_ACTIVATE: {
+			auto event = grd_make_event<GrdFocusEvent>();
+			event->have_focus = GRD_WIN_LOWORD(wParam) != 0;
 			grd_push_windows_window_event(window, event);
 		}
 		break;
 
-		case WM_CHAR: {
+		case GRD_WIN_WM_CHAR: {
 			if (wParam < 32) {
 				return true;
 			}
 
 			switch (wParam) {
-				case VK_BACK:
-				case VK_TAB:
-				case VK_RETURN:
-				case VK_ESCAPE:
+				case GRD_WIN_VK_BACK:
+				case GRD_WIN_VK_TAB:
+				case GRD_WIN_VK_RETURN:
+				case GRD_WIN_VK_ESCAPE:
 				case 127: // Ctrl + backspace
 					return true;
 			}
 
-			if (IS_HIGH_SURROGATE(wParam)) {
+			if (GRD_WIN_IS_HIGH_SURROGATE(wParam)) {
 				window->wm_char_high_surrogate = wParam;
 				return 0;
 			}
@@ -294,7 +296,7 @@ GRD_DEDUP LRESULT grd_read_event_wnd_proc(GrdWindowsWindow* window, HWND h, UINT
 			} else {
 				c = (char32_t) wParam;
 			}
-			auto event = grd_make_event<CharEvent>();
+			auto event = grd_make_event<GrdCharEvent>();
 			event->character = c;
 			grd_push_windows_window_event(window, event);
 
@@ -302,27 +304,27 @@ GRD_DEDUP LRESULT grd_read_event_wnd_proc(GrdWindowsWindow* window, HWND h, UINT
 		}
 		break;
 
-		case WM_KEYUP:
-		case WM_SYSKEYUP:
-		case WM_KEYDOWN:
-		case WM_SYSKEYDOWN: {
-			auto event = grd_make_event<KeyEvent>();
-			event->action = (m == WM_KEYDOWN || m == WM_SYSKEYDOWN) ? KeyAction::Down : KeyAction::Up;
-			event->key = map_windows_key(wParam, lParam);
+		case GRD_WIN_WM_KEYUP:
+		case GRD_WIN_WM_SYSKEYUP:
+		case GRD_WIN_WM_KEYDOWN:
+		case GRD_WIN_WM_SYSKEYDOWN: {
+			auto event = grd_make_event<GrdKeyEvent>();
+			event->action = (m == GRD_WIN_WM_KEYDOWN || m == GRD_WIN_WM_SYSKEYDOWN) ? GrdKeyAction::Down : GrdKeyAction::Up;
+			event->key = grd_map_windows_key(wParam, lParam);
 			event->os_key_code = wParam;
 			grd_push_windows_window_event(window, event);
 		}
 		break;
 
-		case WM_MOUSEWHEEL: {
-			s32 int_delta   =     -GET_WHEEL_DELTA_WPARAM(wParam)  /     WHEEL_DELTA;
-			f32 float_delta = f32(-GET_WHEEL_DELTA_WPARAM(wParam)) / f32(WHEEL_DELTA);
+		case GRD_WIN_WM_MOUSEWHEEL: {
+			s32 int_delta   =     -GRD_WIN_GET_WHEEL_DELTA_WPARAM(wParam)  /     GRD_WIN_WHEEL_DELTA;
+			f32 float_delta = f32(-GRD_WIN_GET_WHEEL_DELTA_WPARAM(wParam)) / f32(GRD_WIN_WHEEL_DELTA);
 
 			// WM_MOUSEWHEEL has screen relative coords, unlike WM_LBUTTONDOWN for example, which has client relative coords.
-			POINT p = { .x = GET_X_LPARAM(lParam), .y = GET_Y_LPARAM(lParam) };
+			GRD_WIN_POINT p = { .x = GRD_WIN_GET_X_LPARAM(lParam), .y = GRD_WIN_GET_Y_LPARAM(lParam) };
 			ScreenToClient(window->hwnd, &p);
 
-			Pointer pointer = {
+			GrdPointer pointer = {
 				.id = grd_map_os_mouse_to_pointer_id(&window->os_pointer_mapper),
 				.kind = GrdPointerKind::Mouse,
 				.position = grd_convert_windows_coords(window->hwnd, p),
@@ -338,22 +340,22 @@ GRD_DEDUP LRESULT grd_read_event_wnd_proc(GrdWindowsWindow* window, HWND h, UINT
 		}
 		break;
 
-		case WM_MOUSEMOVE: {
+		case GRD_WIN_WM_MOUSEMOVE: {
 			// https://developer.blender.org/rBd5c59913de95b6b6952088f175a8393bef376d27
 			// This link helped to correct the initial code.
 			
-			POINT p = { .x = GET_X_LPARAM(lParam), .y = GET_Y_LPARAM(lParam) };
+			GRD_WIN_POINT p = { .x = GRD_WIN_GET_X_LPARAM(lParam), .y = GRD_WIN_GET_Y_LPARAM(lParam) };
 			ClientToScreen(window->hwnd, &p);
 
-			MOUSEMOVEPOINT current_point = {
+			GRD_WIN_MOUSEMOVEPOINT current_point = {
 				.x    = p.x,
 				.y    = p.y,
-				.time = grd_bitcast<DWORD>(GetMessageTime()),
+				.time = grd_bitcast<GRD_WIN_DWORD>(GetMessageTime()),
 			};
 
-			MOUSEMOVEPOINT points[65]; // 64 + 1 (+1 for the current_point)
+			GRD_WIN_MOUSEMOVEPOINT points[65]; // 64 + 1 (+1 for the current_point)
 
-			int count = GetMouseMovePointsEx(sizeof(MOUSEMOVEPOINT), &current_point, points, 64, GMMP_USE_DISPLAY_POINTS);
+			int count = GetMouseMovePointsEx(sizeof(GRD_WIN_MOUSEMOVEPOINT), &current_point, points, 64, GRD_WIN_GMMP_USE_DISPLAY_POINTS);
 			int i = 0;
 			while (i < count) {
 				if (points[i].x > 32767) points[i].x -= 65536;
@@ -375,9 +377,9 @@ GRD_DEDUP LRESULT grd_read_event_wnd_proc(GrdWindowsWindow* window, HWND h, UINT
 			i += 1;
 
 			while (--i >= 0) {
-				POINT p = { .x = points[i].x, .y = points[i].y };
+				GRD_WIN_POINT p = { .x = points[i].x, .y = points[i].y };
 				ScreenToClient(window->hwnd, &p);
-				Pointer pointer = {
+				GrdPointer pointer = {
 					.id       = grd_map_os_mouse_to_pointer_id(&window->os_pointer_mapper),
 					.kind     = GrdPointerKind::Mouse,
 					.position = grd_convert_windows_coords(window->hwnd, p),
@@ -393,19 +395,31 @@ GRD_DEDUP LRESULT grd_read_event_wnd_proc(GrdWindowsWindow* window, HWND h, UINT
 		}
 		break;
 
-		case WM_LBUTTONDOWN: grd_push_windows_mouse_button_event(window, wParam, lParam, GrdPointerAction::Down, GRD_POINTER_BUTTON_MOUSE_LEFT); break;
-		case WM_RBUTTONDOWN: grd_push_windows_mouse_button_event(window, wParam, lParam, GrdPointerAction::Down, GRD_POINTER_BUTTON_MOUSE_RIGHT); break;
-		case WM_MBUTTONDOWN: grd_push_windows_mouse_button_event(window, wParam, lParam, GrdPointerAction::Down, GRD_POINTER_BUTTON_MOUSE_MIDDLE); break;
-		case WM_LBUTTONUP:
-		case WM_NCLBUTTONUP: grd_push_windows_mouse_button_event(window, wParam, lParam, GrdPointerAction::Up, GRD_POINTER_BUTTON_MOUSE_LEFT); break;
-		case WM_RBUTTONUP:
-		case WM_NCRBUTTONUP: grd_push_windows_mouse_button_event(window, wParam, lParam, GrdPointerAction::Up, GRD_POINTER_BUTTON_MOUSE_RIGHT); break;
-		case WM_MBUTTONUP:
-		case WM_NCMBUTTONUP: grd_push_windows_mouse_button_event(window, wParam, lParam, GrdPointerAction::Up, GRD_POINTER_BUTTON_MOUSE_MIDDLE); break;
+		case GRD_WIN_WM_LBUTTONDOWN:
+			grd_push_windows_mouse_button_event(window, wParam, lParam, GrdPointerAction::Down, GRD_POINTER_BUTTON_MOUSE_LEFT);
+			break;
+		case GRD_WIN_WM_RBUTTONDOWN:
+			grd_push_windows_mouse_button_event(window, wParam, lParam, GrdPointerAction::Down, GRD_POINTER_BUTTON_MOUSE_RIGHT);
+			break;
+		case GRD_WIN_WM_MBUTTONDOWN:
+			grd_push_windows_mouse_button_event(window, wParam, lParam, GrdPointerAction::Down, GRD_POINTER_BUTTON_MOUSE_MIDDLE);
+			break;
+		case GRD_WIN_WM_LBUTTONUP:
+		case GRD_WIN_WM_NCLBUTTONUP:
+			grd_push_windows_mouse_button_event(window, wParam, lParam, GrdPointerAction::Up, GRD_POINTER_BUTTON_MOUSE_LEFT);
+			break;
+		case GRD_WIN_WM_RBUTTONUP:
+		case GRD_WIN_WM_NCRBUTTONUP:
+			grd_push_windows_mouse_button_event(window, wParam, lParam, GrdPointerAction::Up, GRD_POINTER_BUTTON_MOUSE_RIGHT);
+			break;
+		case GRD_WIN_WM_MBUTTONUP:
+		case GRD_WIN_WM_NCMBUTTONUP:
+			grd_push_windows_mouse_button_event(window, wParam, lParam, GrdPointerAction::Up, GRD_POINTER_BUTTON_MOUSE_MIDDLE);
+			break;
 
-		case WM_DESTROY:
-		case WM_CLOSE: {
-			auto event = grd_make_event<WindowCloseEvent>();
+		case GRD_WIN_WM_DESTROY:
+		case GRD_WIN_WM_CLOSE: {
+			auto event = grd_make_event<GrdWindowCloseEvent>();
 			grd_push_windows_window_event(window, event);
 		}
 		break;
@@ -414,19 +428,33 @@ GRD_DEDUP LRESULT grd_read_event_wnd_proc(GrdWindowsWindow* window, HWND h, UINT
 	return DefWindowProcW(h, m, wParam, lParam);
 }
 
-// @TODO: Add a check that grd_makes sure that this function is called from the same thread that created the window, because Windows requires that.
-//   And the check must be present on all OSs (not Windows only) for consistency.
-GRD_DEDUP GrdArray<Event*> grd_os_read_window_events(GrdWindowsWindow* window) {
-	GrdScopedRestore(window->wnd_proc);
-	window->wnd_proc = grd_read_event_wnd_proc;
+GRD_DEDUP GrdArray<GrdEvent*> grd_os_read_window_events(GrdWindow* window) {
+	auto x = grd_reflect_cast<GrdWindowsWindow>(window);
+	if (!x) {
+		return {};
+	}
+	GrdScopedRestore(x->wnd_proc);
+	x->wnd_proc = grd_read_event_wnd_proc;
 
-	MSG msg;
-	while (PeekMessageW(&msg, window->hwnd, 0, 0, PM_REMOVE)) {
+	GRD_WIN_MSG msg;
+	while (PeekMessageW(&msg, x->hwnd, 0, 0, GRD_WIN_PM_REMOVE)) {
 		TranslateMessage(&msg);
 		DispatchMessageW(&msg);
 	}
 
-	auto result = window->events;
-	window->events = { .allocator = result.allocator };
+	auto result = x->events;
+	x->events = { .allocator = result.allocator };
 	return result;
+}
+
+GRD_DEF grd_os_close_window(GrdWindow* window) {
+	auto x = grd_reflect_cast<GrdWindowsWindow>(window);
+	if (!x) {
+		return;
+	}
+	for (auto event: x->events) {
+		event->free();
+	}
+	x->os_pointer_mapper.free();
+	DestroyWindow(x->hwnd);
 }

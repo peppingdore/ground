@@ -4,6 +4,7 @@
 #include "../grd_scoped.h"
 #include "../math/grd_vector.h"
 #include "../grd_error.h"
+#include "../grd_log.h"
 #include "grd_event.h"
 
 struct GrdWindowParams {
@@ -16,6 +17,7 @@ struct GrdWindowParams {
 struct GrdWindow {
 	GrdType*        type;
 	GrdWindowParams params;
+	GrdThreadId     owner_thread_id;
 };
 
 struct GrdWindowEvent: GrdEvent {
@@ -72,4 +74,20 @@ struct GrdWindowCloseEvent: GrdWindowEvent {
 };
 GRD_REFLECT(GrdWindowCloseEvent) {
 	GRD_BASE_TYPE(GrdWindowEvent);
+}
+
+GRD_DEF grd_init_window(GrdWindow* window, GrdWindowParams params, GrdType* tp) {
+	window->params = params;
+	window->owner_thread_id = grd_current_thread_id();
+	window->type = tp;
+}
+
+GRD_DEF grd_os_read_window_events(GrdWindow* window) -> GrdArray<GrdEvent*>;
+
+GRD_DEF grd_read_window_events(GrdWindow* window) -> GrdArray<GrdEvent*> {
+	if (window->owner_thread_id != grd_current_thread_id()) {
+		GrdLogWithInfo({ .level = GrdLogLevel::Warning }, "grd_read_window_events(), is called from a different thread than the window owner.");
+		return {};
+	}
+	return grd_os_read_window_events(window);
 }

@@ -4,7 +4,7 @@
 #include "../math/grd_vector.h"
 #include "../grd_hash_map.h"
 #include "grd_event.h"
-#include "grd_window_interface.h"
+#include "grd_window_base.h"
 
 enum class GrdPointerAction: s32 {
 	Down   = 0,

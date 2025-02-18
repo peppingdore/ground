@@ -1059,14 +1059,14 @@
 	X(_WM_RASDIALEVENT, 0xcccd)\
 
 #pragma push_macro("X")
-enum class GrdWindowsMessageCode {
-	#define X(name, code) name = code,
+enum GrdWindowsMessageCode {
+	#define X(name, code) GRD_WIN##name = code,
 	GRD_WINDOWS_MESSAGE_CODE_LIST
 	#undef X
 };
 
 GRD_REFLECT(GrdWindowsMessageCode) {
-	#define X(name, code) GRD_ENUM_VALUE(name);
+	#define X(name, code) GRD_ENUM_VALUE(GRD_WIN##name);
 	GRD_WINDOWS_MESSAGE_CODE_LIST
 	#undef X
 }
