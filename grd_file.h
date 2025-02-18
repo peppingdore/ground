@@ -35,27 +35,27 @@ GRD_DEDUP GrdFile grd_file_from_native_handle(GrdNativeFileHandle handle) {
 GRD_DEDUP GrdTuple<GrdFile, GrdError*> grd_open_file(GrdUnicodeString path, GrdOpenFileFlag flags = GRD_FILE_READ, u32 unix_perm=0777/*ignored*/) {
 	int windows_flags = 0;
 	if (flags & GRD_FILE_READ) {
-		windows_flags |= GENERIC_READ;
+		windows_flags |= GRD_WIN_GENERIC_READ;
 	}
 	if (flags & GRD_FILE_WRITE) {
-		windows_flags |= GENERIC_WRITE;
+		windows_flags |= GRD_WIN_GENERIC_WRITE;
 	}
 	if (windows_flags == 0) {
 		return { {}, grd_make_error("flags must contain at least one of FILE_READ/FILE_WRITE") };
 	}
 
-	int creation_disposition = (flags & GRD_FILE_CREATE_NEW) ? CREATE_ALWAYS : OPEN_EXISTING;
+	int creation_disposition = (flags & GRD_FILE_CREATE_NEW) ? GRD_WIN_CREATE_ALWAYS : GRD_WIN_OPEN_EXISTING;
 
 	auto wide = grd_encode_utf16(path);
 	grd_defer { wide.free(); };
 
-	GRD_WIN_HANDLE handle = CreateFileW((wchar_t*) wide.data, windows_flags, FILE_SHARE_READ, NULL, creation_disposition, FILE_ATTRIBUTE_NORMAL, NULL);
-	if (handle == INVALID_HANDLE_VALUE) {
+	GRD_WIN_HANDLE handle = CreateFileW((wchar_t*) wide.data, windows_flags, GRD_WIN_FILE_SHARE_READ, NULL, creation_disposition, GRD_WIN_FILE_ATTRIBUTE_NORMAL, NULL);
+	if (handle == GRD_WIN_INVALID_HANDLE_VALUE) {
 		return { {}, grd_windows_error() };
 	}
 
 	if (flags & GRD_FILE_APPEND) {
-		SetFilePointer(handle, 0, NULL, FILE_END);
+		SetFilePointer(handle, 0, NULL, GRD_WIN_FILE_END);
 	}
 	return { grd_file_from_native_handle(handle), NULL };
 }
@@ -76,7 +76,7 @@ GRD_DEDUP GrdTuple<s64, GrdError*> grd_os_read_file(GrdFile* file, void* buf, s6
 	GRD_WIN_DWORD read;
 	GRD_WIN_BOOL  result = ReadFile(file->handle, buf, to_read, &read, NULL);
 	if (!result) {
-		if (GetLastError() == ERROR_HANDLE_EOF) {
+		if (GetLastError() == GRD_WIN_ERROR_HANDLE_EOF) {
 			return { 0, NULL };
 		}
 		return { -1, grd_windows_error() };
@@ -226,14 +226,14 @@ GRD_DEDUP GrdError* write_string_to_file(GrdString str, GrdUnicodeString path) {
 
 GRD_DEF grd_iterate_folder(GrdUnicodeString path) -> GrdGenerator<GrdTuple<GrdError*, GrdAllocatedUnicodeString>> {
 #if GRD_OS_WINDOWS
-	WIN32_FIND_DATAW findFileData;
-	GRD_WIN_HANDLE hFind = INVALID_HANDLE_VALUE;
+	GRD_WIN_WIN32_FIND_DATAW findFileData;
+	GRD_WIN_HANDLE hFind = GRD_WIN_INVALID_HANDLE_VALUE;
 	auto wide_path = grd_encode_utf16(path);
 	grd_add(&wide_path, u"/*\0"_b);
 	grd_defer_x(wide_path.free());
 	hFind = FindFirstFileW((wchar_t*) wide_path.data, &findFileData);
 	grd_defer_x(FindClose(hFind));
-	if (hFind == INVALID_HANDLE_VALUE) {
+	if (hFind == GRD_WIN_INVALID_HANDLE_VALUE) {
 		co_yield { grd_windows_error() };
 		co_return;
 	}
